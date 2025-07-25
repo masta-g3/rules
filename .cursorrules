@@ -48,7 +48,7 @@ The following instructions apply when working with python. Ignore for JS or any 
   * Avoid complexity - you should leave the codebase simpler and more organized when you finished your work.
   * Comments should be direct and clear; avoid changelogs and obvious stuff.
   * Don't fail silently; avoid try/except and similar unless really needed.
-<Minimalist Design Philosophy>
+</Minimalist Design Philosophy>
 
 <Reviewing and Logging Changes>
 - When possible test functions without triggering external effects (e.g., avoid database writes, unintended file modifications).
