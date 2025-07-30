@@ -56,3 +56,16 @@ The following instructions apply when working with python. Ignore for JS or any 
 - After you are done with the work update STRUCTURE.md when needed (e.g.: new files added, deleted, etc.).
 - Also update CHANGES.md if the initial objective / feature deviated from what you ended up implementing.
 </Reviewing and Logging Changes>
+
+<Generating Documentation>
+- Create multi-layered documentation: start with high-level overview, then architecture, then implementation details.
+- Lead with visual diagrams (prefer Mermaid) to explain system flows, component relationships, and data structures before diving into text.
+- Document the "why" behind design decisions, not just the "what" - explain trade-offs, constraints, and strategic context.
+- When relevant include real performance metrics, actual usage patterns, and concrete examples rather than theoretical descriptions.
+- Structure with essential sections: Overview, Architecture, Component Breakdown, Data Flow, Integration Points, Performance Characteristics.
+- Focus on information that can't be derived from reading code - avoid restating obvious implementation details.
+- Keep examples realistic and working - include expected inputs/outputs and error handling scenarios.
+- Write for developers who will maintain the code 6 months from now - explain non-obvious decisions and edge cases.
+- Place documentation close to the code it describes, maintain consistent terminology, and update docs when code changes.
+- Avoid over-documenting self-explanatory utilities, but always document major features, complex algorithms, integration points, and performance-critical paths.
+</Generating Documentation>
