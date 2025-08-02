@@ -1,72 +1,70 @@
 <Codebase Structure>
-- Look at STRUCTURE.md to understand how the project is organized.
-- Always check your current directory before creating a new file or doing operations in the terminal.
-- Carefully consider function responsibilities and place them in appropriate utils/ scripts based on their purpose (e.g., data processing functions in data_utils.py, formatting functions in format_utils.py, etc.).
-- Keep STRUCTURE.md up to date by reporting any new files or content in the repository.
+- Check STRUCTURE.md to understand project organization
+- Always verify current directory before creating files or terminal operations
+- Place functions in appropriate utils/ scripts by purpose (data_utils.py, format_utils.py, etc.)
+- Keep STRUCTURE.md updated with new files or content
 </Codebase Structure>
 
 <Coding Style>
-- Prioritize minimalism. Clean, readable, lightweight and modular code is always desirable; avoid corporate bloat at all costs.
-- When working on an existing codebase, do not introduce new patterns or technologies unless strictly needed.
-- Study related functions in the same script when creating new ones to maintain consistent patterns and coding style.
-- Avoid thin wrappers.
-- Make minimal, non-disruptive changes that adhere to existing code structure and style.
-- Avoid ad-hoc patches; think how the code needs to be updated to maintain a consistent and generalizable structure.
-- Avoid duplication of code, which means checking for other areas of the codebase that might already have similar code and functionality.
-- Avoid adding comments related to 'changelogs', or indications of 'new' features, and so on (the code will keep evolving and no one would clean up these messages).
-- When updating functions do not rename them to 'enhanced', 'new' or similar if not needed; keep names direct and simple.
+- Prioritize minimalism: clean, readable, lightweight, modular code; avoid corporate bloat at all costs
+- Don't introduce new patterns/technologies unless strictly needed
+- Study existing functions to maintain consistent patterns and style
+- Avoid thin wrappers and ad-hoc patches
+- Make minimal, non-disruptive changes that follow existing structure
+- Check for existing similar code to avoid duplication
+- Keep function names direct and simple (no 'enhanced', 'new' prefixes)
+- No changelog comments or 'new feature' indicators
 </Coding Style>
 
 <Python Specific Coding Style>
-The following instructions apply when working with python. Ignore for JS or any other language.
-- Docstrings should generally be a single line explaining functionality. Avoid args or returns.
-- Use "##" when adding comments, as opposed to a single "#" (used to comment-out lines). Use proper case and correct punctuation.
-- Avoid try-except blocks except when dealing with minor procesing failures; we don't want processes to fail silently.
-- When possible, centralize all imports at the top of the script.
+- Single-line docstrings explaining functionality (skip args/returns)
+- Use "##" for comments, "#" for commenting out code
+- Avoid try-except except for minor processing failures; we don't want processes to fail silently
+- Centralize imports at script top
 </Python Specific Coding Style>
 
 <Step-by-Step Instructions (PLANNING.md)>
-- If the request is complex or requires multiple steps, use PLANNING.md:
-    1. Create a new section (# Header) for the project you will be working on.
-    2. Brainstorm on what is needed to solve the problem.
-        a) If you are debugging an issue, reflect on possible sources of the problem, distill those into the most likely ones, and validate your assumptions before implementing any fix.
-        b) If you are developing a new feature inspect how the rest of the class / script works to avoid producing duplicate/redundant code, and maintain a consistent style.
-        c) Consider different alternatives before making major architectural changes or developments. Prioritize versions that align with our current code style, that are modular, lightweight, clean, and lean (avoid corporate bloat).
-    3. Write out all steps needed to complete the task [ ].
-    4. Iterate carefully over the work. Mark completed steps with [x] as you make progress.
-- Clear up PLANNING.md before signing off (ie remove the fully completed section), leaving instead a brief summary of changes on CHANGES.md. Do no clear up content if we have tasks that are pending and have not been completed, and do not remove plans from other sections (these are from other people working on the project). You can update the plan as you make progress if that makes sense.
+For complex requests:
+1. Create new section (# Header) in PLANNING.md
+2. Brainstorm solution approach:
+   - Debugging: identify likely problem sources, validate assumptions
+   - New features: inspect existing code patterns, avoid duplication
+   - Consider alternatives that align with current style (modular, lightweight, clean, avoid corporate bloat)
+3. Write out all steps needed [ ]
+4. Mark completed steps [x] as you progress
+- Clear completed sections from PLANNING.md, summarize in CHANGES.md
+- Keep pending tasks and others' plans intact
 </Step-by-Step Instructions (PLANNING.md)>
 
 <Minimalist Design Philosophy>
-- We are working at a lean startup, mantained by a pair of 10x engineers, not a large corporation. Be sure to code accordingly.
-- Follow these design principles:
-  * Less is more, elegance is clarity.
-  * Avoid useless boilerplate code, be minimal and efficient.
-  * Make components modular and reusable.
-  * Reuse as much as possible, and when creating follow existing styles and patterns.
-  * Prioritize clean and organized.
-  * Avoid complexity - you should leave the codebase simpler and more organized when you finished your work.
-  * Comments should be direct and clear; avoid changelogs and obvious stuff.
-  * Don't fail silently; avoid try/except and similar unless really needed.
-  * Avoid implementing backward compatibility of implementing defaults that are not requested by the user.
+We are working at a lean startup, maintained by 10x engineers, not a large corporation. Code accordingly:
+- Less is more, elegance is clarity
+- Avoid useless boilerplate code, be minimal and efficient
+- Make components modular and reusable
+- Follow existing styles and patterns
+- Leave codebase simpler and more organized
+- Skip redundant validations unless failure has real consequences
+- Let errors surface naturally; avoid blanket try/except (especially "pass") that hides bugs
+- No backward compatibility or defaults unless requested
+- Comment only non-obvious logic
 </Minimalist Design Philosophy>
 
 <Reviewing and Logging Changes>
-- When possible test functions without triggering external effects (e.g., avoid database writes, unintended file modifications).
-- If testing isn't possible, perform appropriate validation to ensure code correctness.
-- After you are done with the work update STRUCTURE.md when needed (e.g.: new files added, deleted, etc.).
-- Also update CHANGES.md if the initial objective / feature deviated from what you ended up implementing.
+- Test functions without external effects when possible
+- If testing impossible, validate code correctness
+- Update STRUCTURE.md for new/deleted files
+- Update CHANGES.md if implementation deviates from initial objective
 </Reviewing and Logging Changes>
 
 <Generating Documentation>
-- Create multi-layered documentation: start with high-level overview, then architecture, then implementation details.
-- Lead with visual diagrams (prefer Mermaid) to explain system flows, component relationships, and data structures before diving into text.
-- Document the "why" behind design decisions, not just the "what" - explain trade-offs, constraints, and strategic context.
-- When relevant include real performance metrics, actual usage patterns, and concrete examples rather than theoretical descriptions.
-- Structure with essential sections: Overview, Architecture, Component Breakdown, Data Flow, Integration Points, Performance Characteristics.
-- Focus on information that can't be derived from reading code - avoid restating obvious implementation details.
-- Keep examples realistic and working - include expected inputs/outputs and error handling scenarios.
-- Write for developers who will maintain the code 6 months from now - explain non-obvious decisions and edge cases.
-- Place documentation close to the code it describes, maintain consistent terminology, and update docs when code changes.
-- Avoid over-documenting self-explanatory utilities, but always document major features, complex algorithms, integration points, and performance-critical paths.
+- Multi-layered: overview → architecture → implementation details
+- Lead with visual diagrams (prefer Mermaid) for flows and relationships
+- Document "why" behind decisions - trade-offs, constraints, strategic context
+- Include real metrics, usage patterns, concrete examples
+- Essential sections: Overview, Architecture, Component Breakdown, Data Flow, Integration Points, Performance
+- Focus on information not derivable from code
+- Keep examples realistic and working
+- Write for maintainers 6 months later
+- Place docs close to code, maintain consistent terminology
+- Document major features, complex algorithms, integration points, performance-critical paths
 </Generating Documentation>
