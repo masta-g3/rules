@@ -13,7 +13,8 @@
 - Make minimal, non-disruptive changes that follow existing structure
 - Check for existing similar code to avoid duplication
 - Keep function names direct and simple (no 'enhanced', 'new' prefixes)
-- No changelog comments or 'new feature' indicators
+- Never solve problems with hacks or hacky solutions, brainstorm alternatives with the user instead
+- Avoid changelog style comments (or useless ones) as well as new 'new feature' indicators
 </Coding Style>
 
 <Python Specific Coding Style>
@@ -35,6 +36,17 @@ For complex requests:
 - Clear completed sections from PLANNING.md, summarize in CHANGES.md
 - Keep pending tasks and others' plans intact
 </Step-by-Step Instructions (PLANNING.md)>
+
+<Session Progress Tracking (PROGRESS.md)>
+When working over long plans with PLANNING.md and a break is requested, create or update PROGRESS.md with a summary of the main objective and what was tackled this session. Think of this as a complimentary document to PLANNING.md.
+- Include the main objective of the plan and what was tackled this session.
+- Provide a brief overview of the discussion context and key decisions.
+- Document exactly what was implemented and achieved in this session.
+- Note important patterns or conventions to remember when resuming work.
+- Call out challenges, risks, and likely pitfalls for the next engineer; add practical tips.
+- Write with handoff in mind: enough context for another engineer to continue efficiently.
+- Finally, also update PLANNING.md when a pause/break is requested, reflecting any changes in design and marking complete items as [x].
+</Session Progress Tracking (PROGRESS.md)>
 
 <Minimalist Design Philosophy>
 We are working at a lean startup, maintained by 10x engineers, not a large corporation. Code accordingly:
@@ -68,3 +80,9 @@ We are working at a lean startup, maintained by 10x engineers, not a large corpo
 - Place docs close to code, maintain consistent terminology
 - Document major features, complex algorithms, integration points, performance-critical paths
 </Generating Documentation>
+
+<Testing>
+- Consider Test Driven Development as a possible philosophy for fobust sophrase development.
+- Whenever possible create ephemereal tests to validate that your features, functions and implementations work as you expect. Remove these temporary tests once you finish working with them.
+- Whenever you introduce new core or important features, add related tests in tests/ directory. Avoid over-testing; we want to mantain a lean set of unit tests that provide most code coverage with the least amount of code.
+</Testing>
