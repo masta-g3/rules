@@ -7,34 +7,30 @@
 
 <Coding Style>
 - Prioritize minimalism: clean, readable, lightweight, modular code; avoid corporate bloat at all costs
+- Never solve problems with hacks or hacky solutions; if an approach is not working, brainstorm alternatives with the user instead
 - Don't introduce new patterns/technologies unless strictly needed
 - Study existing functions to maintain consistent patterns and style
 - Avoid thin wrappers and ad-hoc patches
 - Make minimal, non-disruptive changes that follow existing structure
 - Check for existing similar code to avoid duplication
 - Keep function names direct and simple (no 'enhanced', 'new' prefixes)
-- Never solve problems with hacks or hacky solutions, brainstorm alternatives with the user instead
-- Avoid changelog style comments (or useless ones) as well as new 'new feature' indicators
+- Avoid unecessary changelog style comments (or useless ones), such as 'new feature' indicators
+- Avoid try-except except for minor processing failures; we don't want processes to fail silently
+- Avoid adding fallback mechanism or default values unless the user explicitly asks
+- Centralize imports at script top (for languages like python, where this is best practice)
 </Coding Style>
 
-<Python Specific Coding Style>
-- Single-line docstrings explaining functionality (skip args/returns)
-- Use "##" for comments, "#" for commenting out code
-- Avoid try-except except for minor processing failures; we don't want processes to fail silently
-- Centralize imports at script top
-</Python Specific Coding Style>
 
 <Step-by-Step Instructions (PLANNING.md)>
 For complex requests:
-1. Create new section (# Header) in PLANNING.md
+1. Create a new PLANNING.md document (use PLANNING2.md, etc. if already taken)
 2. Brainstorm solution approach:
    - Debugging: identify likely problem sources, validate assumptions
    - New features: inspect existing code patterns, avoid duplication
    - Consider alternatives that align with current style (modular, lightweight, clean, avoid corporate bloat)
 3. Write out all steps needed [ ]
 4. Mark completed steps [x] as you progress
-- Clear completed sections from PLANNING.md, summarize in CHANGES.md
-- Keep pending tasks and others' plans intact
+5. Finally, verify if the plan actually corresponds to what was implemented, if there are divergences, update the document
 </Step-by-Step Instructions (PLANNING.md)>
 
 <Session Progress Tracking (PROGRESS.md)>
@@ -64,11 +60,11 @@ We are working at a lean startup, maintained by 10x engineers, not a large corpo
 <Reviewing and Logging Changes>
 - Test functions without external effects when possible
 - If testing impossible, validate code correctness
-- Update STRUCTURE.md for new/deleted files
-- Update CHANGES.md if implementation deviates from initial objective
+- Update STRUCTURE.md to reflect new/deleted files, or when important new functionality and changes to the codebase
 </Reviewing and Logging Changes>
 
 <Generating Documentation>
+User will ask you to generate many .md files thougohut the process (PLANNING.md, STRUCTURE.md, etc). Adopt the following style:
 - Multi-layered: overview → architecture → implementation details
 - Lead with visual diagrams (prefer Mermaid) for flows and relationships
 - Document "why" behind decisions - trade-offs, constraints, strategic context
@@ -82,7 +78,7 @@ We are working at a lean startup, maintained by 10x engineers, not a large corpo
 </Generating Documentation>
 
 <Testing>
-- Consider Test Driven Development as a possible philosophy for fobust sophrase development.
+- Consider Test Driven Development as a possible philosophy for robust software development.
 - Whenever possible create ephemereal tests to validate that your features, functions and implementations work as you expect. Remove these temporary tests once you finish working with them.
 - Whenever you introduce new core or important features, add related tests in tests/ directory. Avoid over-testing; we want to mantain a lean set of unit tests that provide most code coverage with the least amount of code.
 </Testing>
