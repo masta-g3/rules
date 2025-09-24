@@ -21,9 +21,9 @@
 </Coding Style>
 
 
-<Step-by-Step Instructions (PLANNING.md)>
+<Step-by-Step Planning>
 For complex requests:
-1. Create a new PLANNING.md document (use PLANNING2.md, etc. if already taken)
+1. Create new markdown document with the name of the feature or request (e.g. REDDIT_INTEGRATION.md)
 2. Brainstorm solution approach:
    - Debugging: identify likely problem sources, validate assumptions
    - New features: inspect existing code patterns, avoid duplication
@@ -31,7 +31,7 @@ For complex requests:
 3. Write out all steps needed [ ]
 4. Mark completed steps [x] as you progress
 5. Finally, verify if the plan actually corresponds to what was implemented, if there are divergences, update the document
-</Step-by-Step Instructions (PLANNING.md)>
+</Step-by-Step Planning>
 
 <Session Progress Tracking (PROGRESS.md)>
 When working over long plans with PLANNING.md and a break is requested, create or update PROGRESS.md with a summary of the main objective and what was tackled this session. Think of this as a complimentary document to PLANNING.md.
@@ -41,10 +41,10 @@ When working over long plans with PLANNING.md and a break is requested, create o
 - Note important patterns or conventions to remember when resuming work.
 - Call out challenges, risks, and likely pitfalls for the next engineer; add practical tips.
 - Write with handoff in mind: enough context for another engineer to continue efficiently.
-- Finally, also update PLANNING.md when a pause/break is requested, reflecting any changes in design and marking complete items as [x].
+- Finally, also update planning md when a pause/break is requested, reflecting any changes in design and marking complete items as [x].
 </Session Progress Tracking (PROGRESS.md)>
 
-<Minimalist Design Philosophy>
+<Minimalist Coding Philosophy>
 We are working at a lean startup, maintained by 10x engineers, not a large corporation. Code accordingly:
 - Less is more, elegance is clarity
 - Avoid useless boilerplate code, be minimal and efficient
@@ -53,9 +53,10 @@ We are working at a lean startup, maintained by 10x engineers, not a large corpo
 - Leave codebase simpler and more organized
 - Skip redundant validations unless failure has real consequences
 - Let errors surface naturally; avoid blanket try/except (especially "pass") that hides bugs
+- Avoid adding fallback mechanism or default values unless the user explicitly asks
 - No backward compatibility or defaults unless requested
 - Comment only non-obvious logic
-</Minimalist Design Philosophy>
+</Minimalist Coding Philosophy>
 
 <Reviewing and Logging Changes>
 - Test functions without external effects when possible
@@ -64,7 +65,7 @@ We are working at a lean startup, maintained by 10x engineers, not a large corpo
 </Reviewing and Logging Changes>
 
 <Generating Documentation>
-User will ask you to generate many .md files thougohut the process (PLANNING.md, STRUCTURE.md, etc). Adopt the following style:
+User will ask you to generate many .md files thougohut the process (FEATURE.md, STRUCTURE.md, etc). Adopt the following style:
 - Multi-layered: overview → architecture → implementation details
 - Lead with visual diagrams (prefer Mermaid) for flows and relationships
 - Document "why" behind decisions - trade-offs, constraints, strategic context
