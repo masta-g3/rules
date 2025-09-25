@@ -34,7 +34,7 @@ For complex requests:
 </Step-by-Step Planning>
 
 <Session Progress Tracking (PROGRESS.md)>
-When working over long plans with PLANNING.md and a break is requested, create or update PROGRESS.md with a summary of the main objective and what was tackled this session. Think of this as a complimentary document to PLANNING.md.
+When working over long plans and a break is requested, create or update PROGRESS.md with a summary of the main objective and what was tackled this session. Think of this as a complimentary document to the planning document.
 - Include the main objective of the plan and what was tackled this session.
 - Provide a brief overview of the discussion context and key decisions.
 - Document exactly what was implemented and achieved in this session.
