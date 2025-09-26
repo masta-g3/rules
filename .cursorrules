@@ -28,9 +28,10 @@ For complex requests:
    - Debugging: identify likely problem sources, validate assumptions
    - New features: inspect existing code patterns, avoid duplication
    - Consider alternatives that align with current style (modular, lightweight, clean, avoid corporate bloat)
-3. Write out all steps needed [ ]
-4. Mark completed steps [x] as you progress
-5. Finally, verify if the plan actually corresponds to what was implemented, if there are divergences, update the document
+3. Write out an implementation plan with technical details on all the steps needed
+4. Divide the plan into phases or steps and add [ ] to track progress
+5. Mark completed steps [x] as resolve and validate them
+As you progress, verify if the plan actually corresponds to what was implemented, and if there are divergences, update the document
 </Step-by-Step Planning>
 
 <Session Progress Tracking (PROGRESS.md)>
