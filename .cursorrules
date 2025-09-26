@@ -22,16 +22,15 @@
 
 
 <Step-by-Step Planning>
-For complex requests:
-1. Create new markdown document with the name of the feature or request (e.g. REDDIT_INTEGRATION.md)
-2. Brainstorm solution approach:
-   - Debugging: identify likely problem sources, validate assumptions
-   - New features: inspect existing code patterns, avoid duplication
-   - Consider alternatives that align with current style (modular, lightweight, clean, avoid corporate bloat)
-3. Write out an implementation plan with precise details on all the steps needed
+For complex requests, or when the user requests a plan in a .md:
+1. Create new markdown document with the name of the feature or request (e.g. DOCUMENT_INTEGRATION.md)
+2. Brainstorm solution alternatives that align with current style (modular, lightweight, clean, avoid corporate bloat).
+3. Write out an implementation plan with precise details (code snippets, file names, etc.) on all the steps needed
 4. Divide the plan into phases or steps and add [ ] to track progress
 5. Mark completed steps [x] as resolve and validate them
-As you progress, verify if the plan actually corresponds to what was implemented, and if there are divergences, update the document
+As you progress, verify if the plan actually corresponds to what was implemented, and if there are divergences, update the document.
+Finally, when the user asks to 'archive' the plan, reorganize it as a feature spec that serves as a reference for future engineers. You can include a simplified version of the [x] to-do list at the end of the document. Once you have reformated the document, archive it under docs/history/yyyymmdd_feature_spec.md (e.g. 20250925_document_integration.md; verify the date in the terminal).
+
 </Step-by-Step Planning>
 
 <Session Progress Tracking (PROGRESS.md)>
