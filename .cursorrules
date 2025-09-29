@@ -23,11 +23,11 @@
 
 <Step-by-Step Planning>
 For complex requests, or when the user requests a plan in a .md:
-1. Create new markdown document with the name of the feature or request (e.g. DOCUMENT_INTEGRATION.md)
+1. Create new markdown document with the name of the feature or request (e.g. DOCUMENT_INTEGRATION.md).
 2. Brainstorm solution alternatives that align with current style (modular, lightweight, clean, avoid corporate bloat).
-3. Write out an implementation plan with precise details (code snippets, file names, etc.) on all the steps needed
-4. Divide the plan into phases or steps and add [ ] to track progress
-5. Mark completed steps [x] as resolve and validate them
+3. Write out a detailed implementation plan with precise details (code snippets, file names, etc.) on all the steps needed. Think of this as a implementation guide for a junior engineer who will execute on the job.
+4. Divide the plan into phases or steps and add [ ] to track progress.
+5. Mark completed steps [x] as resolve and validate them.
 As you progress, verify if the plan actually corresponds to what was implemented, and if there are divergences, update the document.
 Finally, when the user asks to 'archive' the plan, reorganize it as a feature spec that serves as a reference for future engineers. You can include a simplified version of the [x] to-do list at the end of the document. Once you have reformated the document, archive it under docs/history/yyyymmdd_feature_spec.md (e.g. 20250925_document_integration.md; verify the date in the terminal).
 
@@ -65,7 +65,7 @@ We are working at a lean startup, maintained by 10x engineers, not a large corpo
 </Reviewing and Logging Changes>
 
 <Generating Documentation>
-User will ask you to generate many .md files thougohut the process (FEATURE.md, STRUCTURE.md, etc). Adopt the following style:
+User will ask you to generate many .md files throughout the process (FEATURE.md, STRUCTURE.md, etc). Adopt the following style:
 - Multi-layered: overview → architecture → implementation details
 - Lead with visual diagrams (prefer Mermaid) for flows and relationships
 - Document "why" behind decisions - trade-offs, constraints, strategic context
