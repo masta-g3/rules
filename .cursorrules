@@ -1,8 +1,8 @@
 <Codebase Structure>
-- Check STRUCTURE.md to understand project organization
+- Check docs/STRUCTURE.md to understand project organization
 - Always verify current directory before creating files or terminal operations
 - Place functions in appropriate utils/ scripts by purpose (data_utils.py, format_utils.py, etc.)
-- Keep STRUCTURE.md updated with new files or content
+- Keep docs/STRUCTURE.md updated with new files or content
 </Codebase Structure>
 
 <Coding Style>
@@ -18,20 +18,19 @@
 - Avoid try-except except for minor processing failures; we don't want processes to fail silently
 - Avoid adding fallback mechanism or default values unless the user explicitly asks
 - Centralize imports at script top (for languages like python, where this is best practice)
+- Test functions without external effects when possible
+- If testing impossible, validate code correctness
 </Coding Style>
 
 
-<Step-by-Step Planning>
+<Planning & Organization>
 For complex requests, or when the user requests a plan in a .md:
 1. Create new markdown document with the name of the feature or request (e.g. DOCUMENT_INTEGRATION.md).
 2. Brainstorm solution alternatives that align with current style (modular, lightweight, clean, avoid corporate bloat).
 3. Write out a detailed implementation plan with precise details (code snippets, file names, etc.) on all the steps needed. Think of this as a implementation guide for a junior engineer who will execute on the job.
 4. Divide the plan into phases or steps and add [ ] to track progress.
-5. Mark completed steps [x] as resolve and validate them.
-As you progress, verify if the plan actually corresponds to what was implemented, and if there are divergences, update the document.
-Finally, when the user asks to 'archive' the plan, reorganize it as a feature spec that serves as a reference for future engineers. You can include a simplified version of the [x] to-do list at the end of the document. Once you have reformated the document, archive it under docs/history/yyyymmdd_feature_spec.md (e.g. 20250925_document_integration.md; verify the date in the terminal).
-
-</Step-by-Step Planning>
+As you progress, verify if the plan actually corresponds to what was implemented, mark [x] what is completed, and if there are divergences, update the document. Keep a single document per session.
+</Planning & Organization>
 
 <Session Progress Tracking (PROGRESS.md)>
 When working over long plans and a break is requested, create or update PROGRESS.md with a summary of the main objective and what was tackled this session. Think of this as a complimentary document to the planning document.
@@ -58,28 +57,19 @@ We are working at a lean startup, maintained by 10x engineers, not a large corpo
 - Comment only non-obvious logic
 </Minimalist Coding Philosophy>
 
-<Reviewing and Logging Changes>
-- Test functions without external effects when possible
-- If testing impossible, validate code correctness
-- Update STRUCTURE.md to reflect new/deleted files, or when important new functionality and changes to the codebase
-</Reviewing and Logging Changes>
-
 <Generating Documentation>
-User will ask you to generate many .md files throughout the process (FEATURE.md, STRUCTURE.md, etc). Adopt the following style:
-- Multi-layered: overview → architecture → implementation details
-- Lead with visual diagrams (prefer Mermaid) for flows and relationships
+Adhere to the following style when the user asks you to generate a markdown file (e.g.: FEATURE.md):
+- Leverage markdown elements and visual diagrams (prefer Mermaid)
 - Document "why" behind decisions - trade-offs, constraints, strategic context
-- Include real metrics, usage patterns, concrete examples
-- Essential sections: Overview, Architecture, Component Breakdown, Data Flow, Integration Points, Performance
-- Focus on information not derivable from code
+- Include real code snippits, usage patterns, concrete examples
 - Keep examples realistic and working
 - Write for maintainers 6 months later
 - Place docs close to code, maintain consistent terminology
 - Document major features, complex algorithms, integration points, performance-critical paths
+- Avoid corporate bloat, overengineering or useless boilerplate
 </Generating Documentation>
 
 <Testing>
 - Consider Test Driven Development as a possible philosophy for robust software development.
 - Whenever possible create ephemereal tests to validate that your features, functions and implementations work as you expect. Remove these temporary tests once you finish working with them.
-- Whenever you introduce new core or important features, add related tests in tests/ directory. Avoid over-testing; we want to mantain a lean set of unit tests that provide most code coverage with the least amount of code.
 </Testing>
