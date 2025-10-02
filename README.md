@@ -2,8 +2,6 @@
 
 Minimal, elegant, and pragmatic commands for use by AI agents embedded in developer IDEs.
 
----
-
 ## Philosophy
 
 - **Minimalist & No-Bloat:** Only automate what is required—no unnecessary features or refactoring.
