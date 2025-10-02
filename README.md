@@ -11,8 +11,6 @@ Minimal, elegant, and pragmatic commands for use by AI agents embedded in develo
 - **Deployment First:** Fix only actual blockers to deployment or CI/CD.
 - **Readable, Modular, Elegant:** Less is more. Prioritize code clarity and lightweight solutions.
 
----
-
 ## Key Commands
 
 ### Deployment Readiness
@@ -34,13 +32,9 @@ Minimal, elegant, and pragmatic commands for use by AI agents embedded in develo
     - Ensures commits are focused and self-explanatory.
     - Instructs agents how to document meaningful spec changes.
 
----
-
 ## Usage
 
 Designed for integration with Claude Code, Codex, Cursor or similar AI agents in developer environments. Consult IDE provider for further instructions.
-
----
 
 ## Contributing
 
