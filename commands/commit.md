@@ -1,10 +1,14 @@
+---
+description: Commit files from session and archive planning document.
+---
+
 Commit all files modified during this session:
 
 1. `git add` files worked on. There might be other unrelated staged files in the repo; do not include them in your commit.
 2. `git commit -m` with message format:
    - First line: sentence describing the high-level objective.
    - 2-5 bullets grouping changes by topic (omit if single cohesive change).
-   Do not add additional messages or signatures by Claude / Claude code.
+   Do not add additional messages or signatures.
 3. `git push`
 
 Examples:

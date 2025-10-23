@@ -1,0 +1,54 @@
+<Codebase Structure>
+- Check docs/STRUCTURE.md to understand project organization.
+- Place functions in appropriate utils/, src/, etc. scripts by purpose (data_utils.py, format_utils.py, etc.).
+- Keep docs/STRUCTURE.md updated with new files or content.
+</Codebase Structure>
+
+<Coding Style>
+- Prioritize minimalism: clean, readable, lightweight, modular code; avoid corporate bloat at all costs.
+- Never solve problems with hacks or hacky solutions; if an approach is not working, brainstorm alternatives with the user instead.
+- Don't introduce new patterns/technologies unless strictly needed.
+- Study existing functions to maintain consistent patterns and style.
+- Avoid thin wrappers and ad-hoc patches.
+- Make minimal, non-disruptive changes that follow existing structure.
+- Check for existing similar code to avoid duplication.
+- Keep function names direct and simple (no 'enhanced', 'new' prefixes).
+- Avoid unecessary changelog style comments (or useless ones), such as 'new feature' indicators.
+- Avoid try-except except for minor processing failures; we don't want processes to fail silently.
+- Avoid adding fallback mechanism or default values unless the user explicitly asks.
+- Centralize imports at script top (for languages like python, where this is best practice).
+- Test functions without external effects when possible.
+- If testing impossible, validate code correctness.
+</Coding Style>
+
+<Minimalist Coding Philosophy>
+We are working at a lean startup, maintained by 10x engineers, not a large corporation. Code accordingly:
+- Less is more, elegance is clarity
+- Avoid useless boilerplate code, be minimal and efficient
+- Make components modular and reusable
+- Follow existing styles and patterns
+- Leave codebase simpler and more organized
+- Skip redundant validations unless failure has real consequences
+- Let errors surface naturally; avoid blanket try/except (especially "pass") that hides bugs
+- Avoid adding fallback mechanism or default values unless the user explicitly asks
+- No backward compatibility or defaults unless requested
+- Comment only non-obvious logic
+</Minimalist Coding Philosophy>
+
+<Generating Documentation>
+- When planning features, create detailed markdown documentation that enables any engineer to implement independently.
+- Adhere to the following style when the user asks you to generate a markdown file (e.g.: FEATURE.md):
+    - Leverage markdown elements and visual diagrams (prefer Mermaid).
+    - Document "why" behind decisions - trade-offs, constraints, strategic context.
+    - Include real code snippits, usage patterns, concrete examples.
+    - Keep examples realistic and working.
+    - Write for maintainers 6 months later.
+    - Place docs close to code, maintain consistent terminology.
+    - Document major features, complex algorithms, integration points, performance-critical paths.
+    - Avoid corporate bloat, overengineering or useless boilerplate.
+</Generating Documentation>
+
+<Testing>
+- Consider Test Driven Development as a possible philosophy for robust software development.
+- Whenever possible create ephemereal tests to validate that your features, functions and implementations work as you expect. Remove these temporary tests once you finish working with them.
+</Testing>
