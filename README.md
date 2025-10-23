@@ -11,7 +11,7 @@ Minimal, elegant, and pragmatic commands for use by AI agents embedded in develo
 
 ## Core Guidelines
 
-- `.cursorrules` → Interpreted as **AGENTS.md**  
+- `AGENTS.md`  
   Provides overarching principles and behavioral expectations for AI agents.  
   Ensures consistent alignment across IDE environments and complements task-specific command files.
 
