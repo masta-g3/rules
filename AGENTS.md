@@ -2,6 +2,7 @@
 - Check docs/STRUCTURE.md to understand project organization.
 - Place functions in appropriate utils/, src/, etc. scripts by purpose (data_utils.py, format_utils.py, etc.).
 - Keep docs/STRUCTURE.md updated with new files or content.
+- When working with python always use the `uv` tool for dependency management and virtual environments.
 </Codebase Structure>
 
 <Coding Style>
