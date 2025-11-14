@@ -30,6 +30,12 @@ Minimal, elegant, and pragmatic commands for use by AI agents embedded in develo
   - Fosters code-aware, aligned implementation.  
   - Ensures understanding of architecture, components, and coding style.
 
+### Plan Execution
+
+- `execute.md`: Drives agents to work directly from the approved plan.  
+  - Requires updating checklist progress `[x]` as tasks complete.  
+  - Reinforces minimalist, no-bloat implementation and top-tier UI/UX standards.
+
 ### Versioning, Commit & Documentation
 
 - `commit.md`: Lightweight, structured commit convention.  
