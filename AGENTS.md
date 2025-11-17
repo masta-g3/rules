@@ -1,12 +1,13 @@
 <Codebase Structure>
 - Check docs/STRUCTURE.md to understand project organization.
+- If docs/STRUCTURE.md is missing (e.g., new project), just continue without it.
 - Place functions in appropriate utils/, src/, etc. scripts by purpose (data_utils.py, format_utils.py, etc.).
 - Keep docs/STRUCTURE.md updated with new files or content.
 - When working with python always use the `uv` tool for dependency management and virtual environments.
 </Codebase Structure>
 
 <Coding Style>
-- Prioritize minimalism: clean, readable, lightweight, modular code; avoid corporate bloat at all costs.
+- Prioritize minimalism: clean, readable, lightweight, modular code; avoid enterprise bloat at all costs.
 - Never solve problems with hacks or hacky solutions; if an approach is not working, brainstorm alternatives with the user instead.
 - Don't introduce new patterns/technologies unless strictly needed.
 - Study existing functions to maintain consistent patterns and style.
@@ -16,14 +17,13 @@
 - Keep function names direct and simple (no 'enhanced', 'new' prefixes).
 - Avoid unecessary changelog style comments (or useless ones), such as 'new feature' indicators.
 - Avoid try-except except for minor processing failures; we don't want processes to fail silently.
-- Avoid adding fallback mechanism or default values unless the user explicitly asks.
+- Avoid adding fallback mechanism, mock data or default values unless the user explicitly asks.
 - Centralize imports at script top (for languages like python, where this is best practice).
-- Test functions without external effects when possible.
-- If testing impossible, validate code correctness.
+- Test functions without external effects when possible.If testing impossible, validate code correctness.
 </Coding Style>
 
 <Minimalist Coding Philosophy>
-We are working at a lean startup, maintained by 10x engineers, not a large corporation. Code accordingly:
+We are working at a lean startup, maintained by a small team of 10x engineers, not a large corporation. Code accordingly:
 - Less is more, elegance is clarity
 - Avoid useless boilerplate code, be minimal and efficient
 - Make components modular and reusable
@@ -51,5 +51,5 @@ We are working at a lean startup, maintained by 10x engineers, not a large corpo
 
 <Testing>
 - Consider Test Driven Development as a possible philosophy for robust software development.
-- Whenever possible create ephemereal tests to validate that your features, functions and implementations work as you expect. Remove these temporary tests once you finish working with them.
+- Whenever possible create ephemeral tests to validate that your features, functions and implementations work as you expect. Iterate on running these tests systematically until you get the expected results (or identify a problem with your plan). Remove these temporary tests once you finish working with them.
 </Testing>
