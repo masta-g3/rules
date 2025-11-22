@@ -13,7 +13,7 @@ Commit all files modified during this session:
    - First line: sentence describing the high-level objective.
    - 2-5 bullets grouping changes by topic (omit if single cohesive change).
    Do not add additional messages or signatures (by Claude Code, coauthored with..., etc.).
-3. `git push`
+3. Do not push; leave the branch local unless specifically instructed.
 
 Examples:
 

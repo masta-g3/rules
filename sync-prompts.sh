@@ -11,6 +11,7 @@ mkdir -p "${codex_root}" "${claude_root}" "${cursor_root}"
 
 cp "${repo_root}/AGENTS.md" "${codex_root}/AGENTS.md"
 cp "${repo_root}/AGENTS.md" "${claude_root}/CLAUDE.md"
+cp "${repo_root}/AGENTS.md" "${cursor_root}/AGENTS.md"
 
 mkdir -p "${codex_root}/prompts" "${claude_root}/commands" "${cursor_root}/commands"
 
