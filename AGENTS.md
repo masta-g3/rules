@@ -19,7 +19,6 @@
 - Avoid try-except except for minor processing failures; we don't want processes to fail silently.
 - Avoid adding fallback mechanism, mock data or default values unless the user explicitly asks.
 - Centralize imports at script top (for languages like python, where this is best practice).
-- Test functions without external effects when possible.If testing impossible, validate code correctness.
 </Coding Style>
 
 <Minimalist Coding Philosophy>
@@ -50,6 +49,7 @@ We are working at a lean startup, maintained by a small team of 10x engineers, n
 </Generating Documentation>
 
 <Testing>
-- Consider Test Driven Development as a possible philosophy for robust software development.
-- Whenever possible create ephemeral tests to validate that your features, functions and implementations work as you expect. Iterate on running these tests systematically until you get the expected results (or identify a problem with your plan). Remove these temporary tests once you finish working with them.
+- Test functions without external effects when possible; if testing is impossible, validate code correctness manually.
+- Consider Test Driven Development for robust software development.
+- Create ephemeral tests to validate features and implementations. Iterate until expected results, then remove temporary tests.
 </Testing>

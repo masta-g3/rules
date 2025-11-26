@@ -31,4 +31,4 @@ Refactor API endpoints for better error handling.
 - Implement proper HTTP status codes.
 ```
 
-Finally verify if any updates are needed to the product documentation, mainly docs/@STRUCTURE.md. Do not document if needed, only changes that are worth tracking or and that keep the document true to the codebase.
+Finally verify if any updates are needed to the product documentation, mainly docs/STRUCTURE.md. Only document changes worth tracking that keep the document true to the codebase.
