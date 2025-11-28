@@ -12,4 +12,12 @@ Given the request: **$1**, create and maintain a detailed Markdown implementatio
    - For minor edits or narrow fixes: keep it as concise as the change warrants.
 4. Add an implementation section that divides work into incremental phases—foundation first, then progressive refinement. Each phase should produce testable, reviewable output (e.g., architecture setup → core components → specific features → polish). Use [ ] checkboxes to track progress within each phase.
 
+5. If this feature involves UI work, include a design direction section:
+   - Typography: choose distinctive, beautiful fonts—avoid generic defaults (Inter, Roboto, system fonts)
+   - Color: commit to a cohesive theme with CSS variables; bold accents over timid palettes
+   - Motion: purposeful animations for delight; CSS-first approach
+   - Backgrounds: create atmosphere with gradients, patterns, depth—not flat solid colors
+   - Centralize design tokens (colors, spacing, typography) in theme config or CSS variables—no scattered magic values
+   - Avoid "AI slop": no generic purple gradients, no cookie-cutter layouts, no predictable patterns
+
 Don't execute on this plan yet; the user will provide feedback and finally approve. After that, once you move to the implementation and make progress on it, verify if the plan actually corresponds to what was implemented, mark [x] what is completed, and if there are divergences, update the document. Keep a single document per session.

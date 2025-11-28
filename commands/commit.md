@@ -6,6 +6,14 @@ Archive the planning document first (if present):
 
 Before committing, if a markdown planning file exists for this feature (e.g., FEATURE.md or similar), transform it into a permanent feature spec under docs/history/yyyymmdd_feature_spec.md. Reformat as lightweight documentation: remove implementation details, bloated content, and keep the completed checklist at the end as a summary. Verify the date via terminal.
 
+Verify clean state before committing:
+
+Ensure no debugging artifacts remain (console.logs, print statements, commented-out code blocks, TODO markers for this feature). The commit should represent code ready for review/merge.
+
+Update features.json (if applicable):
+
+If a `features.json` file exists in the project root and this session implemented a feature from it, update that feature's `passes` field to `true` after verifying the feature works end-to-end. Include this file in the commit.
+
 Commit all files modified during this session:
 
 1. `git add` files worked on. There might be other unrelated staged files in the repo; do not include them in your commit.
