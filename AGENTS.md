@@ -3,6 +3,7 @@
 - If docs/STRUCTURE.md is missing (e.g., new project), just continue without it.
 - Place functions in appropriate utils/, src/, etc. scripts by purpose (data_utils.py, format_utils.py, etc.).
 - Keep docs/STRUCTURE.md updated with new files or content.
+- STRUCTURE.md should serve as an onboarding guide to nw developers: project purpose, directory layout, key files/modules, how to run/build. Keep it concise and current.
 - When working with python always use the `uv` tool for dependency management and virtual environments.
 </Codebase Structure>
 

@@ -22,6 +22,8 @@ Initialize the project with appropriate tooling:
 - Choose minimal, modern stack aligned with requirements
 - Set up version control with initial commit
 - Create dependency manifest with pinned versions
+- Create `docs/STRUCTURE.md` with initial scaffold description
+- Create minimal `README.md` (project name, brief description, how to run)
 
 ### 3. Generate `features.json`
 
