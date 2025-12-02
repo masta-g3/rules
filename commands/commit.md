@@ -2,17 +2,28 @@
 description: Archive planning document first, then commit files from session.
 ---
 
-Archive the planning document first (if present):
+Archive the planning document (if present):
 
-Before committing, if a markdown planning file exists for this feature (e.g., FEATURE.md or similar), transform it into a permanent feature spec under docs/history/yyyymmdd_feature_spec.md. Reformat as lightweight documentation: remove implementation details, bloated content, and keep the completed checklist at the end as a summary. Verify the date via terminal.
+If a markdown planning file exists for this work:
+
+**Determine archive path from plan file name:**
+- If plan file matches `{epic}-{nnn}.md` → archive to `docs/history/{id}.md`
+- Otherwise → archive to `docs/history/yyyymmdd_{name}.md`
+
+Transform into permanent spec: remove implementation details, keep completed checklist as summary.
 
 Verify clean state before committing:
 
 Ensure no debugging artifacts remain (console.logs, print statements, commented-out code blocks, TODO markers for this feature). The commit should represent code ready for review/merge.
 
-Update features.json (if applicable):
+Update features.json (if exists and tracked feature):
 
-If a `features.json` file exists in the project root and this session implemented a feature from it, update that feature's `passes` field to `true` after verifying the feature works end-to-end. Include this file in the commit.
+If plan file was `{epic}-{nnn}.md`, use jq to:
+1. Set `status` to `"done"`
+2. Set `spec_file` to the archive path
+3. Verify any discovered items are properly logged
+
+Include features.json in the commit.
 
 Commit all files modified during this session:
 

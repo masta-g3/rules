@@ -5,7 +5,15 @@ description: Create and maintain a Markdown implementation plan from a single re
 
 Given the request: **$1**, create and maintain a detailed Markdown implementation plan as follows.
 
-1. Create new markdown document with the name of the feature or request (e.g. DOCUMENT_INTEGRATION.md).
+### Plan File Naming
+
+- **If input is a feature ID** (e.g., `auth-001: description`): use that ID → `auth-001.md`
+- **If `features.json` exists** and input isn't an ID: auto-register (infer epic, assign next number) → `{new-id}.md`
+- **Otherwise**: standalone mode → `FEATURE_NAME.md`
+
+### Create Plan
+
+1. Create markdown document with the determined name.
 2. Brainstorm solution alternatives that align with current style (modular, lightweight, clean, avoid corporate bloat).
 3. Write out a detailed implementation plan with precise details (code snippets, file names, etc.) on all the steps needed. Include an architectural layout that maps components, data flows, and dependencies. Think of this as an implementation guide for a junior engineer.
    - For substantial features (new apps, rewrites, multi-service work): aim for 200+ lines, including pseudocode, diagrams, and breakdowns.

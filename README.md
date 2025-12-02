@@ -11,43 +11,76 @@ Minimal, elegant, and pragmatic commands for use by AI agents embedded in develo
 
 ## Core Guidelines
 
-- `AGENTS.md`  
-  Provides overarching principles and behavioral expectations for AI agents.  
-  Ensures consistent alignment across IDE environments and complements task-specific command files.
+- `AGENTS.md`
+  Overarching principles and behavioral expectations for AI agents.
+  Includes coding style, documentation standards, and features.json operations.
+
+## Workflows
+
+### Standalone (Ad-hoc Work)
+
+For quick tasks without multi-session tracking:
+
+```
+/prime "task description"    → gather codebase context
+/plan-md "task description"  → create implementation plan (FEATURE_NAME.md)
+/execute                     → implement with baseline verification
+/commit                      → archive plan, commit changes
+```
+
+### Feature-Driven (Multi-Session Projects)
+
+For complex projects with backlog tracking via `features.json`:
+
+```
+/project-init "project description"  → scaffold project, generate features.json
+/next-feature                        → select next ready feature
+/plan-md "feature-id: description"   → create plan (feature-id.md)
+/execute                             → implement, update status to in_progress
+/commit                              → archive, update status to done
+```
+
+The plan file name carries state: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone.
 
 ## Key Commands
 
-### Deployment Readiness
+| Command | Purpose |
+|---------|---------|
+| `project-init.md` | Initialize project with `features.json` backlog |
+| `next-feature.md` | Select next ready feature (by priority + dependencies) |
+| `prime.md` | Context prime: read structure docs, git history |
+| `plan-md.md` | Create detailed implementation plan with phases |
+| `execute.md` | Implement plan with baseline verification |
+| `commit.md` | Archive plan, update features.json, commit |
+| `prechecks.md` | Pre-deployment verification (build, env, API) |
 
-- `prechecks.md`: Full-stack, framework-agnostic pre-deployment verification.  
-  - Runs static checks, build, env, DB, and API validations.  
-  - Only allows minimal, codebase-consistent fixes.  
-  - Reports strictly on deployment blockers, in a simple template.
+## features.json Schema
 
-### Codebase Understanding & Context Priming
+```json
+{
+  "id": "auth-001",
+  "description": "User can sign up",
+  "steps": ["..."],
+  "status": "pending",
+  "priority": 1,
+  "depends_on": [],
+  "discovered_from": null,
+  "spec_file": null,
+  "created_at": "2024-01-15"
+}
+```
 
-- `prime.md`: Guides AI agents to read structure docs and related files before any feature work.  
-  - Fosters code-aware, aligned implementation.  
-  - Ensures understanding of architecture, components, and coding style.
-
-### Plan Execution
-
-- `execute.md`: Drives agents to work directly from the approved plan.  
-  - Requires updating checklist progress `[x]` as tasks complete.  
-  - Reinforces minimalist, no-bloat implementation and top-tier UI/UX standards.
-
-### Versioning, Commit & Documentation
-
-- `commit.md`: Lightweight, structured commit convention.  
-  - Ensures commits are focused and self-explanatory.  
-  - Instructs agents how to document meaningful spec changes.
+- **status**: `pending` → `in_progress` → `done` (or `blocked`)
+- **depends_on**: explicit blockers; feature is "ready" when all deps are done
+- **discovered_from**: links emergent work to parent feature
+- **spec_file**: path to archived spec (set by commit)
 
 ## Usage
 
-Designed for integration with Claude Code, Codex, Cursor or similar AI agents in developer environments.  
+Designed for integration with Claude Code, Codex, Cursor or similar AI agents in developer environments.
 Consult IDE provider for further instructions.
 
 ## Contributing
 
-- Keep all additions minimal, pattern-aligned, and deployment-focused.  
+- Keep all additions minimal, pattern-aligned, and deployment-focused.
 - Document new commands precisely and update structure docs as needed.

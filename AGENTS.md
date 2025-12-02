@@ -2,8 +2,7 @@
 - Check docs/STRUCTURE.md to understand project organization.
 - If docs/STRUCTURE.md is missing (e.g., new project), just continue without it.
 - Place functions in appropriate utils/, src/, etc. scripts by purpose (data_utils.py, format_utils.py, etc.).
-- Keep docs/STRUCTURE.md updated with new files or content.
-- STRUCTURE.md should serve as an onboarding guide to nw developers: project purpose, directory layout, key files/modules, how to run/build. Keep it concise and current.
+- STRUCTURE.md should serve as an onboarding guide to new developers: project purpose, architecture, directory layout, key files/modules, design patterns, how to run/build. Keep it current.
 - When working with python always use the `uv` tool for dependency management and virtual environments.
 </Codebase Structure>
 
@@ -54,3 +53,17 @@ We are working at a lean startup, maintained by a small team of 10x engineers, n
 - Consider Test Driven Development for robust software development.
 - Create ephemeral tests to validate features and implementations. Iterate until expected results, then remove temporary tests.
 </Testing>
+
+<features_json_operations>
+When `features.json` exists, avoid reading the full file into context—it may contain hundreds of entries. Use `jq` for lightweight extraction:
+
+- Extract specific fields (epic prefixes, status counts, recent by created_at)
+- Filter to relevant subset before reading details
+- Update in-place with jq rather than read-modify-write in context
+
+Note: features.json is a root-level array `[{...}, ...]`, not wrapped in an object.
+
+For in-place updates, use: `jq '...' file.json > tmp.$$ && mv -f tmp.$$ file.json`
+
+This keeps context lean for large projects.
+</features_json_operations>

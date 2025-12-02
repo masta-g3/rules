@@ -15,6 +15,6 @@ cp "${repo_root}/AGENTS.md" "${cursor_root}/AGENTS.md"
 
 mkdir -p "${codex_root}/prompts" "${claude_root}/commands" "${cursor_root}/commands"
 
-cp -R "${repo_root}/commands/." "${codex_root}/prompts/"
-cp -R "${repo_root}/commands/." "${claude_root}/commands/"
-cp -R "${repo_root}/commands/." "${cursor_root}/commands/"
+rsync -a --delete "${repo_root}/commands/" "${codex_root}/prompts/"
+rsync -a --delete "${repo_root}/commands/" "${claude_root}/commands/"
+rsync -a --delete "${repo_root}/commands/" "${cursor_root}/commands/"
