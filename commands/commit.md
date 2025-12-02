@@ -14,7 +14,9 @@ Transform into permanent spec: remove implementation details, keep completed che
 
 Verify clean state before committing:
 
-Ensure no debugging artifacts remain (console.logs, print statements, commented-out code blocks, TODO markers for this feature). The commit should represent code ready for review/merge.
+- No debugging artifacts (console.logs, print statements, TODO markers for this feature)
+- No AI slop: excess comments, defensive try/catch in trusted paths, `any` casts to bypass types
+- Code matches surrounding file conventions—if it looks out of place, fix it
 
 Update features.json (if exists and tracked feature):
 
