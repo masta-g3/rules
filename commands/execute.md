@@ -53,3 +53,18 @@ Report status clearly:
 
 - **PLAN COMPLETE** — all phases done, ready for `/commit`
 - **PENDING STEPS** — list remaining phases/tasks, indicate next action
+
+---
+If `.claude/workflow.json` exists and plan is complete, update it: `jq '.next = "/commit"' .claude/workflow.json > tmp.$$ && mv -f tmp.$$ .claude/workflow.json`
+
+On exception (baseline/tests/build fail after fix attempts), clear workflow and report:
+```
+rm -f .claude/workflow.json
+```
+```
+AUTOPILOT EXCEPTION: <baseline_failed|tests_failed|build_failed>
+
+<what failed>
+
+To resume after fixing: /autopilot <feature-id>
+```

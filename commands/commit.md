@@ -17,7 +17,7 @@ Verify clean state before committing:
 Ensure no debugging artifacts remain (console.logs, print statements, commented-out code blocks, TODO markers for this feature). The commit should represent code ready for review/merge.
 
 Update features.json (if exists and tracked feature):
-
+is 
 If plan file was `{epic}-{nnn}.md`, use jq to:
 1. Set `status` to `"done"`
 2. Set `spec_file` to the archive path
@@ -51,3 +51,28 @@ Refactor API endpoints for better error handling.
 ```
 
 Finally verify if any updates are needed to the product documentation, mainly docs/STRUCTURE.md. Only document changes worth tracking that keep the document true to the codebase.
+
+---
+If `.claude/workflow.json` exists:
+```bash
+FEATURE=$(jq -r '.feature' .claude/workflow.json)
+rm -f .claude/workflow.json
+```
+Output:
+```
+AUTOPILOT COMPLETE: $FEATURE
+Committed: <hash>
+```
+
+On exception (git conflicts), clear workflow and report:
+```
+rm -f .claude/workflow.json
+```
+```
+AUTOPILOT EXCEPTION: git_conflicts
+
+Conflicting files:
+- <file list>
+
+To resume after resolving: /autopilot <feature-id>
+```

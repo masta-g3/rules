@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv sync:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(echo:*)"
+    ],
+    "deny": [
+      "Edit(../**)",
+      "Write(../**)",
+      "Bash(cd ..:*)",
+      "Bash(* ../*)"
+    ]
+  },
+  "hooks": {
+    "Stop": [{
+      "hooks": [{
+        "type": "command",
+        "command": "bash .claude/scripts/workflow.sh",
+        "timeout": 5
+      }]
+    }]
+  }
+}
