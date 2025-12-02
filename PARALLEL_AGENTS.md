@@ -4,21 +4,36 @@ Plan for enabling multiple AI agents to work on different features simultaneousl
 
 ---
 
-## Problem Statement
+## Two Modes
 
-Current system is single-agent: one feature at a time, sequential execution. For complex projects with many independent features, parallel execution would speed up development.
+| Mode | Trigger | Workflow |
+|------|---------|----------|
+| **Standalone** | No `features.json` | Direct: plan → execute → commit (simple, no worktrees) |
+| **Feature-driven** | `features.json` exists | Worktree: next-feature → (wt) plan/execute/commit → (main) finalize |
 
-**Challenges:**
-- Multiple agents need isolated working directories
-- features.json must remain the single source of truth for coordination
-- Merge conflicts must be minimized and handled gracefully
-- Agents need to detect their context (main vs worktree)
+**Detection:** Agent checks if `features.json` exists in project root.
+
+- **No features.json** → standalone mode, work directly
+- **features.json exists** → feature-driven mode, use worktrees
 
 ---
 
-## Solution: Git Worktrees
+## Why Worktrees for Feature-Driven?
 
-Git worktrees provide isolated working directories linked to the same repo. Each worktree can be on a different branch, changes don't affect others until merged.
+When `features.json` exists:
+- Multiple agents may work in parallel
+- features.json coordinates who's working on what
+- Worktrees provide isolated working directories
+- Clean merge path back to main
+
+When no `features.json`:
+- Single agent, ad-hoc work
+- No coordination needed
+- Worktrees would be overhead without benefit
+
+---
+
+## Architecture (Feature-Driven)
 
 ```
 Main repo (coordinator):
@@ -41,117 +56,60 @@ Main repo (coordinator):
 
 ---
 
-## Architecture
+## Workflow (Feature-Driven)
+
+### Phase 1: Claim Work (in main)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        MAIN WORKTREE                            │
-│  ┌─────────────────┐                                            │
-│  │ features.json   │ ← source of truth                          │
-│  │ - auth-001: in_progress                                      │
-│  │ - chat-001: in_progress                                      │
-│  │ - data-001: pending                                          │
-│  └─────────────────┘                                            │
-└─────────────────────────────────────────────────────────────────┘
-          │                              │
-          │ claim + create               │ claim + create
-          ▼                              ▼
-┌──────────────────────┐      ┌──────────────────────┐
-│  ../wt-auth-001/     │      │  ../wt-chat-001/     │
-│  branch: feat/auth-001│      │  branch: feat/chat-001│
-│  Agent 1 working...  │      │  Agent 2 working...  │
-└──────────────────────┘      └──────────────────────┘
-          │                              │
-          │ finish                       │ finish
-          ▼                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        MAIN WORKTREE                            │
-│  Merge feat/auth-001, update features.json → done               │
-│  Merge feat/chat-001, update features.json → done               │
-│  Remove worktrees, delete branches                              │
-└─────────────────────────────────────────────────────────────────┘
+/next-feature
+
+Agent:
+1. Reads features.json, selects ready feature (auth-001)
+2. Updates features.json: auth-001 → "in_progress"
+3. Commits to main (claim visible to other agents)
+4. Creates worktree: git worktree add ../wt-auth-001 -b feat/auth-001
+5. Reports:
+
+   CLAIMED: auth-001
+   Worktree: ../wt-auth-001
+   Branch: feat/auth-001
+
+   Next: cd ../wt-auth-001
+   Then: /plan-md "auth-001: description"
 ```
 
----
+### Phase 2: Do Work (in worktree)
 
-## Workflow Phases
-
-### Phase 1: Claim Work (in main worktree)
-
-```bash
-# 1. Select ready feature
-/next-feature --parallel
-
-# Agent does:
-# - Reads features.json, selects auth-001
-# - Updates: auth-001.status = "in_progress"
-# - Commits to main (claim is now visible to other agents)
-# - Creates worktree:
-git worktree add ../wt-auth-001 -b feat/auth-001
-
-# - Reports:
-#   CLAIMED: auth-001
-#   Worktree: ../wt-auth-001
-#   Branch: feat/auth-001
-#   Next: cd ../wt-auth-001 && /plan-md "auth-001: ..."
 ```
-
-### Phase 2: Do Work (in feature worktree)
-
-```bash
 cd ../wt-auth-001
 
 /plan-md "auth-001: user can sign up"
-# Creates auth-001.md, no features.json changes
+# Creates auth-001.md
 
 /execute
 # Implements feature
-# NO features.json updates (already claimed in main)
-# Discovered work noted in plan document only
+# Discovered work noted in plan only (not features.json)
 
 /commit
 # Commits code only
-# NO features.json changes
-# NO archiving (happens in finalize)
+# Reports: "Run /finalize auth-001 in main when ready"
 ```
 
-### Phase 3: Finalize (back in main worktree)
+### Phase 3: Finalize (back in main)
 
-```bash
+```
 cd /path/to/main
 
 /finalize auth-001
 
-# Agent does:
-# - git merge feat/auth-001 (report conflicts if any)
-# - Move auth-001.md to docs/history/auth-001.md
-# - Update features.json: status → "done", spec_file → path
-# - Add discovered work to features.json (if any noted in plan)
-# - Commit
-# - git worktree remove ../wt-auth-001
-# - git branch -d feat/auth-001
-# - Report: FINALIZED: auth-001
-```
-
----
-
-## Worktree Detection
-
-Agent can detect context using git:
-
-```bash
-# Check if in worktree (worktrees have .git as file, not directory)
-if [ -f .git ]; then
-    echo "In worktree"
-    # Get main repo path
-    cat .git | grep gitdir | cut -d' ' -f2 | sed 's|/.git/worktrees/.*||'
-else
-    echo "In main repo"
-fi
-
-# Or use git directly
-git worktree list  # shows all worktrees
-git rev-parse --show-toplevel  # current worktree root
+Agent:
+1. Merges feat/auth-001 (reports conflicts if any)
+2. Archives auth-001.md to docs/history/
+3. Updates features.json: status → "done", spec_file set
+4. Adds discovered work from plan to features.json
+5. Commits
+6. Removes worktree and branch
+7. Reports: FINALIZED: auth-001
 ```
 
 ---
@@ -160,108 +118,138 @@ git rev-parse --show-toplevel  # current worktree root
 
 ### next-feature.md
 
-Add `--parallel` flag handling:
+**If features.json exists:** After selecting feature, claim and create worktree.
 
 ```markdown
-### Parallel Mode (if --parallel flag or worktree workflow)
+### 3. Claim and Create Worktree
 
-After selecting feature:
 1. Update features.json: status → "in_progress"
-2. Commit: `git commit -am "Claim auth-001 for parallel work"`
+2. Commit: `git commit -am "Claim {id}"`
 3. Create worktree: `git worktree add ../wt-{id} -b feat/{id}`
-4. Report:
-   ```
-   CLAIMED: [id]
-   Worktree: ../wt-[id]
-   Branch: feat/[id]
-   Next: cd ../wt-[id] && /plan-md "[id]: [description]"
-   ```
+
+Report:
 ```
+CLAIMED: [id]
+Worktree: ../wt-[id]
+Branch: feat/[id]
+
+Next: cd ../wt-[id]
+Then: /plan-md "[id]: [description]"
+```
+```
+
+---
+
+### plan-md.md
+
+```markdown
+### Plan File Naming
+
+Check if `features.json` exists in project root.
+
+**Feature-driven (features.json exists):**
+- If in worktree: use feature ID from current work → `{id}.md`
+- If in main with tracked feature: use that ID → `{id}.md`
+- If in main, untracked work: auto-register → `{new-id}.md`
+
+**Standalone (no features.json):**
+- Name after feature → `FEATURE_NAME.md`
+```
+
+---
 
 ### execute.md
 
-Add worktree-aware behavior:
-
 ```markdown
-### Worktree Mode
+### Mode Detection
 
-Detect via `test -f .git` (worktrees have .git as file).
+Check if `features.json` exists in project root.
 
-If in worktree:
-- Skip features.json status update (already claimed in main)
-- Note discovered work in plan document only (not features.json)
-- Keep changes modular and targeted to reduce merge conflicts
+**Feature-driven (in worktree):**
+- Status already "in_progress" (set during /next-feature)
+- Do NOT update features.json (lives in main)
+- Note discovered work in plan document only:
+  ```markdown
+  ## Discovered Work
+  - [ ] {id}.1: Description (blocks/parallel)
+  ```
+- Keep changes modular to reduce merge conflicts
 - Avoid modifying shared files unless necessary
+
+**Standalone (no features.json):**
+- Work directly, no worktree considerations
 ```
+
+---
 
 ### commit.md
 
-Add worktree-aware behavior:
-
 ```markdown
-### Worktree Mode
+### Mode Detection
 
-If in worktree (`test -f .git`):
+Check if `features.json` exists in project root.
+
+**Feature-driven (in worktree):**
 - Commit code changes only
+- Do NOT archive plan (happens in /finalize)
 - Do NOT update features.json (lives in main)
-- Do NOT archive plan document (happens in finalize)
-- Report: "Committed in worktree. Run /finalize {id} in main to complete."
+- Report: "Committed. Run /finalize {id} in main when ready."
+
+**Standalone (no features.json):**
+- Archive plan to docs/history/yyyymmdd_{name}.md
+- Commit all changes
+- Report: "Committed and archived."
 ```
+
+---
 
 ### NEW: finalize.md
 
 ```markdown
 ---
 argument-hint: [feature-id]
-description: Merge worktree branch back to main and complete feature tracking.
+description: Merge feature branch to main, update tracking, cleanup worktree.
 ---
 
-Finalize feature **$1** by merging its worktree branch and updating tracking.
+Finalize feature **$1** from main worktree.
 
 ### Prerequisites
-
-- Must be run from main worktree (not from a feature worktree)
-- Feature must be in "in_progress" status
-- Worktree ../wt-{id} must exist
+- Must run from main (features.json must exist here)
+- Worktree ../wt-$1 must exist
 
 ### Steps
 
-1. **Verify context:**
-   - Confirm in main repo: `test -d .git`
-   - Confirm worktree exists: `git worktree list | grep wt-$1`
-
-2. **Merge feature branch:**
+1. **Merge feature branch:**
    ```bash
    git merge feat/$1
    ```
    If conflicts: stop, report to user, do not auto-resolve.
 
-3. **Archive plan document:**
-   - Copy from worktree: `cp ../wt-$1/$1.md docs/history/$1.md`
-   - Transform to spec (remove implementation details, keep checklist)
+2. **Archive plan:**
+   - Copy `../wt-$1/$1.md` to `docs/history/$1.md`
+   - Transform to spec (remove implementation details)
 
-4. **Update features.json:**
+3. **Update features.json:**
    - Set status → "done"
    - Set spec_file → "docs/history/$1.md"
-   - Add any discovered work noted in plan document
+   - Parse "Discovered Work" from plan, add entries
 
-5. **Commit:**
+4. **Commit:**
    ```bash
-   git add docs/history/$1.md features.json
-   git commit -m "Finalize $1: merge feature and update tracking"
+   git commit -am "Finalize $1"
    ```
 
-6. **Cleanup:**
+5. **Cleanup:**
    ```bash
    git worktree remove ../wt-$1
    git branch -d feat/$1
    ```
 
-7. **Report:**
+6. **Report:**
    ```
    FINALIZED: [id]
-   Branch merged, worktree removed
-   Spec archived: docs/history/[id].md
+   Merged: feat/[id] → main
+   Archived: docs/history/[id].md
    ```
 ```
 
@@ -269,90 +257,58 @@ Finalize feature **$1** by merging its worktree branch and updating tracking.
 
 ## Conflict Prevention
 
-Add to execute.md for worktree mode:
+For feature-driven mode, add to execute.md:
 
 ```markdown
 ### Minimizing Merge Conflicts
 
-When working in a worktree:
 - Keep changes modular and targeted to the feature's scope
-- Avoid modifying shared files (utils, configs, base components) unless necessary
+- Avoid modifying shared files (utils, configs) unless necessary
 - If shared files must change, make minimal, surgical edits
 - Prefer adding new files over modifying existing shared ones
-- This reduces merge conflict likelihood when finalizing
 ```
 
 ---
 
 ## Race Condition Handling
 
-**Scenario:** Two agents run `/next-feature --parallel` simultaneously, both select auth-001.
-
-**Solution:** First agent to commit claims the work.
+Two agents claim same feature simultaneously:
 
 ```
-Agent 1: selects auth-001, updates features.json
-Agent 1: git commit → succeeds, auth-001 claimed
-
-Agent 2: selects auth-001, updates features.json
-Agent 2: git commit → fails (features.json changed upstream)
-Agent 2: git pull, re-reads features.json
-Agent 2: auth-001 now in_progress, selects next available (auth-002)
+Agent 1: updates features.json, commits → succeeds (claimed)
+Agent 2: updates features.json, commits → fails (conflict)
+Agent 2: pulls, re-reads features.json, selects next available
 ```
 
-The commit acts as an atomic claim. Agents should handle commit failure gracefully by re-selecting.
+First commit wins. Agents handle failure by re-selecting.
 
 ---
 
-## Discovered Work in Worktrees
+## Discovered Work
 
-When agent discovers sub-tasks (e.g., auth-001.1) while in worktree:
+In worktree, agent notes discovered sub-tasks in plan document:
 
-1. **Note in plan document:**
-   ```markdown
-   ## Discovered Work
-   - [ ] auth-001.1: Email validation helper (blocks auth-001)
-   ```
+```markdown
+## Discovered Work
+- [ ] auth-001.1: Email validation helper (blocks current)
+- [ ] auth-001.2: Password strength check (parallel)
+```
 
-2. **Do NOT update features.json** (lives in main)
-
-3. **During finalize:**
-   - Parse discovered work from plan document
-   - Add entries to features.json in main
-   - Set discovered_from: "auth-001"
-
----
-
-## Implementation Phases
-
-### Phase 1: Foundation
-- [ ] Create finalize.md command
-- [ ] Add worktree detection to execute.md
-- [ ] Add worktree detection to commit.md
-- [ ] Add --parallel mode to next-feature.md
-
-### Phase 2: Integration
-- [ ] Update FEATURES_PLUS.md with parallel workflow
-- [ ] Update README.md with parallel section
-- [ ] Add conflict prevention guidance to execute.md
-
-### Phase 3: Polish
-- [ ] Test full parallel workflow with 2 agents
-- [ ] Handle edge cases (orphaned worktrees, stale claims)
-- [ ] Document recovery procedures
+During `/finalize`, agent parses this section and adds entries to features.json with `discovered_from` set.
 
 ---
 
 ## Summary
 
-**Key changes:**
-- `next-feature --parallel`: claim + create worktree
-- `execute` in worktree: skip features.json, note discovered work in plan
-- `commit` in worktree: code only, no tracking updates
-- **NEW** `finalize`: merge, archive, update tracking, cleanup
+**Two modes based on features.json existence:**
+- No features.json → standalone, simple direct work
+- features.json exists → worktree-based, parallel-safe
 
-**Key principle:**
-features.json is the coordination point. It lives in main only. Worktrees are isolated code sandboxes.
+**Command behavior:**
+- `next-feature`: claim + create worktree (if features.json)
+- `plan-md`: create plan, naming based on mode
+- `execute`: work, note discovered items in plan (not features.json if in worktree)
+- `commit`: code only in worktree, full commit in standalone
+- `finalize`: merge, archive, update tracking, cleanup (feature-driven only)
 
-**Conflict strategy:**
-Prevention (modular changes) + graceful handling (report to user, no auto-resolve).
+**Key principle:** features.json is coordination point, lives in main only.
