@@ -29,10 +29,9 @@ Before implementing new functionality, verify that existing features affected by
 During implementation, you may encounter sub-tasks not in the original plan.
 
 **If working on a tracked feature (plan file matches `{epic}-{nnn}.md`):**
-1. Add discovered items to features.json via jq:
-   - ID: `{parent-id}.n` (e.g., `auth-001.1`)
-   - `discovered_from`: parent feature ID
-   - `status`: `"pending"`, `created_at`: today
+1. Add discovered items to features.json via jq (all fields, matching existing schema):
+   - `id`: `{parent-id}.n` (e.g., `auth-001.1`)
+   - `discovered_from`: parent feature ID, `status`: `"pending"`
 2. Assess impact:
    - If it blocks current work → pause, work on discovered item first
    - If parallelizable → add to backlog, continue current work
