@@ -1,6 +1,6 @@
 ---
 description: Context prime the model by reading files relevant to a task.
-model: claude-sonnet-4-5
+model: claude-haiku-4-5
 ---
 
 Read and thoroughly understand this codebase by examining `docs/STRUCTURE.md` (or similar documentation files), understanding its purpose, architecture, components, and coding/design philosophy.

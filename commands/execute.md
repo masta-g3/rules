@@ -9,7 +9,8 @@ Work directly from the active plan we have been discussing.
 Quick smoke test to confirm project isn't broken—keep this minimal:
 - **Web apps**: Start dev server, verify homepage loads
 - **Libraries/packages**: Run `npm test` or equivalent, verify it passes
-- **CLI tools**: Run one basic command, verify exit code 0 (for TUIs: ensure clean exit/reset to avoid terminal artifacts)
+- **CLI tools (non-TUI)**: Run one basic command, verify exit code 0
+- **TUIs**: Prefer Textual headless (`app.run_test`) to avoid terminal artifacts; otherwise ensure clean exit/reset to avoid garbled text
 
 One test that tells you "proceed" or "broken." If broken, stop and report to user.
 

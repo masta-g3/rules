@@ -28,6 +28,8 @@ For quick tasks without multi-session tracking:
 /commit                      → archive plan, commit changes
 ```
 
+Standalone mode applies only when `features.json` does not exist. If it does, `/plan-md` will auto-register untracked work, assign an ID, and use feature-driven naming/archiving instead.
+
 ### Feature-Driven (Multi-Session Projects)
 
 For complex projects with backlog tracking via `features.json`:
@@ -39,6 +41,8 @@ For complex projects with backlog tracking via `features.json`:
 /execute                             → implement, update status to in_progress
 /commit                              → archive, update status to done
 ```
+
+Any new request planned via `/plan-md` while `features.json` exists will be registered (epic inferred, next ID assigned) and treated as a tracked feature.
 
 The plan file name carries state: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone.
 
