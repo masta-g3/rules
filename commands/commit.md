@@ -6,9 +6,7 @@ Archive the planning document (if present):
 
 If a markdown planning file exists for this work:
 
-**Determine archive path from plan file name:**
-- If plan file matches `{epic}-{nnn}.md` → archive to `docs/history/{id}.md`
-- Otherwise → archive to `docs/history/yyyymmdd_{name}.md`
+**Archive path:** `docs/history/yyyymmdd_{name}.md` (human-readable, chronological). Derive `{name}` from the feature description or plan file name.
 
 Transform into permanent spec: remove implementation details, keep completed checklist as summary.
 
@@ -18,11 +16,11 @@ Verify clean state before committing:
 - No AI slop: excess comments, defensive try/catch in trusted paths, `any` casts to bypass types
 - Code matches surrounding file conventions—if it looks out of place, fix it
 
-Update features.json (if exists and tracked feature):
+Update features.json (if tracked feature):
 
-If plan file was `{epic}-{nnn}.md`, use jq to:
+Use jq to update the feature entry:
 1. Set `status` to `"done"`
-2. Set `spec_file` to the archive path
+2. Set `spec_file` to the archive path (this maps feature ID → human-readable spec)
 3. Verify any discovered items are properly logged
 
 Include features.json in the commit.
