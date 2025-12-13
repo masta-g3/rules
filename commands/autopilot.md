@@ -1,6 +1,17 @@
 ---
 argument-hint: [feature-id]
-description: Run complete feature cycle autonomously.
+description: Run complete feature cycle autonomously (Claude Code only).
+---
+
+**Requires Claude Code with hooks enabled.**
+
+If you are NOT running as Claude Code (no access to `.claude/settings.json` hooks), respond:
+```
+AUTOPILOT unavailable in this environment.
+Use manual workflow: /prime → /plan-md → /execute → /commit
+```
+Then stop.
+
 ---
 
 Initialize autopilot workflow for feature: `$1`

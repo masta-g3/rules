@@ -88,7 +88,42 @@ Requirements:
 - All `status: "pending"` initially
 - `created_at` set to today's date
 
-### 4. Initial Commit
+### 4. Workflow Infrastructure (Claude Code only)
+
+If you are running as **Claude Code** (identifiable by "Claude Code" in your system context and access to `.claude/settings.json` hooks):
+
+1. Create `.claude/scripts/workflow.sh`:
+   ```bash
+   #!/bin/bash
+   STATE=".claude/workflow.json"
+   [[ ! -f "$STATE" ]] && exit 0
+   NEXT=$(jq -r '.next // empty' "$STATE")
+   FEATURE=$(jq -r '.feature // empty' "$STATE")
+   [[ -z "$NEXT" ]] && exit 0
+   if [[ "$NEXT" == "/prime" || "$NEXT" == "/plan-md" ]]; then
+     CMD="$NEXT $FEATURE"
+   else
+     CMD="$NEXT"
+   fi
+   cat << EOF
+   {"decision": "block", "reason": "AUTOPILOT: Run $CMD"}
+   EOF
+   ```
+
+2. Create/merge `.claude/settings.json`:
+   ```json
+   {
+     "hooks": {
+       "Stop": [{"hooks": [{"type": "command", "command": "bash .claude/scripts/workflow.sh", "timeout": 5}]}]
+     }
+   }
+   ```
+
+3. Add `.claude/workflow.json` to `.gitignore`
+
+If running in **Cursor, Codex, OpenCode, or another environment**: skip this step.
+
+### 5. Initial Commit
 
 ```bash
 git add .
@@ -98,7 +133,7 @@ git commit -m "Initialize project with features.json backlog
 - [Stack/framework] project scaffold"
 ```
 
-### 5. Report to User
+### 6. Report to User
 
 Summarize:
 - Total feature count by epic

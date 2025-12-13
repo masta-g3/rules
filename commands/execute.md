@@ -54,10 +54,15 @@ Report status clearly:
 - **PENDING STEPS** — list remaining phases/tasks, indicate next action
 
 ---
-If `.claude/workflow.json` exists and plan is complete, update it: `jq '.next = "/commit"' .claude/workflow.json > tmp.$$ && mv -f tmp.$$ .claude/workflow.json`
+## Autopilot State Transition
 
-On exception (baseline/tests/build fail after fix attempts), clear workflow and report:
+If `.claude/workflow.json` exists (autopilot is active) AND plan is complete, advance the workflow:
+```bash
+jq '.next = "/commit"' .claude/workflow.json > tmp.$$ && mv -f tmp.$$ .claude/workflow.json
 ```
+
+On exception (baseline/tests/build fail after fix attempts), abort autopilot:
+```bash
 rm -f .claude/workflow.json
 ```
 ```

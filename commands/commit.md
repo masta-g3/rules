@@ -53,7 +53,9 @@ Refactor API endpoints for better error handling.
 Finally verify if any updates are needed to the product documentation, mainly docs/STRUCTURE.md. Only document changes worth tracking that keep the document true to the codebase.
 
 ---
-If `.claude/workflow.json` exists:
+## Autopilot State Transition
+
+If `.claude/workflow.json` exists (autopilot is active), complete the workflow:
 ```bash
 FEATURE=$(jq -r '.feature' .claude/workflow.json)
 rm -f .claude/workflow.json
@@ -64,8 +66,8 @@ AUTOPILOT COMPLETE: $FEATURE
 Committed: <hash>
 ```
 
-On exception (git conflicts), clear workflow and report:
-```
+On exception (git conflicts), abort autopilot:
+```bash
 rm -f .claude/workflow.json
 ```
 ```

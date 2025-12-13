@@ -31,10 +31,15 @@ Given the request: **$1**, create and maintain a detailed Markdown implementatio
 Don't execute on this plan yet; the user will provide feedback and finally approve. After that, once you move to the implementation and make progress on it, verify if the plan actually corresponds to what was implemented, mark [x] what is completed, and if there are divergences, update the document. Keep a single document per session, and be sure to keep the scope limited to the feature request (specially when working with `features.json`).
 
 ---
-If `.claude/workflow.json` exists, update it: `jq '.next = "/execute"' .claude/workflow.json > tmp.$$ && mv -f tmp.$$ .claude/workflow.json`
+## Autopilot State Transition
 
-On exception (ambiguous requirements that cannot be resolved), clear workflow and report:
+If `.claude/workflow.json` exists (autopilot is active), advance the workflow:
+```bash
+jq '.next = "/execute"' .claude/workflow.json > tmp.$$ && mv -f tmp.$$ .claude/workflow.json
 ```
+
+On exception (ambiguous requirements that cannot be resolved), abort autopilot:
+```bash
 rm -f .claude/workflow.json
 ```
 ```
