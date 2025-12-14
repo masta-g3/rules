@@ -1,6 +1,7 @@
 ---
 description: Select the next feature to implement from features.json and prepare for the atomic cycle.
 model: claude-haiku-4-5
+disable-model-invocation: true
 ---
 
 ### 1. Review State

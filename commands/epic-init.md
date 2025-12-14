@@ -1,6 +1,7 @@
 ---
 argument-hint: [epic description]
 description: Decompose a complex feature into trackable sub-features for an existing codebase.
+disable-model-invocation: true
 ---
 
 Given the epic request: **$1**, break it down into trackable sub-features for multi-session development.

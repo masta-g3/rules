@@ -1,6 +1,7 @@
 ---
 argument-hint: [feature-id]
 description: Run complete feature cycle autonomously (Claude Code only).
+disable-model-invocation: true
 ---
 
 **Requires Claude Code with hooks enabled.**

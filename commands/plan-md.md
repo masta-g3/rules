@@ -1,6 +1,7 @@
 ---
 argument-hint: [request]
 description: Create and maintain a Markdown implementation plan from a single request string.
+disable-model-invocation: true
 ---
 
 Given the request: **$1**, create and maintain a detailed Markdown implementation plan as follows. Be sure to keep the scope limited to the specific request (i.e.: avoid scope creep).

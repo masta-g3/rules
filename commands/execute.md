@@ -1,5 +1,6 @@
 ---
 description: Implement the approved plan without introducing bloat.
+disable-model-invocation: true
 ---
 
 Work directly from the active plan we have been discussing.

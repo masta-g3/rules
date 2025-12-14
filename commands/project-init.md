@@ -1,6 +1,7 @@
 ---
 argument-hint: [project description]
 description: Initialize a new project with features.json backlog for multi-session development.
+disable-model-invocation: true
 ---
 
 Given the project request: **$1**, set up the foundation for multi-session development.

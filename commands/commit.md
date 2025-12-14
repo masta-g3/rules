@@ -1,5 +1,6 @@
 ---
 description: Archive planning document first, then commit files from session.
+disable-model-invocation: true
 ---
 
 Archive the planning document (if present):
@@ -8,7 +9,7 @@ If a markdown planning file exists for this work:
 
 **Archive path:** `docs/history/yyyymmdd_{name}.md` (human-readable, chronological). Derive `{name}` from the feature description or plan file name.
 
-Transform into permanent spec: remove implementation details, keep completed checklist as summary.
+Transform into permanent spec: remove implementation details, keep completed checklist as summary. Delete the original planning file after archiving.
 
 Verify clean state before committing:
 
