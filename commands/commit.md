@@ -7,7 +7,11 @@ Archive the planning document (if present):
 
 If a markdown planning file exists for this work:
 
-**Archive path:** `docs/history/yyyymmdd_{name}.md` (human-readable, chronological). Derive `{name}` from the feature description or plan file name.
+**Archive path:**
+- Feature-tracked: `docs/history/yyyymmdd_{feature-id}_{short_desc}.md` (e.g., `20241201_auth-001_user_signup.md`)
+- Standalone: `docs/history/yyyymmdd_{short_desc}.md` (e.g., `20241201_refactor_api.md`)
+
+Keep `{short_desc}` to 2-4 words, snake_case. The feature ID enables visual epic grouping when scanning the directory.
 
 Transform into permanent spec: remove implementation details, keep completed checklist as summary. Delete the original planning file after archiving.
 
