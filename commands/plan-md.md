@@ -12,6 +12,10 @@ Given the request: **$1**, create and maintain a detailed Markdown implementatio
 - **If `features.json` exists** and input isn't an ID: auto-register (infer epic, assign next number) → `{new-id}.md`
 - **Otherwise**: standalone mode → `FEATURE_NAME.md`
 
+### Clarify Before Planning
+
+If unclear on scope, requirements, or constraints—ask the user before creating the plan. Resolve what you can via codebase context and reasonable assumptions, but ask when genuinely needed.
+
 ### Create Plan
 
 1. Create markdown document with the determined name.
