@@ -28,10 +28,19 @@ If unclear on scope, requirements, or constraints—ask the user before creating
 5. If this feature involves UI work, include a design direction section:
    - Typography: choose distinctive, beautiful fonts—avoid generic defaults (Inter, Roboto, system fonts)
    - Color: commit to a cohesive theme with CSS variables; bold accents over timid palettes
-   - Motion: purposeful animations for delight; CSS-first approach
-   - Backgrounds: create atmosphere with gradients, patterns, depth—not flat solid colors
    - Centralize design tokens (colors, spacing, typography) in theme config or CSS variables—no scattered magic values
    - Avoid "AI slop": no generic purple gradients, no cookie-cutter layouts, no predictable patterns
+   - Use the frontend design skill if available
+
+6. If this feature touches critical paths, include a testing phase:
+   - **Data integrity**: validation, sanitization, transformations
+   - **Auth/permissions**: login flows, access control, token handling
+   - **Business logic**: calculations, state transitions, domain rules
+   - **Integrations**: API calls, database operations, external services
+
+   Add 1-3 focused tests as a phase. Test outcomes, not implementation details. Persistent tests go under `tests/`; ephemeral tests for one-off validation.
+
+   **Skip testing for**: trivial changes, UI-only work, glue code, or well-covered areas. Not every feature needs tests—only where bugs have real consequences.
 
 Don't execute on this plan yet; the user will provide feedback and finally approve. After that, once you move to the implementation and make progress on it, verify if the plan actually corresponds to what was implemented, mark [x] what is completed, and if there are divergences, update the document. Keep a single document per session, and be sure to keep the scope limited to the feature request (specially when working with `features.json`).
 

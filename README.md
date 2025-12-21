@@ -53,8 +53,6 @@ Stops on exceptions (baseline fails, tests fail, conflicts) with resume instruct
 cp -r /path/to/rules/.claude /your/project/
 ```
 
-See `WORKFLOW_CHAINING.md` for details.
-
 ## Commands
 
 | Command | Purpose |

@@ -3,9 +3,7 @@ description: Archive planning document first, then commit files from session.
 disable-model-invocation: true
 ---
 
-Archive the planning document (if present):
-
-If a markdown planning file exists for this work:
+If a markdown planning file exists for this work, archive it:
 
 **Archive path:**
 - Feature-tracked: `docs/history/yyyymmdd_{feature-id}_{short_desc}.md` (e.g., `20241201_auth-001_user_signup.md`)

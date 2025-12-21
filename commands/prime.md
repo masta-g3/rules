@@ -4,7 +4,7 @@ model: claude-haiku-4-5
 disable-model-invocation: true
 ---
 
-Read and thoroughly understand this codebase by examining `docs/STRUCTURE.md` (or similar documentation files), understanding its purpose, architecture, components, and coding/design philosophy.
+Read and thoroughly understand this codebase by examining `docs/STRUCTURE.md` (and relevant documentation files), understanding its purpose, architecture, components, and coding/design philosophy.
 
 Check recent git history (`git log --oneline -10`) for context on recent work.
 

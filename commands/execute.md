@@ -1,17 +1,17 @@
 ---
-description: Implement the approved plan without introducing bloat.
+description: Implement the approved plan.
 disable-model-invocation: true
 ---
 
 Work directly from the active plan we have been discussing.
 
-### Baseline Verification
+### Baseline Verification (First Task Only)
 
-Quick smoke test to confirm project isn't broken—keep this minimal:
-- **Web apps**: Start dev server, verify homepage loads
-- **Libraries/packages**: Run `npm test` or equivalent, verify it passes
-- **CLI tools (non-TUI)**: Run one basic command, verify exit code 0
-- **TUIs**: Prefer Textual headless (`app.run_test`) to avoid terminal artifacts; otherwise ensure clean exit/reset to avoid garbled text
+Quick smoke test on first engagement:
+- **Web apps**: Dev server starts, homepage loads
+- **Libraries/packages**: Test suite passes
+- **CLI tools**: Basic command exits 0
+- **TUIs**: Use headless mode (`app.run_test`) to avoid terminal artifacts
 
 One test that tells you "proceed" or "broken." If broken, stop and report to user.
 
@@ -44,6 +44,8 @@ Never silently absorb scope—make all work visible.
 While coding, adhere strictly to the minimalist philosophy originally outlined: avoid hacks, fallback mechanisms, or any form of bloat. Keep implementations clean, modular, and pattern-aligned.
 
 At the end of each phase, ensure the code is in a clean, reviewable state—no half-implemented features, no commented-out debugging code, no broken imports.
+
+When writing tests: no mock data, dummy assertions, or placeholder tests. Every test must validate actual functionality—if it doesn't test something meaningful, don't add it.
 
 If the work touches UI or UX, follow the principles and best practices championed by top research design labs.
 

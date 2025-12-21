@@ -29,7 +29,7 @@ Think through: foundation → core functionality → integration → polish. Fol
 **If `features.json` exists:**
 - Extract existing epic prefixes via jq
 - If this work extends an existing epic → use that prefix
-- If new domain → choose a short, descriptive prefix (e.g., `sync`, `export`, `dash`)
+- If new domain → choose a short, descriptive prefix (e.g., `authfix`, `cart`, `notif`, `dash`)
 
 **If `features.json` doesn't exist:** Create it as a root-level array `[{...}, ...]`. Choose prefix based on the epic's domain.
 
