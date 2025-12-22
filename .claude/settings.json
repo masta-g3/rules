@@ -18,7 +18,7 @@
       "hooks": [{
         "type": "command",
         "command": "bash .claude/scripts/workflow.sh",
-        "timeout": 5
+        "timeout": 15
       }]
     }]
   }

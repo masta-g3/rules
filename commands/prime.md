@@ -1,7 +1,7 @@
 ---
 description: Context prime the model by reading files relevant to a task.
 model: claude-haiku-4-5
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 Read and thoroughly understand this codebase by examining `docs/STRUCTURE.md` (and relevant documentation files), understanding its purpose, architecture, components, and coding/design philosophy.

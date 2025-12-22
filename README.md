@@ -50,7 +50,7 @@ Stops on exceptions (baseline fails, tests fail, conflicts) with resume instruct
 
 **Enable in a project:**
 ```bash
-cp -r /path/to/rules/.claude /your/project/
+/path/to/rules/setup-autopilot.sh /your/project
 ```
 
 ## Commands

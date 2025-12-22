@@ -1,6 +1,6 @@
 ---
 description: Implement the approved plan.
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 Work directly from the active plan we have been discussing.

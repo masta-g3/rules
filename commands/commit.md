@@ -1,6 +1,6 @@
 ---
 description: Archive planning document first, then commit files from session.
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 If a markdown planning file exists for this work, archive it:

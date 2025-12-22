@@ -8,15 +8,15 @@ FEATURE=$(jq -r '.feature // empty' "$STATE")
 
 [[ -z "$NEXT" ]] && exit 0
 
-if [[ "$NEXT" == "/prime" || "$NEXT" == "/plan-md" ]]; then
-  CMD="$NEXT $FEATURE"
-else
-  CMD="$NEXT"
-fi
+# Validate known commands
+case "$NEXT" in
+  /prime|/plan-md)
+    [[ -z "$FEATURE" ]] && { echo '{"decision":"block","reason":"AUTOPILOT ERROR: '"$NEXT"' requires feature ID"}'; exit 0; }
+    CMD="$NEXT $FEATURE" ;;
+  /execute|/commit)
+    CMD="$NEXT" ;;
+  *)
+    echo '{"decision":"block","reason":"AUTOPILOT ERROR: Unknown command '"$NEXT"'"}'; exit 0 ;;
+esac
 
-cat << EOF
-{
-  "decision": "block",
-  "reason": "AUTOPILOT: Run $CMD"
-}
-EOF
+echo '{"decision":"block","reason":"AUTOPILOT: Run '"$CMD"'"}'

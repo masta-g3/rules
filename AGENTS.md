@@ -55,6 +55,11 @@ We are working at a lean startup, maintained by a small team of 10x engineers, n
 - Create ephemeral tests to validate features and implementations. Iterate until expected results, then remove temporary tests.
 </Testing>
 
+<Autopilot>
+When a Stop hook blocks with reason starting with "AUTOPILOT:", execute the slash command specified.
+Example: "AUTOPILOT: Run /prime auth-001" → immediately run /prime auth-001
+</Autopilot>
+
 <features_json_operations>
 When `features.json` exists, avoid reading the full file into context—it may contain hundreds of entries. Use `jq` for lightweight extraction:
 

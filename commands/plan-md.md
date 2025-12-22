@@ -1,12 +1,14 @@
 ---
 argument-hint: [request]
 description: Create and maintain a Markdown implementation plan from a single request string.
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 Given the request: **$1**, create and maintain a detailed Markdown implementation plan as follows. Be sure to keep the scope limited to the specific request (i.e.: avoid scope creep).
 
-### Plan File Naming
+### Plan File Location & Naming
+
+Store plans in `docs/plans/`:
 
 - **If input is a feature ID** (e.g., `auth-001: description`): use that ID → `auth-001.md`
 - **If `features.json` exists** and input isn't an ID: auto-register (infer epic, assign next number) → `{new-id}.md`
