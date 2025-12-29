@@ -6,14 +6,11 @@ disable-model-invocation: true
 
 Given the epic request: **$1**, break it down into trackable sub-features for multi-session development.
 
-### 1. Gather Context
+### Clarify Before Decomposing
 
-- Read `docs/STRUCTURE.md` (if present) for architecture and patterns
-- Run `git log --oneline -10` for recent work context
-- If `features.json` exists, extract epic prefixes and status counts via jq
-- Identify relevant files/modules that this epic will touch
+If the epic scope, boundaries, or constraints are unclear, ambiguous or too broad—ask the user before proceeding (you can use the AskUserQuestion tool for this if available). Decomposition errors are costly to fix later.
 
-### 2. Decompose Epic
+### 1. Decompose Epic
 
 Break down into **atomic features**—each with one testable outcome, completable in one session.
 
@@ -24,16 +21,9 @@ Break down into **atomic features**—each with one testable outcome, completabl
 
 Think through: foundation → core functionality → integration → polish. Fold trivial setup into the first feature that needs it.
 
-### 3. Determine Epic Prefix
+### 2. Generate Features
 
-**If `features.json` exists:**
-- Extract existing epic prefixes via jq
-- If this work extends an existing epic → use that prefix
-- If new domain → choose a short, descriptive prefix (e.g., `authfix`, `cart`, `notif`, `dash`)
-
-**If `features.json` doesn't exist:** Create it as a root-level array `[{...}, ...]`. Choose prefix based on the epic's domain.
-
-### 4. Generate Features
+Choose a short, descriptive epic prefix (e.g., `auth`, `cart`, `notif`, `dash`). If `features.json` exists, extract existing prefixes via jq—extend an existing epic if this work belongs there, otherwise create a new prefix.
 
 Create or append to `features.json` with entries following this schema:
 
@@ -69,24 +59,9 @@ Use jq to append without reading full file into context:
 jq '. += [<new_features>]' features.json > tmp.$$ && mv tmp.$$ features.json
 ```
 
-### 5. Report to User
+### 3. Report to User
 
-Summarize:
-```
-EPIC: {prefix}
-Features: {count} total
-  - Priority 1 (foundation): {n}
-  - Priority 2 (core): {n}
-  - Priority 3 (polish): {n}
-
-Dependency chain:
-  {prefix}-001 → {prefix}-002 → {prefix}-003
-                              ↘ {prefix}-004
-
-Recommended start: {first-ready-feature-id}
-```
-
-List any assumptions made or clarifications needed before starting.
+Summarize the decomposition: epic prefix, feature count by priority, key dependencies, and recommended starting feature. List any assumptions made or clarifications needed before starting.
 
 ---
 

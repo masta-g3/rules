@@ -3,17 +3,11 @@ description: Implement the approved plan.
 disable-model-invocation: false
 ---
 
-Work directly from the active plan we have been discussing.
+Work directly from the active plan or task we have been discussing.
 
 ### Baseline Verification (First Task Only)
 
-Quick smoke test on first engagement:
-- **Web apps**: Dev server starts, homepage loads
-- **Libraries/packages**: Test suite passes
-- **CLI tools**: Basic command exits 0
-- **TUIs**: Use headless mode (`app.run_test`) to avoid terminal artifacts
-
-One test that tells you "proceed" or "broken." If broken, stop and report to user.
+Run a minimal smoke test before starting—run relevant tests if they exist, or start the app and confirm basic functionality. One quick check that confirms "system works" or "something's broken." If broken, stop and report to user.
 
 ### Begin Implementation
 
@@ -30,10 +24,11 @@ Before implementing new functionality, verify that existing features affected by
 During implementation, you may encounter sub-tasks not in the original plan.
 
 **If working on a tracked feature (plan file matches `{epic}-{nnn}.md`):**
-1. Add discovered items to features.json via jq (all fields, matching existing schema):
+1. Check if this work already exists in features.json—if so, note the dependency but don't duplicate
+2. If genuinely new, add to features.json via jq (all fields, matching existing schema):
    - `id`: `{parent-id}.n` (e.g., `auth-001.1`)
    - `discovered_from`: parent feature ID, `status`: `"pending"`
-2. Assess impact:
+3. Assess impact:
    - If it blocks current work → pause, work on discovered item first
    - If parallelizable → add to backlog, continue current work
 
@@ -41,13 +36,15 @@ During implementation, you may encounter sub-tasks not in the original plan.
 
 Never silently absorb scope—make all work visible.
 
+### Code Quality
+
 While coding, adhere strictly to the minimalist philosophy originally outlined: avoid hacks, fallback mechanisms, or any form of bloat. Keep implementations clean, modular, and pattern-aligned.
 
 At the end of each phase, ensure the code is in a clean, reviewable state—no half-implemented features, no commented-out debugging code, no broken imports.
 
 When writing tests: no mock data, dummy assertions, or placeholder tests. Every test must validate actual functionality—if it doesn't test something meaningful, don't add it.
 
-If the work touches UI or UX, follow the principles and best practices championed by top research design labs.
+If the work touches UI or UX, follow the design principles and best practices of by top research design labs.
 
 ### Session End
 
@@ -64,14 +61,4 @@ If `.claude/workflow.json` exists (autopilot is active) AND plan is complete, ad
 jq '.next = "/commit"' .claude/workflow.json > tmp.$$ && mv -f tmp.$$ .claude/workflow.json
 ```
 
-On exception (baseline/tests/build fail after fix attempts), abort autopilot:
-```bash
-rm -f .claude/workflow.json
-```
-```
-AUTOPILOT EXCEPTION: <baseline_failed|tests_failed|build_failed>
-
-<what failed>
-
-To resume after fixing: /autopilot <feature-id>
-```
+On exception (baseline/tests/build fail), abort autopilot (`rm -f .claude/workflow.json`) and report the issue to the user.

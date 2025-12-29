@@ -16,7 +16,7 @@ Transform into permanent spec: remove implementation details, keep completed che
 Verify clean state before committing:
 
 - No debugging artifacts (console.logs, print statements, TODO markers for this feature)
-- No AI slop: excess comments, defensive try/catch in trusted paths, `any` casts to bypass types
+- No AI slop: excess comments, defensive try/catch in trusted paths, unrequested default values, `any` casts to bypass types, etc.
 - Code matches surrounding file conventions—if it looks out of place, fix it
 
 Update features.json (if tracked feature):
@@ -69,15 +69,4 @@ AUTOPILOT COMPLETE: $FEATURE
 Committed: <hash>
 ```
 
-On exception (git conflicts), abort autopilot:
-```bash
-rm -f .claude/workflow.json
-```
-```
-AUTOPILOT EXCEPTION: git_conflicts
-
-Conflicting files:
-- <file list>
-
-To resume after resolving: /autopilot <feature-id>
-```
+On exception (git conflicts), abort autopilot (`rm -f .claude/workflow.json`) and report the issue to the user.
