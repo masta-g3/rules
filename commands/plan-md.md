@@ -37,6 +37,10 @@ If unclear on scope, requirements, or constraints—ask the user before creating
 
 Don't execute on this plan yet; the user will provide feedback and finally approve. After that, once you move to the implementation and make progress on it, verify if the plan actually corresponds to what was implemented, mark [x] what is completed, and if there are divergences, update the document. Keep a single document per session, and be sure to keep the scope limited to the feature request (specially when working with `features.json`).
 
+### Plan Review (Non-Trivial Plans Only)
+
+For plans involving architectural decisions, multi-file changes, or complex logic: invoke the **plan-critic** subagent via Task tool to review. Skip for trivial edits. Address valid concerns; ignore suggestions that add bloat.
+
 ---
 ## Autopilot State Transition
 

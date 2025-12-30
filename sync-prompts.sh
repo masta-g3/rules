@@ -18,3 +18,6 @@ mkdir -p "${codex_root}/prompts" "${claude_root}/commands" "${cursor_root}/comma
 rsync -a --delete "${repo_root}/commands/" "${codex_root}/prompts/"
 rsync -a --delete "${repo_root}/commands/" "${claude_root}/commands/"
 rsync -a --delete "${repo_root}/commands/" "${cursor_root}/commands/"
+
+mkdir -p "${claude_root}/agents"
+rsync -a --delete "${repo_root}/.claude/agents/" "${claude_root}/agents/"
