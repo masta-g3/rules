@@ -13,7 +13,13 @@ Keep `{short_desc}` to 2-4 words, snake_case. The feature ID enables visual epic
 
 Transform into permanent spec: remove implementation details, keep completed checklist as summary. Delete the original planning file after archiving.
 
-Verify clean state before committing:
+### Code Review (Non-Trivial Changes Only)
+
+For changes involving multiple files or significant logic: invoke the **code-critic** subagent via Task tool to review modified files. Skip for trivial edits (typos, single-line fixes). Address valid concerns before committing.
+
+### Verify Clean State
+
+Check modified files for:
 
 - No debugging artifacts (console.logs, print statements, TODO markers for this feature)
 - No AI slop: excess comments, defensive try/catch in trusted paths, unrequested default values, `any` casts to bypass types, etc.
