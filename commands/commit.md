@@ -64,14 +64,61 @@ Finally verify if any updates are needed to the product documentation, mainly do
 ---
 ## Autopilot State Transition
 
-If `.claude/workflow.json` exists (autopilot is active), complete the workflow:
+If `.claude/workflow.json` exists (autopilot is active):
+
+### Read mode
 ```bash
-FEATURE=$(jq -r '.feature' .claude/workflow.json)
-rm -f .claude/workflow.json
+MODE=$(jq -r '.mode // "single"' .claude/workflow.json)
+```
+
+### Single mode
+```bash
+if [[ "$MODE" == "single" ]]; then
+  FEATURE=$(jq -r '.feature' .claude/workflow.json)
+  rm -f .claude/workflow.json
+fi
 ```
 Output:
 ```
 AUTOPILOT COMPLETE: $FEATURE
+Committed: <hash>
+```
+
+### Continuous mode
+```bash
+if [[ "$MODE" == "continuous" ]]; then
+  EPIC=$(jq -r '.epic' .claude/workflow.json)
+
+  # Find next ready feature in epic (status=pending, deps satisfied)
+  NEXT_FEATURE=$(jq -r --arg e "$EPIC" '
+    ([.[] | select(.status == "done") | .id]) as $done |
+    [.[] | select(
+      .status == "pending" and
+      (.id | startswith($e)) and
+      ((.depends_on // []) | all(. as $dep | $done | index($dep)))
+    )] |
+    sort_by(.priority, .created_at) |
+    .[0].id // empty
+  ' features.json)
+
+  if [[ -n "$NEXT_FEATURE" ]]; then
+    # Loop back
+    jq --arg f "$NEXT_FEATURE" '.feature = $f | .next = "/prime"' .claude/workflow.json > tmp.$$ && mv tmp.$$ .claude/workflow.json
+  else
+    # Epic complete
+    rm -f .claude/workflow.json
+  fi
+fi
+```
+
+Output if looping:
+```
+AUTOPILOT CONTINUING: $NEXT_FEATURE
+```
+
+Output if complete:
+```
+AUTOPILOT COMPLETE: $EPIC epic
 Committed: <hash>
 ```
 

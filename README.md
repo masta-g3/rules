@@ -42,9 +42,13 @@ Autonomous feature cycle via Stop hooks:
 ```
 /autopilot              → picks next feature, runs full cycle
 /autopilot feature-id   → runs cycle for specific feature
+/autopilot --epic       → completes all ready features in auto-detected epic
+/autopilot --epic auth  → completes all ready features in auth-* epic
 ```
 
 Chains: `/prime` → `/plan-md` → `/execute` → `/commit`
+
+Single mode stops after one feature. Continuous mode (`--epic`) loops back after each commit until no ready features remain in the epic.
 
 Stops on exceptions (baseline fails, tests fail, conflicts) with resume instructions.
 
