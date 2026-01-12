@@ -35,6 +35,12 @@ If unclear on scope, requirements, or constraints—ask the user before creating
 
 5. Add an implementation section that divides work into incremental phases—foundation first, then progressive refinement (e.g., architecture setup → core components → specific features → polish). Use [ ] checkboxes to track progress. End each phase with a verification step to confirm it works and didn't break existing functionality.
 
+6. Include a **verification strategy** for each phase:
+   - Focus on outcomes, not syntax: "Does it achieve the goal?" not "Does it import?"
+   - For side effects: test actual workflows end-to-end, but keep operations read-only or ephemeral (no real state mutations)
+   - For pure logic: test with realistic inputs and edge cases
+   - If a function's only test is that it exists, it's not tested
+
 Don't execute on this plan yet; the user will provide feedback and finally approve. After that, once you move to the implementation and make progress on it, verify if the plan actually corresponds to what was implemented, mark [x] what is completed, and if there are divergences, update the document. Keep a single document per session, and be sure to keep the scope limited to the feature request (specially when working with `features.json`).
 
 ### Plan Review (Non-Trivial Plans Only)
