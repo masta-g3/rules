@@ -21,3 +21,12 @@ rsync -a --delete "${repo_root}/commands/" "${cursor_root}/commands/"
 
 mkdir -p "${claude_root}/agents"
 rsync -a --delete "${repo_root}/.claude/agents/" "${claude_root}/agents/"
+
+mkdir -p "${claude_root}/statusline"
+rsync -a "${repo_root}/statusline/" "${claude_root}/statusline/"
+
+# Merge statusLine config into settings.json
+if [[ -f "${claude_root}/settings.json" ]]; then
+  jq '. + {statusLine: {type: "command", command: "bash ~/.claude/statusline/minimal.sh"}}' \
+    "${claude_root}/settings.json" > tmp.$$ && mv tmp.$$ "${claude_root}/settings.json"
+fi
