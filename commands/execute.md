@@ -46,6 +46,19 @@ When writing tests: no mock data, dummy assertions, or placeholder tests. Every 
 
 If the work touches UI or UX, follow the design principles and best practices of by top research design labs.
 
+### Functional Testing (Complex User-Facing Features Only)
+
+For substantial features where users interact directly—new UI flows, API endpoints, database schemas with user-visible impact, interactive elements (games, editors, etc.): invoke a testing subagent via Task tool to verify end-to-end behavior.
+
+Test as a user would:
+- UI: browser automation to walk through flows
+- API: call endpoints with realistic payloads
+- Data: query edge cases that could corrupt or mishandle user data
+
+Keep testing concise but comprehensive—verify the feature works and key edge cases are covered. Skip for internal refactors or changes without user-observable behavior.
+
+Fix issues found before proceeding. Report test summary to user (what was tested, pass/fail, any caveats).
+
 ### Session End
 
 Report status clearly:
