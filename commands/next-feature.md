@@ -6,9 +6,23 @@ disable-model-invocation: true
 
 ### 1. Review State
 
-- Read `docs/STRUCTURE.md` (if present) for project context
-- Use jq to extract feature status summary from `features.json`
 - Run `git log --oneline -10` to understand recent work
+- Use this jq query to find the next ready feature in one pass:
+
+```bash
+jq '
+  ([.[] | select(.status == "done") | .id]) as $done |
+  [.[] | select(
+    .status == "pending" and
+    ((.depends_on // []) | all(. as $dep | $done | index($dep)))
+  )] |
+  unique_by(.id) |
+  sort_by(.priority, .created_at) |
+  .[0]
+' features.json
+```
+
+- Read `docs/STRUCTURE.md` only if feature context is unclear
 
 ### 2. Select Feature
 

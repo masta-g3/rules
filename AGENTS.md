@@ -61,6 +61,14 @@ Example: "AUTOPILOT: Run /prime auth-001" → immediately run /prime auth-001
 </Autopilot>
 
 <features_json_operations>
+`features.json` is a project backlog file tracking features through the development cycle. Minimal schema:
+
+```json
+{"id": "auth-001", "status": "pending|in_progress|done", "description": "...", "priority": 1, "depends_on": [], "created_at": "2024-01-15"}
+```
+
+Optional fields: `discovered_from`, `spec_file`, or custom metadata as needed.
+
 When `features.json` exists, avoid reading the full file into context—it may contain hundreds of entries. Use `jq` for lightweight extraction:
 
 - Extract specific fields (epic prefixes, status counts, recent by created_at)
