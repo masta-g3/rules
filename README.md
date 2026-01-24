@@ -63,31 +63,72 @@ Stops on exceptions (baseline fails, tests fail, conflicts) with resume instruct
 |---------|---------|
 | `autopilot.md` | Autonomous feature cycle (Claude Code) |
 | `project-init.md` | Initialize project with features.json |
+| `epic-init.md` | Initialize new epic with features |
 | `next-feature.md` | Select next ready feature |
 | `prime.md` | Context prime: structure docs, git history |
 | `plan-md.md` | Create implementation plan |
 | `execute.md` | Implement with baseline verification |
 | `commit.md` | Archive plan, commit |
-| `prechecks.md` | Pre-deployment verification |
+| `test-coverage.md` | Analyze test coverage |
+
+## CLI Tools
+
+### pv - Portfolio & Feature Viewer
+
+Terminal TUI for visualizing `features.json` across projects.
+
+**Install:**
+```bash
+./bin/install.sh
+```
+
+**Usage:**
+```bash
+pv                    # Portfolio view (scan ~/Code)
+pv /path/to/dir       # Portfolio view (scan specific directory)
+pv features.json      # Project view (specific file)
+fv                    # Project view (./features.json in current dir)
+```
+
+**Navigation:**
+- `j/k` or `↑/↓` - Move selection
+- `Enter` - Drill down (Portfolio → Project → Epic → Feature)
+- `Esc/b` - Go back
+- `s` - Cycle sort mode (portfolio)
+- `a` - Toggle show all projects
+- `z` - Show stalled only
+- `h/?` - Help
+- `q` - Quit
 
 ## features.json Schema
 
 ```json
 {
   "id": "auth-001",
-  "description": "User can sign up",
+  "epic": "auth",
   "status": "pending",
+  "title": "User can sign up",
+  "description": "Implement signup flow with email validation",
   "priority": 1,
-  "depends_on": [],
+  "depends_on": ["auth-000"],
+  "steps": ["Create form", "Add validation", "Connect API"],
+  "created_at": "2024-01-15",
+  "spec_file": "docs/plans/auth-001.md",
   "discovered_from": null,
-  "spec_file": null,
-  "created_at": "2024-01-15"
+  "notes": null
 }
 ```
 
-- **status**: `pending` → `in_progress` → `done` (or `blocked`)
-- **depends_on**: feature is "ready" when all deps are done
-- **discovered_from**: links emergent work to parent feature
+**Required:** `id`, `status`
+
+**Status values:** `pending` → `in_progress` → `done` (or `blocked`, `abandoned`, `superseded`)
+
+**Key fields:**
+- **epic**: Groups related features (e.g., "auth", "payments")
+- **depends_on**: Feature is "ready" when all deps are done
+- **steps**: Implementation checklist
+- **discovered_from**: Links emergent work to parent feature
+- **spec_file**: Path to implementation plan
 
 ## Setup
 
@@ -96,3 +137,4 @@ Stops on exceptions (baseline fails, tests fail, conflicts) with resume instruct
 ```
 
 See `AGENTS.md` for coding style and behavioral guidelines.
+See `docs/STRUCTURE.md` for project architecture.
