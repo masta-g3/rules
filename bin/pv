@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """
-pv - Project Viewer TUI
+pv - Portfolio & Feature Viewer
 
-A portfolio dashboard for all projects with features.json.
-Scans ~/Code, shows project health at a glance.
+Unified TUI for features.json tracking.
+Navigate: Portfolio → Project → Epic → Feature
 
 Usage:
-    pv              # Scan ~/Code, show dashboard
-    pv /path        # Scan specific directory
-    pv --help       # Show help
+    pv                    # Scan ~/Code, portfolio view
+    pv /path              # Scan specific directory
+    pv features.json      # Project view for specific file
+    fv                    # Alias: project view for ./features.json
 
 Navigation:
     j/k or ↑/↓  Move selection
-    Enter       Launch fv for selected project
-    s           Cycle sort mode
-    a           Toggle show all (including complete)
-    z           Show only stalled projects
+    Enter       Drill down (project/epic/feature)
+    b/Esc       Go back
+    s           Cycle sort mode (portfolio)
+    a           Toggle show all (portfolio)
+    z           Show stalled only (portfolio)
     h/?         Show help
     q           Quit
 """
@@ -28,32 +30,47 @@ import re
 import sys
 import tty
 import termios
-import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from shutil import get_terminal_size
 from typing import Any
 
-ANSI_ESCAPE = re.compile(r'\033\[[0-9;]*m')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONSTANTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+ANSI_ESCAPE = re.compile(r'\033\[[0-9;]*m')
+
 STATUS_DONE = {'done', 'complete'}
 STATUS_ACTIVE = {'in_progress'}
 STATUS_PENDING = {'pending'}
 
+STATUS_SYMBOL = {
+    'done': '✓', 'complete': '✓',
+    'in_progress': '◉',
+    'pending': '○',
+    'abandoned': '✗',
+    'superseded': '↷',
+}
+
+STATUS_COLOR = {
+    'done': 34, 'complete': 34,
+    'in_progress': 33,
+    'pending': 245,
+    'abandoned': 238,
+    'superseded': 238,
+}
+
 COLOR_MUTED = 240
+COLOR_EPIC = 39
 COLOR_PROJECT = 39
+COLOR_DEP = 213
 COLOR_HEALTHY = 34
 COLOR_ACTIVE = 33
 COLOR_STALLED = 131
 COLOR_BORDER = 237
-
-SORT_MODES = ['pending', 'modified', 'total', 'completion']
-STALL_DAYS = 14
 
 BOX = {
     'tl': '┌', 'tr': '┐', 'bl': '└', 'br': '┘',
@@ -61,18 +78,22 @@ BOX = {
 }
 
 BLOCKS = ' ▏▎▍▌▋▊▉█'
+SORT_MODES = ['open', 'modified', 'total', 'completion']
+STALL_DAYS = 14
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ANSI RENDERING
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def ansi(text: str, color: int | None = None, bold: bool = False) -> str:
-    if not (color or bold):
+def ansi(text: str, color: int | None = None, bold: bool = False, dim: bool = False) -> str:
+    if not (color or bold or dim):
         return text
     codes = []
     if bold:
         codes.append('1')
+    if dim:
+        codes.append('2')
     if color:
         codes.append(f'38;5;{color}')
     return f"\033[{';'.join(codes)}m{text}\033[0m"
@@ -144,12 +165,174 @@ def section_header(title: str, width: int) -> str:
     return f"  {ansi(title, bold=True)} {ansi(BOX['title'] * line_len, COLOR_MUTED)}"
 
 
+def getch() -> str:
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch = sys.stdin.read(1)
+        if not ch:
+            return 'q'
+        if ch == '\x1b':
+            ch2 = sys.stdin.read(1)
+            if not ch2:
+                return ch
+            if ch2 == '[':
+                ch3 = sys.stdin.read(1)
+                if not ch3:
+                    return ch
+                return {'A': 'up', 'B': 'down', 'C': 'right', 'D': 'left'}.get(ch3, ch)
+        return ch
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
-# DATA MODEL
+# DATA MODEL - FEATURES
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
-class Project:
+class Feature:
+    id: str
+    status: str
+    title: str = ''
+    description: str = ''
+    epic: str | None = None
+    depends_on: list[str] = field(default_factory=list)
+    priority: int | None = None
+    created_at: str | None = None
+    spec_file: str | None = None
+    steps: list[str] = field(default_factory=list)
+    discovered_from: str | None = None
+    notes: str | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Feature:
+        title = d.get('title') or d.get('name') or d.get('description', '')[:60] or d['id']
+        priority = d.get('priority')
+        if isinstance(priority, str):
+            priority = {'low': 3, 'medium': 2, 'high': 1, 'critical': 0}.get(priority.lower())
+
+        return cls(
+            id=d['id'],
+            status=d.get('status', 'pending'),
+            title=title,
+            description=d.get('description', ''),
+            epic=d.get('epic'),
+            depends_on=d.get('depends_on', []),
+            priority=priority,
+            created_at=d.get('created_at'),
+            spec_file=d.get('spec_file'),
+            steps=d.get('steps', []),
+            discovered_from=d.get('discovered_from'),
+            notes=d.get('notes'),
+        )
+
+    @property
+    def is_done(self) -> bool:
+        return self.status in STATUS_DONE
+
+    @property
+    def is_active(self) -> bool:
+        return self.status in STATUS_ACTIVE
+
+    @property
+    def is_pending(self) -> bool:
+        return self.status in STATUS_PENDING
+
+
+@dataclass
+class Epic:
+    name: str
+    features: list[Feature] = field(default_factory=list)
+
+    @property
+    def done(self) -> int:
+        return sum(1 for f in self.features if f.is_done)
+
+    @property
+    def active(self) -> int:
+        return sum(1 for f in self.features if f.is_active)
+
+    @property
+    def pending(self) -> int:
+        return sum(1 for f in self.features if f.is_pending)
+
+    @property
+    def total(self) -> int:
+        return len(self.features)
+
+    @property
+    def percent(self) -> float:
+        return (self.done / self.total * 100) if self.total else 0
+
+
+@dataclass
+class Model:
+    features: dict[str, Feature]
+    epics: dict[str, Epic]
+    activity: dict[str, list[str]]
+
+    @classmethod
+    def load(cls, path: str) -> Model:
+        with open(path) as f:
+            data = json.load(f)
+
+        features = {}
+        epics: dict[str, Epic] = {}
+        activity: dict[str, list[str]] = {}
+
+        for item in data:
+            feat = Feature.from_dict(item)
+            features[feat.id] = feat
+
+            epic_name = feat.epic or '(no epic)'
+            if epic_name not in epics:
+                epics[epic_name] = Epic(name=epic_name)
+            epics[epic_name].features.append(feat)
+
+            if feat.created_at:
+                if feat.created_at not in activity:
+                    activity[feat.created_at] = []
+                activity[feat.created_at].append(feat.id)
+
+        epics = dict(sorted(epics.items(), key=lambda x: (-x[1].percent, x[0])))
+        return cls(features=features, epics=epics, activity=activity)
+
+    @property
+    def total(self) -> int:
+        return len(self.features)
+
+    @property
+    def done(self) -> int:
+        return sum(1 for f in self.features.values() if f.is_done)
+
+    @property
+    def active(self) -> int:
+        return sum(1 for f in self.features.values() if f.is_active)
+
+    @property
+    def pending(self) -> int:
+        return sum(1 for f in self.features.values() if f.is_pending)
+
+    def upcoming(self) -> list[Feature]:
+        upcoming = [f for f in self.features.values() if f.is_active or f.is_pending]
+        return sorted(upcoming, key=lambda f: (
+            0 if f.is_active else 1,
+            f.priority if f.priority is not None else 999,
+            f.created_at or '9999',
+        ))
+
+    def unlocks(self, feature_id: str) -> list[str]:
+        return [f.id for f in self.features.values() if feature_id in f.depends_on]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DATA MODEL - PORTFOLIO
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class ProjectSummary:
     path: str
     name: str
     total: int = 0
@@ -162,9 +345,10 @@ class Project:
     last_modified: datetime | None = None
     oldest_pending_date: str | None = None
     worked_today: bool = False
+    _detail: Model | None = field(default=None, repr=False)
 
     @classmethod
-    def from_path(cls, features_path: str) -> Project | None:
+    def from_path(cls, features_path: str) -> ProjectSummary | None:
         try:
             with open(features_path) as f:
                 data = json.load(f)
@@ -213,6 +397,12 @@ class Project:
 
         return proj
 
+    def load_detail(self) -> Model:
+        if self._detail is None:
+            features_path = os.path.join(self.path, 'features.json')
+            self._detail = Model.load(features_path)
+        return self._detail
+
     @property
     def percent(self) -> float:
         return (self.done / self.total * 100) if self.total else 0
@@ -237,7 +427,7 @@ class Project:
 
 @dataclass
 class Portfolio:
-    projects: list[Project]
+    projects: list[ProjectSummary]
 
     @property
     def total_projects(self) -> int:
@@ -263,9 +453,10 @@ class Portfolio:
     def complete_projects(self) -> int:
         return sum(1 for p in self.projects if p.is_complete)
 
-    def sorted_by(self, mode: str) -> list[Project]:
-        if mode == 'pending':
-            return sorted(self.projects, key=lambda p: -p.pending)
+    def sorted_by(self, mode: str) -> list[ProjectSummary]:
+        if mode == 'open':
+            # Sort by total open work (pending + active), most first
+            return sorted(self.projects, key=lambda p: -(p.pending + p.active))
         elif mode == 'modified':
             return sorted(self.projects, key=lambda p: p.last_modified or datetime.min, reverse=True)
         elif mode == 'total':
@@ -274,7 +465,7 @@ class Portfolio:
             return sorted(self.projects, key=lambda p: p.percent)
         return self.projects
 
-    def filtered(self, show_all: bool = False, stalled_only: bool = False) -> list[Project]:
+    def filtered(self, show_all: bool = False, stalled_only: bool = False) -> list[ProjectSummary]:
         if stalled_only:
             return [p for p in self.projects if p.is_stalled]
         if show_all:
@@ -286,12 +477,19 @@ def scan_projects(root: str) -> Portfolio:
     projects = []
     root_path = Path(root).expanduser()
 
-    for features_path in root_path.rglob('features.json'):
-        if any(part.startswith('.') or part == 'node_modules' for part in features_path.parts):
-            continue
-        proj = Project.from_path(str(features_path))
-        if proj and proj.total > 0:
-            projects.append(proj)
+    # Directories to skip entirely (never traverse into)
+    skip_dirs = {'.git', 'node_modules', '__pycache__', '.venv', 'venv', '.tox',
+                 'dist', 'build', '.eggs', '.mypy_cache', '.pytest_cache'}
+
+    for dirpath, dirnames, filenames in os.walk(root_path):
+        # Prune directories in-place BEFORE os.walk descends into them
+        dirnames[:] = [d for d in dirnames if not d.startswith('.') and d not in skip_dirs]
+
+        if 'features.json' in filenames:
+            features_path = os.path.join(dirpath, 'features.json')
+            proj = ProjectSummary.from_path(features_path)
+            if proj and proj.total > 0:
+                projects.append(proj)
 
     return Portfolio(projects=projects)
 
@@ -300,11 +498,10 @@ def scan_projects(root: str) -> Portfolio:
 # VIEWS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def view_dashboard(portfolio: Portfolio, state: 'State', width: int, height: int) -> list[str]:
+def view_portfolio(portfolio: Portfolio, state: 'State', width: int, height: int) -> list[str]:
     lines = []
     inner = width - 4
 
-    # Portfolio summary
     lines.append('')
     lines.append(section_header('PORTFOLIO', inner))
     lines.append('')
@@ -324,7 +521,6 @@ def view_dashboard(portfolio: Portfolio, state: 'State', width: int, height: int
         status.append(ansi(f"✓ {portfolio.complete_projects} complete", COLOR_HEALTHY))
     lines.append('  ' + '    '.join(status))
 
-    # Project list
     lines.append('')
     lines.append(section_header(f'PROJECTS (sort: {state.sort_mode})', inner))
     lines.append('')
@@ -334,7 +530,7 @@ def view_dashboard(portfolio: Portfolio, state: 'State', width: int, height: int
     display = [p for p in sorted_projects if p in filtered]
 
     for i, proj in enumerate(display):
-        cursor = ansi('▸', COLOR_PROJECT, bold=True) if i == state.selected else ' '
+        cursor = ansi('▸', COLOR_PROJECT, bold=True) if i == state.project_index else ' '
         name = truncate(proj.name, 16).ljust(16)
         bar = progress_bar(proj.done, proj.total, 16)
         count = f"{proj.done}/{proj.total}".rjust(7)
@@ -360,7 +556,6 @@ def view_dashboard(portfolio: Portfolio, state: 'State', width: int, height: int
     if not display:
         lines.append(f"  {ansi('No projects match current filter', COLOR_MUTED)}")
 
-    # Attention section
     stalled = [p for p in portfolio.projects if p.is_stalled]
     if stalled and not state.stalled_only:
         lines.append('')
@@ -369,6 +564,209 @@ def view_dashboard(portfolio: Portfolio, state: 'State', width: int, height: int
         for proj in stalled[:3]:
             days = (datetime.now() - proj.last_modified).days if proj.last_modified else '?'
             lines.append(f"  {ansi('⚠', COLOR_STALLED)} {proj.name}: stalled {days} days, {proj.pending} pending")
+
+    lines.append('')
+    return lines
+
+
+def view_project(model: Model, state: 'State', width: int, height: int) -> list[str]:
+    lines = []
+    inner = width - 4
+
+    lines.append('')
+    lines.append(section_header('PROGRESS', inner))
+    lines.append('')
+
+    pct = (model.done / model.total * 100) if model.total else 0
+    bar_width = min(50, inner - 20)
+    lines.append(f"  {progress_bar(model.done, model.total, bar_width)}  {model.done}/{model.total}  {pct:.1f}%")
+
+    status_parts = []
+    if model.done:
+        status_parts.append(ansi(f"✓ {model.done} done", STATUS_COLOR['done']))
+    if model.active:
+        status_parts.append(ansi(f"◉ {model.active} active", STATUS_COLOR['in_progress']))
+    if model.pending:
+        status_parts.append(ansi(f"○ {model.pending} pending", STATUS_COLOR['pending']))
+    abandoned = sum(1 for f in model.features.values() if f.status == 'abandoned')
+    if abandoned:
+        status_parts.append(ansi(f"✗ {abandoned} abandoned", STATUS_COLOR['abandoned']))
+    superseded = sum(1 for f in model.features.values() if f.status == 'superseded')
+    if superseded:
+        status_parts.append(ansi(f"↷ {superseded} superseded", STATUS_COLOR['superseded']))
+    lines.append('  ' + '   '.join(status_parts))
+
+    lines.append('')
+    lines.append(section_header('EPICS', inner))
+    lines.append('')
+
+    for i, (epic_name, epic) in enumerate(model.epics.items()):
+        bar_w = 16
+        bar = progress_bar(epic.done, epic.total, bar_w)
+        pct_str = f"{epic.percent:3.0f}%" if epic.total else "  -"
+        name = truncate(epic_name, 12).ljust(12)
+        count = f"{epic.done}/{epic.total}".rjust(5)
+
+        status_hint = ''
+        if epic.active:
+            status_hint += ansi(f"  ◉ {epic.active} active", STATUS_COLOR['in_progress'])
+        if epic.pending:
+            status_hint += ansi(f"  ○ {epic.pending} pending", STATUS_COLOR['pending'])
+
+        cursor = ansi('▸', COLOR_EPIC, bold=True) if i == state.epic_index else ' '
+        lines.append(f" {cursor}{ansi(name, COLOR_EPIC)}  {bar}  {count} {pct_str}{status_hint}")
+
+    lines.append('')
+    lines.append(section_header('RECENT', inner))
+    lines.append('')
+
+    sorted_dates = sorted(model.activity.keys(), reverse=True)[:5]
+    max_count = max((len(model.activity[d]) for d in sorted_dates), default=1)
+
+    for date in sorted_dates:
+        feature_ids = model.activity[date]
+        count = len(feature_ids)
+        spark_width = min(14, int(count / max_count * 14)) if max_count else 0
+        spark = ansi('█' * spark_width + '░' * (14 - spark_width), 34)
+
+        try:
+            dt = datetime.fromisoformat(date)
+            date_str = dt.strftime('%b %d')
+        except ValueError:
+            date_str = date[-5:]
+
+        ids_preview = ', '.join(feature_ids[:3])
+        if len(feature_ids) > 3:
+            ids_preview += f'... (+{len(feature_ids) - 3})'
+
+        lines.append(f"  {date_str}  {spark}  {ansi(ids_preview, COLOR_MUTED)}")
+
+    lines.append('')
+    lines.append(section_header('NEXT UP', inner))
+    lines.append('')
+
+    upcoming = model.upcoming()[:3]
+    for feat in upcoming:
+        sym = STATUS_SYMBOL.get(feat.status, '?')
+        color = STATUS_COLOR.get(feat.status, 0)
+        name = truncate(feat.id, 18).ljust(18)
+        title = truncate(feat.title, 35).ljust(35)
+
+        unlocks = model.unlocks(feat.id)
+        unlock_str = f"→ unlocks: {', '.join(unlocks[:2])}" if unlocks else ''
+
+        lines.append(f"  {ansi(sym, color)} {ansi(name, color)}  {title}  {ansi(unlock_str, COLOR_DEP)}")
+
+    if not upcoming:
+        lines.append(f"  {ansi('All features complete!', COLOR_HEALTHY)}")
+
+    lines.append('')
+    return lines
+
+
+def view_epic(model: Model, epic_name: str, state: 'State', width: int, height: int) -> list[str]:
+    epic = model.epics.get(epic_name)
+    if not epic:
+        return [f"  Epic '{epic_name}' not found"]
+
+    lines = []
+    inner = width - 4
+
+    lines.append('')
+    bar_w = min(50, inner - 30)
+    lines.append(f"  {progress_bar(epic.done, epic.total, bar_w)}  {epic.done}/{epic.total} completed  {epic.percent:.0f}%")
+
+    lines.append('')
+    lines.append(section_header('FEATURES', inner))
+    lines.append('')
+
+    sorted_features = sorted(epic.features, key=lambda f: f.id)
+    for i, feat in enumerate(sorted_features):
+        sym = STATUS_SYMBOL.get(feat.status, '?')
+        color = STATUS_COLOR.get(feat.status, 0)
+        fid = truncate(feat.id, 14).ljust(14)
+        title = truncate(feat.title, 45)
+
+        deps = ''
+        if feat.depends_on:
+            dep_short = [d.split('-')[-1] if '-' in d else d for d in feat.depends_on[:2]]
+            deps = ansi(f"← {', '.join(dep_short)}", COLOR_DEP)
+
+        cursor = ansi('▸', COLOR_EPIC, bold=True) if i == state.feature_index else ' '
+        lines.append(f" {cursor}{ansi(sym, color)} {fid}  {title}  {deps}")
+
+    lines.append('')
+    return lines
+
+
+def view_feature(model: Model, feature_id: str, width: int, height: int) -> list[str]:
+    feat = model.features.get(feature_id)
+    if not feat:
+        return [f"  Feature '{feature_id}' not found"]
+
+    lines = []
+    inner = width - 4
+
+    lines.append('')
+    sym = STATUS_SYMBOL.get(feat.status, '?')
+    color = STATUS_COLOR.get(feat.status, 0)
+    lines.append(f"  {ansi(feat.title, bold=True)}")
+    lines.append(f"  {ansi(f'{sym} {feat.status}', color)}")
+
+    if feat.description:
+        lines.append('')
+        lines.append(section_header('DESCRIPTION', inner))
+        lines.append('')
+        words = feat.description.split()
+        line = '  '
+        for word in words:
+            if len(line) + len(word) + 1 > inner:
+                lines.append(line)
+                line = '  '
+            line += word + ' '
+        if line.strip():
+            lines.append(line)
+
+    lines.append('')
+    lines.append(section_header('METADATA', inner))
+    lines.append('')
+
+    if feat.epic:
+        lines.append(f"  {'Epic':<12}  {ansi(feat.epic, COLOR_EPIC)}")
+    if feat.priority is not None:
+        prio_label = {0: 'critical', 1: 'high', 2: 'medium', 3: 'low'}.get(feat.priority, str(feat.priority))
+        lines.append(f"  {'Priority':<12}  {feat.priority} ({prio_label})")
+    if feat.created_at:
+        lines.append(f"  {'Created':<12}  {feat.created_at}")
+    if feat.spec_file:
+        lines.append(f"  {'Spec':<12}  {ansi(feat.spec_file, COLOR_MUTED)}")
+
+    lines.append('')
+    lines.append(section_header('DEPENDENCIES', inner))
+    lines.append('')
+
+    if feat.depends_on:
+        deps_status = []
+        for dep_id in feat.depends_on:
+            dep = model.features.get(dep_id)
+            if dep:
+                s = STATUS_SYMBOL.get(dep.status, '?')
+                deps_status.append(f"{dep_id} {ansi(s, STATUS_COLOR.get(dep.status, 0))}")
+            else:
+                deps_status.append(f"{dep_id} ?")
+        lines.append(f"  {'Blocked by:':<12}  {', '.join(deps_status)}")
+    else:
+        lines.append(f"  {'Blocked by:':<12}  (none)")
+
+    unlocks = model.unlocks(feature_id)
+    lines.append(f"  {'Unlocks:':<12}  {', '.join(unlocks) if unlocks else '(none)'}")
+
+    if feat.steps:
+        lines.append('')
+        lines.append(section_header('STEPS', inner))
+        lines.append('')
+        for i, step in enumerate(feat.steps, 1):
+            lines.append(f"  {i}. {truncate(step, inner - 6)}")
 
     lines.append('')
     return lines
@@ -383,24 +781,29 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append('')
     lines.append(f"  {ansi('j', bold=True)} / {ansi('↓', bold=True)}      Move selection down")
     lines.append(f"  {ansi('k', bold=True)} / {ansi('↑', bold=True)}      Move selection up")
-    lines.append(f"  {ansi('Enter', bold=True)}      Launch fv for selected project")
-    lines.append(f"  {ansi('s', bold=True)}          Cycle sort mode")
-    lines.append(f"  {ansi('a', bold=True)}          Toggle show all projects")
-    lines.append(f"  {ansi('z', bold=True)}          Show only stalled projects")
+    lines.append(f"  {ansi('Enter', bold=True)}      Drill down into selected item")
+    lines.append(f"  {ansi('Esc', bold=True)} / {ansi('b', bold=True)}    Go back (quit at top level)")
     lines.append(f"  {ansi('h', bold=True)} / {ansi('?', bold=True)}      Show this help")
-    lines.append(f"  {ansi('q', bold=True)}          Quit")
+    lines.append(f"  {ansi('q', bold=True)}          Quit immediately")
     lines.append('')
-    lines.append(section_header('INDICATORS', inner))
+    lines.append(section_header('PORTFOLIO CONTROLS', inner))
     lines.append('')
-    lines.append(f"  {ansi('●', COLOR_ACTIVE)}  active work    {ansi('○', COLOR_STALLED)}  stalled (>{STALL_DAYS}d)")
-    lines.append(f"  {ansi('✓', COLOR_HEALTHY)}  complete       {ansi('◆', COLOR_ACTIVE)}  worked today")
+    lines.append(f"  {ansi('s', bold=True)}          Cycle sort mode (pending/modified/total/completion)")
+    lines.append(f"  {ansi('a', bold=True)}          Toggle show all projects (including complete)")
+    lines.append(f"  {ansi('z', bold=True)}          Show only stalled projects")
     lines.append('')
-    lines.append(section_header('SORT MODES', inner))
+    lines.append(section_header('STATUS SYMBOLS', inner))
     lines.append('')
-    lines.append(f"  pending     Most pending features first")
-    lines.append(f"  modified    Most recently touched first")
-    lines.append(f"  total       Largest projects first")
-    lines.append(f"  completion  Least complete first")
+    lines.append(f"  {ansi('✓', STATUS_COLOR['done'])}  done        {ansi('◉', STATUS_COLOR['in_progress'])}  in progress")
+    lines.append(f"  {ansi('○', STATUS_COLOR['pending'])}  pending     {ansi('✗', STATUS_COLOR['abandoned'])}  abandoned")
+    lines.append(f"  {ansi('↷', STATUS_COLOR['superseded'])}  superseded  {ansi('◆', COLOR_ACTIVE)}  worked today")
+    lines.append('')
+    lines.append(section_header('USAGE', inner))
+    lines.append('')
+    lines.append(f"  {ansi('pv', bold=True)}                   Scan ~/Code, portfolio view")
+    lines.append(f"  {ansi('pv /path', bold=True)}             Scan specific directory")
+    lines.append(f"  {ansi('pv features.json', bold=True)}     Project view for specific file")
+    lines.append(f"  {ansi('fv', bold=True)}                   Project view for ./features.json")
     lines.append('')
 
     return lines
@@ -412,102 +815,159 @@ def view_help(width: int, height: int) -> list[str]:
 
 @dataclass
 class State:
-    selected: int = 0
-    sort_mode: str = 'pending'
+    view: str = 'portfolio'
+
+    # Portfolio level
+    portfolio: Portfolio | None = None
+    project_index: int = 0
+    sort_mode: str = 'open'
     show_all: bool = False
     stalled_only: bool = False
-    view: str = 'dashboard'
+
+    # Project level
+    current_project: ProjectSummary | None = None
+    epic_index: int = 0
+
+    # Epic level
+    current_epic: str | None = None
+    feature_index: int = 0
+
+    # Feature level
+    current_feature: str | None = None
+
+    # Previous view for help overlay
+    prev_view: str | None = None
 
 
-def render(state: State, portfolio: Portfolio, width: int, height: int) -> str:
-    if state.view == 'help':
-        title = 'help'
-        footer = '[b]ack [q]uit'
-        lines = view_help(width, height)
-    else:
-        title = 'pv'
-        filter_hint = ''
-        if state.show_all:
-            filter_hint = ' [all]'
-        elif state.stalled_only:
-            filter_hint = ' [stalled]'
-        footer = f'[a]ll [s]ort [z]stalled [Enter]fv [h]elp [q]uit{filter_hint}'
-        lines = view_dashboard(portfolio, state, width, height)
-    framed = frame(lines, width, title, footer)
-    return '\n'.join(framed)
-
-
-def getch() -> str:
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        ch = sys.stdin.read(1)
-        if not ch:
-            return 'q'
-        if ch == '\x1b':
-            ch2 = sys.stdin.read(1)
-            if not ch2:
-                return ch
-            if ch2 == '[':
-                ch3 = sys.stdin.read(1)
-                if not ch3:
-                    return ch
-                return {'A': 'up', 'B': 'down', 'C': 'right', 'D': 'left'}.get(ch3, ch)
-        return ch
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
-
-
-def handle_input(key: str, state: State, portfolio: Portfolio) -> State | str | None:
+def handle_input(key: str, state: State) -> State | None:
+    # Help toggle
     if key in ('h', '?'):
-        state.view = 'help' if state.view != 'help' else 'dashboard'
+        if state.view == 'help':
+            state.view = state.prev_view or 'portfolio'
+            state.prev_view = None
+        else:
+            state.prev_view = state.view
+            state.view = 'help'
         return state
 
+    # Quit
     if key in ('q', '\x03'):
         if state.view == 'help':
-            state.view = 'dashboard'
+            state.view = state.prev_view or 'portfolio'
+            state.prev_view = None
             return state
         return None
 
-    if key in ('\x1b', 'b'):
+    # Back navigation (Esc/b/Backspace) - go back one level, quit at top
+    if key in ('\x1b', 'b', '\x7f'):
         if state.view == 'help':
-            state.view = 'dashboard'
-            return state
-
-    if state.view == 'help':
+            state.view = state.prev_view or 'portfolio'
+            state.prev_view = None
+        elif state.view == 'feature':
+            state.view = 'epic'
+            state.current_feature = None
+        elif state.view == 'epic':
+            state.view = 'project'
+            state.current_epic = None
+            state.feature_index = 0
+        elif state.view == 'project':
+            if state.portfolio:
+                state.view = 'portfolio'
+                state.current_project = None
+                state.epic_index = 0
+            else:
+                # Direct project mode (fv), no portfolio to go back to → quit
+                return None
+        elif state.view == 'portfolio':
+            # At top level, Esc quits (natural "escape out" pattern)
+            return None
         return state
 
-    if key in ('j', 'down'):
-        filtered = portfolio.filtered(state.show_all, state.stalled_only)
-        sorted_projects = portfolio.sorted_by(state.sort_mode)
-        display = [p for p in sorted_projects if p in filtered]
-        state.selected = min(state.selected + 1, len(display) - 1)
-    elif key in ('k', 'up'):
-        state.selected = max(state.selected - 1, 0)
+    # View-specific input handling
+    if state.view == 'portfolio':
+        return handle_portfolio_input(key, state)
+    elif state.view == 'project':
+        return handle_project_input(key, state)
+    elif state.view == 'epic':
+        return handle_epic_input(key, state)
 
+    return state
+
+
+def handle_portfolio_input(key: str, state: State) -> State:
+    portfolio = state.portfolio
+    if not portfolio:
+        return state
+
+    filtered = portfolio.filtered(state.show_all, state.stalled_only)
+    sorted_projects = portfolio.sorted_by(state.sort_mode)
+    display = [p for p in sorted_projects if p in filtered]
+
+    if key in ('j', 'down'):
+        state.project_index = min(state.project_index + 1, len(display) - 1)
+    elif key in ('k', 'up'):
+        state.project_index = max(state.project_index - 1, 0)
     elif key == 's':
         idx = SORT_MODES.index(state.sort_mode)
         state.sort_mode = SORT_MODES[(idx + 1) % len(SORT_MODES)]
-        state.selected = 0
-
+        state.project_index = 0
     elif key == 'a':
         state.show_all = not state.show_all
         state.stalled_only = False
-        state.selected = 0
-
+        state.project_index = 0
     elif key == 'z':
         state.stalled_only = not state.stalled_only
         state.show_all = False
-        state.selected = 0
-
+        state.project_index = 0
     elif key in ('\r', '\n'):
-        filtered = portfolio.filtered(state.show_all, state.stalled_only)
-        sorted_projects = portfolio.sorted_by(state.sort_mode)
-        display = [p for p in sorted_projects if p in filtered]
-        if display and 0 <= state.selected < len(display):
-            proj = display[state.selected]
-            return f'fv:{proj.path}'
+        if display and 0 <= state.project_index < len(display):
+            state.current_project = display[state.project_index]
+            state.current_project.load_detail()
+            state.view = 'project'
+            state.epic_index = 0
+
+    return state
+
+
+def handle_project_input(key: str, state: State) -> State:
+    if not state.current_project or not state.current_project._detail:
+        return state
+
+    model = state.current_project._detail
+    epic_names = list(model.epics.keys())
+
+    if key in ('j', 'down'):
+        state.epic_index = min(state.epic_index + 1, len(epic_names) - 1)
+    elif key in ('k', 'up'):
+        state.epic_index = max(state.epic_index - 1, 0)
+    elif key in ('\r', '\n', 'e'):
+        if epic_names and 0 <= state.epic_index < len(epic_names):
+            state.current_epic = epic_names[state.epic_index]
+            state.view = 'epic'
+            state.feature_index = 0
+
+    return state
+
+
+def handle_epic_input(key: str, state: State) -> State:
+    if not state.current_project or not state.current_project._detail or not state.current_epic:
+        return state
+
+    model = state.current_project._detail
+    epic = model.epics.get(state.current_epic)
+    if not epic:
+        return state
+
+    sorted_features = sorted(epic.features, key=lambda f: f.id)
+
+    if key in ('j', 'down'):
+        state.feature_index = min(state.feature_index + 1, len(sorted_features) - 1)
+    elif key in ('k', 'up'):
+        state.feature_index = max(state.feature_index - 1, 0)
+    elif key in ('\r', '\n', 'f'):
+        if sorted_features and 0 <= state.feature_index < len(sorted_features):
+            state.current_feature = sorted_features[state.feature_index].id
+            state.view = 'feature'
 
     return state
 
@@ -516,48 +976,139 @@ def handle_input(key: str, state: State, portfolio: Portfolio) -> State | str | 
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def main():
-    root = '~/Code'
-    if len(sys.argv) > 1:
-        if sys.argv[1] in ('-h', '--help'):
-            print(__doc__)
-            return
-        root = sys.argv[1]
+def render(state: State, width: int, height: int) -> str:
+    if state.view == 'help':
+        title = 'help'
+        footer = '[Esc]back'
+        lines = view_help(width, height)
+    elif state.view == 'portfolio':
+        title = 'pv'
+        filter_hint = ''
+        if state.show_all:
+            filter_hint = ' [all]'
+        elif state.stalled_only:
+            filter_hint = ' [stalled]'
+        footer = f'[s]ort [a]ll [z]stalled [h]elp [q]uit{filter_hint}'
+        lines = view_portfolio(state.portfolio, state, width, height)
+    elif state.view == 'project':
+        proj_name = state.current_project.name if state.current_project else 'project'
+        title = proj_name
+        footer = '[Esc]back [h]elp [q]uit'
+        model = state.current_project._detail if state.current_project else None
+        if model:
+            lines = view_project(model, state, width, height)
+        else:
+            lines = ['  No project loaded']
+    elif state.view == 'epic':
+        title = f'epic: {state.current_epic}'
+        footer = '[Esc]back [h]elp [q]uit'
+        model = state.current_project._detail if state.current_project else None
+        if model and state.current_epic:
+            lines = view_epic(model, state.current_epic, state, width, height)
+        else:
+            lines = ['  No epic selected']
+    elif state.view == 'feature':
+        title = state.current_feature or 'feature'
+        footer = '[Esc]back [h]elp [q]uit'
+        model = state.current_project._detail if state.current_project else None
+        if model and state.current_feature:
+            lines = view_feature(model, state.current_feature, width, height)
+        else:
+            lines = ['  No feature selected']
+    else:
+        lines = ['  Unknown view']
+        title = ''
+        footer = ''
 
+    framed = frame(lines, width, title, footer)
+    return '\n'.join(framed)
+
+
+def init_portfolio_state(root: str) -> State:
     portfolio = scan_projects(root)
+    return State(view='portfolio', portfolio=portfolio)
 
-    if not portfolio.projects:
-        print(f"No projects with features.json found in {Path(root).expanduser()}")
+
+def init_project_state(features_path: str) -> State:
+    model = Model.load(features_path)
+    proj = ProjectSummary.from_path(features_path)
+    if proj:
+        proj._detail = model
+    else:
+        proj = ProjectSummary(path=str(Path(features_path).parent), name=Path(features_path).parent.name)
+        proj._detail = model
+    return State(
+        view='project',
+        portfolio=None,
+        current_project=proj,
+    )
+
+
+def detect_entry_point() -> State:
+    prog_name = os.path.basename(sys.argv[0])
+    is_fv_mode = prog_name in ('fv', 'fv.py')
+
+    if len(sys.argv) < 2:
+        if is_fv_mode:
+            if os.path.exists('features.json'):
+                return init_project_state('features.json')
+            else:
+                print("Error: features.json not found")
+                print("Run from a directory containing features.json, or specify path.")
+                sys.exit(1)
+        else:
+            return init_portfolio_state('~/Code')
+
+    arg = sys.argv[1]
+
+    if arg in ('-h', '--help'):
+        print(__doc__)
+        sys.exit(0)
+
+    if arg.endswith('.json'):
+        if not os.path.exists(arg):
+            print(f"Error: {arg} not found")
+            sys.exit(1)
+        return init_project_state(arg)
+
+    if os.path.isdir(arg):
+        return init_portfolio_state(arg)
+
+    print(f"Error: {arg} not found")
+    sys.exit(1)
+
+
+def main():
+    try:
+        state = detect_entry_point()
+    except json.JSONDecodeError as e:
+        print(f"Error parsing JSON: {e}")
+        sys.exit(1)
+    except KeyError as e:
+        print(f"Error: missing required field {e}")
         sys.exit(1)
 
-    state = State()
     size = get_terminal_size()
 
+    # Non-interactive mode
     if not sys.stdin.isatty():
-        output = render(state, portfolio, size.columns, size.lines)
+        output = render(state, size.columns, size.lines)
         print(output)
         return
 
+    # Clear screen and hide cursor
     print('\033[2J\033[H\033[?25l', end='')
 
     try:
         while True:
             size = get_terminal_size()
-            output = render(state, portfolio, size.columns, size.lines)
-            print(f'\033[H{output}', end='', flush=True)
+            output = render(state, size.columns, size.lines)
+            print(f'\033[H{output}\033[J', end='', flush=True)
 
             key = getch()
-            result = handle_input(key, state, portfolio)
-
-            if result is None:
+            state = handle_input(key, state)
+            if state is None:
                 break
-            elif isinstance(result, str) and result.startswith('fv:'):
-                path = result[3:]
-                print('\033[?25h\033[2J\033[H', end='')
-                subprocess.run(['fv', os.path.join(path, 'features.json')])
-                print('\033[2J\033[H\033[?25l', end='')
-            else:
-                state = result
     finally:
         print('\033[?25h\033[2J\033[H', end='')
 
