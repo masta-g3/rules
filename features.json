@@ -28,5 +28,23 @@
       "Implement save with 'w' key (write to features.json)",
       "Warn on quit if unsaved changes"
     ]
+  },
+  {
+    "id": "pv-003",
+    "epic": "pv",
+    "status": "pending",
+    "title": "Archive Epics via UI",
+    "description": "Add ability to archive completed epics from within the TUI. Archived epics would be hidden from default view but preserved in features.json with an archived tag/field. Similar interaction pattern to pv-002 editing.",
+    "created_at": "2026-01-24",
+    "depends_on": [
+      "pv-002"
+    ],
+    "steps": [
+      "Add archived: true field support to epic/feature schema",
+      "Filter archived epics from default view (show with toggle)",
+      "Add archive action in epic view (e.g. A key)",
+      "Persist archived state to features.json",
+      "Add visual indicator for archived items when shown"
+    ]
   }
 ]
