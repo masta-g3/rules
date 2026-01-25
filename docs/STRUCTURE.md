@@ -53,20 +53,25 @@ Features have: id, status, epic, dependencies, priority, steps.
 
 ```mermaid
 graph LR
-    prime[/prime] --> plan[/plan-md]
-    plan --> execute[/execute]
-    execute --> commit[/commit]
-    commit --> next[/next-feature]
+    prime["/prime"] --> plan["/plan-md"]
+    plan --> execute["/execute"]
+    execute --> commit["/commit"]
+    commit --> next["/next-feature"]
     next --> prime
 ```
 
 ### pv/fv TUI
 
-Terminal dashboard for `features.json` visualization:
+Terminal dashboard for `features.json` visualization and editing:
 - **pv**: Portfolio view - scans directory tree for all projects
 - **fv**: Feature view - single project's features.json
 
 Navigation: Portfolio → Project → Epic → Feature (4-level drill-down)
+
+Modes:
+- **Table view**: Default list-based navigation with sorting/filtering
+- **Tree view**: Collapsible hierarchy with search (`/`) and zoom (`z`)
+- **Edit mode**: Inline feature editing with field navigation and save (`w`)
 
 ## Key Files
 

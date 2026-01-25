@@ -75,7 +75,7 @@ Stops on exceptions (baseline fails, tests fail, conflicts) with resume instruct
 
 ### pv - Portfolio & Feature Viewer
 
-Terminal TUI for visualizing `features.json` across projects.
+Terminal TUI for visualizing and editing `features.json` across projects.
 
 **Install:**
 ```bash
@@ -94,11 +94,30 @@ fv                    # Project view (./features.json in current dir)
 - `j/k` or `↑/↓` - Move selection
 - `Enter` - Drill down (Portfolio → Project → Epic → Feature)
 - `Esc/b` - Go back
-- `s` - Cycle sort mode (portfolio)
-- `a` - Toggle show all projects
-- `z` - Show stalled only
 - `h/?` - Help
 - `q` - Quit
+
+**Portfolio controls:**
+- `s` - Cycle sort mode (open/modified/total/completion)
+- `a` - Toggle show all projects (including complete)
+- `z` - Show stalled projects only
+- `t` - Switch to tree view
+
+**Tree view:**
+- `h/l` or `←/→` - Collapse/expand node
+- `o` - Toggle expand, `O` - Expand all, `M` - Collapse all
+- `/` - Search, `n/N` - Next/prev match
+- `z` - Zoom to node, `t` - Back to table view
+
+**Feature editing:**
+- `e` - Enter edit mode
+- `Tab` - Next field, `j/k` - Cycle status options
+- `Esc` - Exit edit mode
+- `w` - Write changes to features.json
+- `D` - Delete feature (with confirmation)
+
+**Epic view:**
+- `n` - Create new feature in epic
 
 ## features.json Schema
 
@@ -121,7 +140,7 @@ fv                    # Project view (./features.json in current dir)
 
 **Required:** `id`, `status`
 
-**Status values:** `pending` → `in_progress` → `done` (or `blocked`, `abandoned`, `superseded`)
+**Status values:** `pending` → `in_progress` → `done` (or `abandoned`, `superseded`)
 
 **Key fields:**
 - **epic**: Groups related features (e.g., "auth", "payments")
