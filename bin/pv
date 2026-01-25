@@ -81,6 +81,10 @@ BLOCKS = ' ▏▎▍▌▋▊▉█'
 SORT_MODES = ['open', 'modified', 'total', 'completion']
 STALL_DAYS = 14
 
+# Edit mode
+EDITABLE_FIELDS = ['title', 'status', 'priority', 'description', 'depends_on', 'notes']
+STATUS_OPTIONS = ['pending', 'in_progress', 'done', 'abandoned', 'superseded']
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ANSI RENDERING
@@ -495,6 +499,208 @@ def scan_projects(root: str) -> Portfolio:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# TREE VIEW DATA MODEL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class TreeNode:
+    """Node in collapsible tree hierarchy."""
+    type: str  # 'root' | 'project' | 'epic' | 'feature'
+    id: str
+    label: str
+    children: list['TreeNode'] = field(default_factory=list)
+    expanded: bool = False
+    data: Any = None  # ProjectSummary | Epic | Feature
+    parent: 'TreeNode | None' = None
+    project_ref: 'ProjectSummary | None' = None
+
+    @property
+    def has_children(self) -> bool:
+        return len(self.children) > 0 or (self.type == 'epic' and self.data is None)
+
+
+@dataclass
+class TreeState:
+    """State for tree view mode."""
+    root: TreeNode
+    cursor_idx: int = 0
+    scroll_offset: int = 0
+    show_all: bool = False
+    # Search state
+    search_mode: bool = False
+    search_query: str = ''
+    search_matches: list[TreeNode] = field(default_factory=list)
+    search_index: int = 0
+    # Zoom state
+    zoomed_node: TreeNode | None = None
+
+
+@dataclass
+class EditState:
+    """State for edit mode in feature view."""
+    mode: str = 'navigate'  # 'navigate' | 'edit'
+    field_idx: int = 0
+    editing_value: str = ''
+    pending_changes: dict = field(default_factory=dict)
+    confirm_action: str | None = None  # 'quit' | 'delete' | None
+
+
+def build_tree(portfolio: Portfolio, show_all: bool = False) -> TreeNode:
+    """Build tree from portfolio. Epic children loaded lazily on expand."""
+    root = TreeNode(type='root', id='root', label='Portfolio')
+
+    for proj in portfolio.projects:
+        if not show_all and proj.is_complete:
+            continue
+
+        proj_node = TreeNode(
+            type='project',
+            id=proj.path,
+            label=proj.name,
+            data=proj,
+            expanded=True,
+            parent=root,
+            project_ref=proj,
+        )
+
+        for epic_name in sorted(proj.epics):
+            epic_node = TreeNode(
+                type='epic',
+                id=f"{proj.path}:{epic_name}",
+                label=epic_name,
+                data=None,  # Loaded on expand
+                expanded=False,
+                parent=proj_node,
+                project_ref=proj,
+            )
+            proj_node.children.append(epic_node)
+
+        if proj_node.children or show_all:
+            root.children.append(proj_node)
+
+    return root
+
+
+def expand_epic(node: TreeNode, show_all: bool = False) -> None:
+    """Populate epic children on first expansion (lazy load)."""
+    if node.type != 'epic' or node.children:
+        return
+
+    proj = node.project_ref
+    if not proj:
+        return
+
+    model = proj.load_detail()
+    epic = model.epics.get(node.label)
+    if not epic:
+        return
+
+    node.data = epic
+
+    for feat in sorted(epic.features, key=lambda f: f.id):
+        if not show_all and feat.is_done:
+            continue
+
+        feat_node = TreeNode(
+            type='feature',
+            id=feat.id,
+            label=f"{feat.id} {feat.title}",
+            data=feat,
+            parent=node,
+            project_ref=proj,
+        )
+        node.children.append(feat_node)
+
+
+def expand_all(node: TreeNode, show_all: bool = False) -> None:
+    """Recursively expand node and all descendants."""
+    if node.type == 'epic' and not node.children:
+        expand_epic(node, show_all)
+    node.expanded = True
+    for child in node.children:
+        expand_all(child, show_all)
+
+
+def collapse_all(node: TreeNode) -> None:
+    """Recursively collapse node and all descendants."""
+    node.expanded = False
+    for child in node.children:
+        collapse_all(child)
+
+
+def flatten_tree(node: TreeNode, depth: int = 0, zoomed: TreeNode | None = None) -> list[tuple[int, TreeNode]]:
+    """Flatten tree to (depth, node) pairs for rendering.
+    If zoomed is set, only include that node and its descendants.
+    """
+    result = []
+
+    # If zoomed, start from zoomed node as if it were root
+    if zoomed and node.type == 'root':
+        return flatten_tree(zoomed, 0, None)
+
+    if node.type != 'root':
+        result.append((depth, node))
+
+    if node.type == 'root' or node.expanded:
+        for child in node.children:
+            child_depth = depth + 1 if node.type != 'root' else 0
+            result.extend(flatten_tree(child, child_depth, None))
+
+    return result
+
+
+def find_parent_idx(flat: list[tuple[int, TreeNode]], cursor_idx: int) -> int:
+    """Find index of parent node in flattened list."""
+    if cursor_idx <= 0 or cursor_idx >= len(flat):
+        return -1
+
+    current_depth, _ = flat[cursor_idx]
+
+    for i in range(cursor_idx - 1, -1, -1):
+        depth, _ = flat[i]
+        if depth < current_depth:
+            return i
+
+    return -1
+
+
+def search_tree(node: TreeNode, query: str) -> list[TreeNode]:
+    """Find all nodes matching query (case-insensitive)."""
+    matches = []
+    query_lower = query.lower()
+
+    if node.type != 'root':
+        if query_lower in node.label.lower():
+            matches.append(node)
+        elif node.type == 'feature' and node.data and node.data.description:
+            if query_lower in node.data.description.lower():
+                matches.append(node)
+
+    for child in node.children:
+        matches.extend(search_tree(child, query))
+
+    return matches
+
+
+def expand_path_to(node: TreeNode, show_all: bool = False) -> None:
+    """Expand all ancestors to make node visible."""
+    current = node.parent
+    while current and current.type != 'root':
+        if current.type == 'epic' and not current.children:
+            expand_epic(current, show_all)
+        current.expanded = True
+        current = current.parent
+
+
+def find_node_idx(flat: list[tuple[int, TreeNode]], target: TreeNode) -> int:
+    """Find index of node in flattened list."""
+    for i, (_, node) in enumerate(flat):
+        if node is target:
+            return i
+    return -1
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # VIEWS
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -772,6 +978,171 @@ def view_feature(model: Model, feature_id: str, width: int, height: int) -> list
     return lines
 
 
+def view_feature_editable(feat: 'Feature', edit: EditState, width: int) -> list[str]:
+    """Render feature view in edit mode with field cursor."""
+    lines = []
+    inner = width - 4
+
+    lines.append('')
+    lines.append(f"  {ansi(feat.title or feat.id, bold=True)}")
+    lines.append('')
+    lines.append(section_header('EDIT FIELDS', inner))
+    lines.append('')
+
+    for i, field in enumerate(EDITABLE_FIELDS):
+        is_current = (i == edit.field_idx and edit.mode == 'edit')
+
+        # Get value: pending_changes > current editing > feature attribute
+        if is_current:
+            value = edit.editing_value
+        elif field in edit.pending_changes:
+            value = edit.pending_changes[field]
+        else:
+            value = getattr(feat, field, '') or ''
+
+        if field == 'status':
+            # Radio buttons
+            options = []
+            for opt in STATUS_OPTIONS:
+                marker = '◉' if value == opt else '○'
+                color = STATUS_COLOR.get(opt, 0)
+                styled = ansi(f'{marker} {opt}', color)
+                options.append(styled)
+            display = '  '.join(options)
+        elif field == 'depends_on':
+            if isinstance(value, list):
+                display = f"[{', '.join(value)}]"
+            else:
+                display = f"[{value}]"
+        else:
+            display = f"[{value}]"
+
+        prefix = '▸ ' if is_current else '  '
+        label = f"{field}:".ljust(14)
+        lines.append(f"{prefix}{ansi(label, COLOR_MUTED)}{display}")
+
+    lines.append('')
+    return lines
+
+
+def view_tree(state: 'State', width: int, height: int) -> list[str]:
+    """Render tree view."""
+    lines = []
+    inner = width - 4
+
+    if not state.tree or not state.tree.root:
+        return ['  No tree data']
+
+    flat = flatten_tree(state.tree.root, zoomed=state.tree.zoomed_node)
+
+    if not flat:
+        lines.append('')
+        filter_msg = '(all items filtered)' if not state.tree.show_all else '(no projects)'
+        lines.append(f"  {ansi(f'Empty tree {filter_msg}', COLOR_MUTED)}")
+        lines.append(f"  {ansi('Press [a] to show all', COLOR_MUTED)}")
+        return lines
+
+    # Search mode header
+    if state.tree.search_mode:
+        search_line = f"  /{state.tree.search_query}█"
+        if state.tree.search_matches:
+            match_info = f" ({state.tree.search_index + 1}/{len(state.tree.search_matches)})"
+            search_line += ansi(match_info, COLOR_MUTED)
+        lines.append(search_line)
+        lines.append('')
+
+    visible_height = max(1, height - 6)
+    if state.tree.search_mode:
+        visible_height -= 2
+    cursor_idx = state.tree.cursor_idx
+    scroll = state.tree.scroll_offset
+
+    # Adjust scroll to keep cursor visible
+    if cursor_idx < scroll:
+        scroll = cursor_idx
+    elif cursor_idx >= scroll + visible_height:
+        scroll = cursor_idx - visible_height + 1
+    state.tree.scroll_offset = max(0, scroll)
+
+    lines.append('')
+
+    for i, (depth, node) in enumerate(flat[scroll:scroll + visible_height]):
+        actual_idx = i + scroll
+        is_cursor = (actual_idx == cursor_idx)
+        is_match = node in state.tree.search_matches
+        line = render_tree_node(depth, node, is_cursor, inner, is_match)
+        lines.append(line)
+
+    # Stats footer
+    lines.append('')
+    proj_count = sum(1 for _, n in flat if n.type == 'project')
+    epic_count = sum(1 for _, n in flat if n.type == 'epic')
+    feat_count = sum(1 for _, n in flat if n.type == 'feature')
+    stats = f'{proj_count} projects, {epic_count} epics, {feat_count} features'
+    if state.tree.search_matches and not state.tree.search_mode:
+        stats += f' | {len(state.tree.search_matches)} matches'
+    lines.append(f"  {ansi(stats, COLOR_MUTED)}")
+
+    return lines
+
+
+def render_tree_node(depth: int, node: TreeNode, is_cursor: bool, width: int, is_match: bool = False) -> str:
+    """Render single tree node line."""
+    indent = '  ' * depth
+
+    # Expand/collapse indicator
+    if node.has_children:
+        arrow = '▼ ' if node.expanded else '► '
+    else:
+        arrow = '  '
+
+    # Status symbol for features
+    if node.type == 'feature':
+        feat = node.data
+        sym = STATUS_SYMBOL.get(feat.status, '?')
+        color = STATUS_COLOR.get(feat.status, 0)
+        prefix = ansi(sym, color) + ' '
+    else:
+        prefix = ''
+
+    # Label with appropriate color
+    if node.type == 'project':
+        label = ansi(node.label, COLOR_PROJECT, bold=is_cursor)
+    elif node.type == 'epic':
+        label = ansi(node.label, COLOR_EPIC, bold=is_cursor)
+    else:
+        label = node.label
+
+    # Progress bar for project/epic
+    progress = ''
+    if node.type == 'project':
+        proj = node.data
+        bar = progress_bar(proj.done, proj.total, 12)
+        pct = f"{proj.percent:.0f}%"
+        progress = f"  {proj.done}/{proj.total} {bar} {pct}"
+    elif node.type == 'epic' and node.data and node.expanded:
+        epic = node.data
+        bar = progress_bar(epic.done, epic.total, 12)
+        pct = f"{epic.percent:.0f}%"
+        progress = f"  {epic.done}/{epic.total} {bar} {pct}"
+
+    # Dependencies for features
+    deps = ''
+    if node.type == 'feature' and node.data.depends_on:
+        dep_ids = ', '.join(node.data.depends_on[:2])
+        if len(node.data.depends_on) > 2:
+            dep_ids += '...'
+        deps = ansi(f" ← {dep_ids}", COLOR_DEP)
+
+    # Match indicator
+    match_marker = ansi('●', 220) + ' ' if is_match else ''
+
+    # Cursor indicator
+    cursor = ansi('▸', COLOR_PROJECT, bold=True) if is_cursor else ' '
+
+    return f"{cursor}{indent}{arrow}{match_marker}{prefix}{label}{progress}{deps}"
+
+
 def view_help(width: int, height: int) -> list[str]:
     lines = []
     inner = width - 4
@@ -791,6 +1162,16 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append(f"  {ansi('s', bold=True)}          Cycle sort mode (pending/modified/total/completion)")
     lines.append(f"  {ansi('a', bold=True)}          Toggle show all projects (including complete)")
     lines.append(f"  {ansi('z', bold=True)}          Show only stalled projects")
+    lines.append(f"  {ansi('t', bold=True)}          Switch to tree view")
+    lines.append('')
+    lines.append(section_header('TREE VIEW', inner))
+    lines.append('')
+    lines.append(f"  {ansi('h', bold=True)} / {ansi('←', bold=True)}      Collapse node or move to parent")
+    lines.append(f"  {ansi('l', bold=True)} / {ansi('→', bold=True)}      Expand node or drill into feature")
+    lines.append(f"  {ansi('o', bold=True)}          Toggle expand/collapse")
+    lines.append(f"  {ansi('O', bold=True)}          Expand all under cursor")
+    lines.append(f"  {ansi('M', bold=True)}          Collapse all")
+    lines.append(f"  {ansi('t', bold=True)}          Switch back to table view")
     lines.append('')
     lines.append(section_header('STATUS SYMBOLS', inner))
     lines.append('')
@@ -838,10 +1219,29 @@ class State:
     # Previous view for help overlay
     prev_view: str | None = None
 
+    # Tree view
+    tree: TreeState | None = None
+
+    # Edit mode
+    edit: EditState | None = None
+    dirty: bool = False
+
 
 def handle_input(key: str, state: State) -> State | None:
-    # Help toggle
-    if key in ('h', '?'):
+    # Handle quit confirmation when dirty
+    if state.edit and state.edit.confirm_action == 'quit':
+        if key == 's':
+            apply_pending_changes(state)
+            save_features(state.current_project)
+            return None
+        elif key == 'd':
+            return None
+        elif key == 'c':
+            state.edit.confirm_action = None
+        return state
+
+    # Help toggle (h conflicts with tree navigation, so only use ? in tree view)
+    if key == '?' or (key == 'h' and state.view != 'tree'):
         if state.view == 'help':
             state.view = state.prev_view or 'portfolio'
             state.prev_view = None
@@ -856,6 +1256,12 @@ def handle_input(key: str, state: State) -> State | None:
             state.view = state.prev_view or 'portfolio'
             state.prev_view = None
             return state
+        # Prompt for unsaved changes
+        if state.dirty:
+            if not state.edit:
+                state.edit = EditState()
+            state.edit.confirm_action = 'quit'
+            return state
         return None
 
     # Back navigation (Esc/b/Backspace) - go back one level, quit at top
@@ -864,8 +1270,16 @@ def handle_input(key: str, state: State) -> State | None:
             state.view = state.prev_view or 'portfolio'
             state.prev_view = None
         elif state.view == 'feature':
-            state.view = 'epic'
+            # In edit mode, Esc returns to navigate mode (handled by handle_feature_input)
+            if state.edit and state.edit.mode == 'edit':
+                return handle_feature_input(key, state)
+            # In navigate mode, go back
+            if state.tree:
+                state.view = 'tree'
+            else:
+                state.view = 'epic'
             state.current_feature = None
+            state.edit = None
         elif state.view == 'epic':
             state.view = 'project'
             state.current_epic = None
@@ -878,6 +1292,9 @@ def handle_input(key: str, state: State) -> State | None:
             else:
                 # Direct project mode (fv), no portfolio to go back to → quit
                 return None
+        elif state.view == 'tree':
+            state.view = 'portfolio'
+            state.tree = None
         elif state.view == 'portfolio':
             # At top level, Esc quits (natural "escape out" pattern)
             return None
@@ -890,6 +1307,10 @@ def handle_input(key: str, state: State) -> State | None:
         return handle_project_input(key, state)
     elif state.view == 'epic':
         return handle_epic_input(key, state)
+    elif state.view == 'feature':
+        return handle_feature_input(key, state)
+    elif state.view == 'tree':
+        return handle_tree_input(key, state)
 
     return state
 
@@ -925,6 +1346,12 @@ def handle_portfolio_input(key: str, state: State) -> State:
             state.current_project.load_detail()
             state.view = 'project'
             state.epic_index = 0
+    elif key == 't':
+        state.tree = TreeState(
+            root=build_tree(state.portfolio, state.show_all),
+            show_all=state.show_all,
+        )
+        state.view = 'tree'
 
     return state
 
@@ -940,7 +1367,7 @@ def handle_project_input(key: str, state: State) -> State:
         state.epic_index = min(state.epic_index + 1, len(epic_names) - 1)
     elif key in ('k', 'up'):
         state.epic_index = max(state.epic_index - 1, 0)
-    elif key in ('\r', '\n', 'e'):
+    elif key in ('\r', '\n'):
         if epic_names and 0 <= state.epic_index < len(epic_names):
             state.current_epic = epic_names[state.epic_index]
             state.view = 'epic'
@@ -964,10 +1391,384 @@ def handle_epic_input(key: str, state: State) -> State:
         state.feature_index = min(state.feature_index + 1, len(sorted_features) - 1)
     elif key in ('k', 'up'):
         state.feature_index = max(state.feature_index - 1, 0)
-    elif key in ('\r', '\n', 'f'):
+    elif key in ('\r', '\n'):
         if sorted_features and 0 <= state.feature_index < len(sorted_features):
             state.current_feature = sorted_features[state.feature_index].id
             state.view = 'feature'
+            state.edit = None  # Reset edit state when entering feature
+    elif key == 'n':
+        feat = create_feature(model, state.current_epic)
+        state.current_feature = feat.id
+        state.view = 'feature'
+        state.edit = EditState(mode='edit')
+        load_field_value(state)
+        state.dirty = True
+
+    return state
+
+
+def next_feature_id(model: 'Model', epic: str) -> str:
+    """Generate next ID for epic (e.g., auth-005)."""
+    pattern = re.compile(rf'^{re.escape(epic)}-(\d+)$')
+
+    max_num = 0
+    for fid in model.features.keys():
+        match = pattern.match(fid)
+        if match:
+            max_num = max(max_num, int(match.group(1)))
+
+    return f"{epic}-{max_num + 1:03d}"
+
+
+def create_feature(model: 'Model', epic_name: str) -> 'Feature':
+    """Create new feature in epic."""
+    new_id = next_feature_id(model, epic_name)
+    today = datetime.now().strftime('%Y-%m-%d')
+
+    feat = Feature(
+        id=new_id,
+        status='pending',
+        title='',
+        epic=epic_name,
+        created_at=today,
+    )
+
+    model.features[new_id] = feat
+
+    if epic_name not in model.epics:
+        model.epics[epic_name] = Epic(name=epic_name)
+    model.epics[epic_name].features.append(feat)
+
+    return feat
+
+
+def handle_feature_input(key: str, state: State) -> State:
+    """Handle input in feature view (navigate + edit modes)."""
+    if not state.current_project or not state.current_project._detail or not state.current_feature:
+        return state
+
+    if not state.edit:
+        state.edit = EditState()
+
+    feat = state.current_project._detail.features.get(state.current_feature)
+    if not feat:
+        return state
+
+    # Handle confirmation dialogs first
+    if state.edit.confirm_action == 'delete':
+        if key == 'y':
+            model = state.current_project._detail
+            feat_id = state.current_feature
+            feat_obj = model.features.get(feat_id)
+            if feat_obj:
+                del model.features[feat_id]
+                if feat_obj.epic and feat_obj.epic in model.epics:
+                    model.epics[feat_obj.epic].features = [
+                        f for f in model.epics[feat_obj.epic].features if f.id != feat_id
+                    ]
+            state.dirty = True
+            state.edit.confirm_action = None
+            state.current_feature = None
+            state.view = 'epic'
+        elif key == 'n':
+            state.edit.confirm_action = None
+        return state
+
+    # Navigate mode
+    if state.edit.mode == 'navigate':
+        if key == 'e':
+            state.edit.mode = 'edit'
+            state.edit.field_idx = 0
+            load_field_value(state)
+        elif key == 'D':
+            state.edit.confirm_action = 'delete'
+        elif key == 'w' and state.dirty:
+            apply_pending_changes(state)
+            if save_features(state.current_project):
+                state.dirty = False
+                state.edit.pending_changes.clear()
+        return state
+
+    # Edit mode
+    if key == '\x1b':  # Esc - commit current field and exit edit mode
+        commit_field_edit(state)
+        state.edit.mode = 'navigate'
+        state.edit.editing_value = ''
+        return state
+
+    if key == '\t':  # Tab - commit and advance
+        commit_field_edit(state)
+        state.edit.field_idx = (state.edit.field_idx + 1) % len(EDITABLE_FIELDS)
+        load_field_value(state)
+        return state
+
+    field = EDITABLE_FIELDS[state.edit.field_idx]
+
+    if field == 'status':
+        if key in ('j', 'down'):
+            current = state.edit.editing_value
+            idx = STATUS_OPTIONS.index(current) if current in STATUS_OPTIONS else 0
+            state.edit.editing_value = STATUS_OPTIONS[(idx + 1) % len(STATUS_OPTIONS)]
+            state.dirty = True
+        elif key in ('k', 'up'):
+            current = state.edit.editing_value
+            idx = STATUS_OPTIONS.index(current) if current in STATUS_OPTIONS else 0
+            state.edit.editing_value = STATUS_OPTIONS[(idx - 1) % len(STATUS_OPTIONS)]
+            state.dirty = True
+    else:
+        # Text field editing
+        if key == '\x7f':  # Backspace
+            state.edit.editing_value = state.edit.editing_value[:-1]
+            state.dirty = True
+        elif len(key) == 1 and key.isprintable():
+            state.edit.editing_value += key
+            state.dirty = True
+
+    return state
+
+
+def load_field_value(state: State) -> None:
+    """Load current field value into editing_value."""
+    if not state.edit or not state.current_project or not state.current_feature:
+        return
+
+    field = EDITABLE_FIELDS[state.edit.field_idx]
+    feat = state.current_project._detail.features.get(state.current_feature)
+    if not feat:
+        return
+
+    if field in state.edit.pending_changes:
+        value = state.edit.pending_changes[field]
+    else:
+        value = getattr(feat, field, '') or ''
+
+    if field == 'depends_on' and isinstance(value, list):
+        value = ', '.join(value)
+
+    state.edit.editing_value = str(value) if value else ''
+
+
+def commit_field_edit(state: State) -> None:
+    """Store current editing_value in pending_changes."""
+    if not state.edit:
+        return
+
+    field = EDITABLE_FIELDS[state.edit.field_idx]
+    value = state.edit.editing_value
+
+    if field == 'depends_on':
+        value = [x.strip() for x in value.split(',') if x.strip()]
+    elif field == 'priority':
+        try:
+            value = int(value) if value else None
+        except ValueError:
+            value = None
+
+    state.edit.pending_changes[field] = value
+
+
+def apply_pending_changes(state: State) -> None:
+    """Apply pending edits to Feature object."""
+    if not state.edit:
+        return
+
+    feat = state.current_project._detail.features.get(state.current_feature)
+    if not feat:
+        return
+
+    # Only commit current field if we're still in edit mode
+    if state.edit.mode == 'edit':
+        commit_field_edit(state)
+
+    # Apply all pending changes to feature
+    for field, value in state.edit.pending_changes.items():
+        setattr(feat, field, value)
+
+    state.edit.pending_changes.clear()
+
+
+def save_features(project: 'ProjectSummary') -> bool:
+    """Save features.json. Returns True on success."""
+    features_path = os.path.join(project.path, 'features.json')
+    model = project._detail
+    if not model:
+        return False
+
+    data = []
+    for feat in model.features.values():
+        item = {'id': feat.id, 'status': feat.status}
+        for attr in ['title', 'description', 'epic', 'depends_on', 'priority',
+                     'created_at', 'spec_file', 'steps', 'discovered_from', 'notes']:
+            val = getattr(feat, attr, None)
+            if val:
+                item[attr] = val
+        data.append(item)
+
+    data.sort(key=lambda x: x['id'])
+
+    with open(features_path, 'w') as f:
+        json.dump(data, f, indent=2)
+        f.write('\n')
+
+    return True
+
+
+def handle_tree_input(key: str, state: State) -> State:
+    """Handle input in tree view."""
+    if not state.tree:
+        return state
+
+    # Handle search mode input
+    if state.tree.search_mode:
+        return handle_tree_search_input(key, state)
+
+    flat = flatten_tree(state.tree.root, zoomed=state.tree.zoomed_node)
+
+    # Handle empty tree
+    if not flat:
+        if key == 't':
+            state.view = 'portfolio'
+        elif key == 'a':
+            state.tree.show_all = not state.tree.show_all
+            state.tree.root = build_tree(state.portfolio, state.tree.show_all)
+            state.tree.cursor_idx = 0
+        elif key == '/':
+            state.tree.search_mode = True
+            state.tree.search_query = ''
+        return state
+
+    # Clamp cursor to valid range
+    cursor_idx = min(state.tree.cursor_idx, len(flat) - 1)
+    cursor_idx = max(0, cursor_idx)
+    state.tree.cursor_idx = cursor_idx
+
+    if key in ('j', 'down'):
+        if cursor_idx < len(flat) - 1:
+            state.tree.cursor_idx = cursor_idx + 1
+
+    elif key in ('k', 'up'):
+        if cursor_idx > 0:
+            state.tree.cursor_idx = cursor_idx - 1
+
+    elif key in ('l', 'right', '\r', '\n'):
+        _, node = flat[cursor_idx]
+        if node.type == 'epic' and not node.expanded:
+            expand_epic(node, state.tree.show_all)
+            node.expanded = True
+        elif node.has_children and not node.expanded:
+            node.expanded = True
+        elif node.type == 'feature':
+            proj = node.project_ref
+            if proj:
+                proj.load_detail()
+                state.current_project = proj
+                state.current_epic = node.parent.label if node.parent else None
+                state.current_feature = node.data.id
+                state.view = 'feature'
+
+    elif key in ('h', 'left'):
+        _, node = flat[cursor_idx]
+        if node.expanded:
+            node.expanded = False
+        else:
+            parent_idx = find_parent_idx(flat, cursor_idx)
+            if parent_idx >= 0:
+                state.tree.cursor_idx = parent_idx
+
+    elif key == 'o':
+        _, node = flat[cursor_idx]
+        if node.type == 'epic' and not node.expanded:
+            expand_epic(node, state.tree.show_all)
+        if node.has_children:
+            node.expanded = not node.expanded
+
+    elif key == 'O':
+        _, node = flat[cursor_idx]
+        expand_all(node, state.tree.show_all)
+
+    elif key == 'M':
+        collapse_all(state.tree.root)
+        state.tree.cursor_idx = 0
+        state.tree.search_matches = []
+
+    elif key == 't':
+        state.view = 'portfolio'
+
+    elif key == 'a':
+        state.tree.show_all = not state.tree.show_all
+        state.tree.root = build_tree(state.portfolio, state.tree.show_all)
+        state.tree.cursor_idx = 0
+        state.tree.search_matches = []
+
+    elif key == '/':
+        state.tree.search_mode = True
+        state.tree.search_query = ''
+        state.tree.search_matches = []
+        state.tree.search_index = 0
+
+    elif key == 'n' and state.tree.search_matches:
+        # Next match
+        state.tree.search_index = (state.tree.search_index + 1) % len(state.tree.search_matches)
+        target = state.tree.search_matches[state.tree.search_index]
+        expand_path_to(target, state.tree.show_all)
+        flat = flatten_tree(state.tree.root, zoomed=state.tree.zoomed_node)
+        idx = find_node_idx(flat, target)
+        if idx >= 0:
+            state.tree.cursor_idx = idx
+
+    elif key == 'N' and state.tree.search_matches:
+        # Previous match
+        state.tree.search_index = (state.tree.search_index - 1) % len(state.tree.search_matches)
+        target = state.tree.search_matches[state.tree.search_index]
+        expand_path_to(target, state.tree.show_all)
+        flat = flatten_tree(state.tree.root, zoomed=state.tree.zoomed_node)
+        idx = find_node_idx(flat, target)
+        if idx >= 0:
+            state.tree.cursor_idx = idx
+
+    elif key == 'z':
+        # Toggle zoom
+        _, node = flat[cursor_idx]
+        if state.tree.zoomed_node == node:
+            state.tree.zoomed_node = None  # Unzoom
+        else:
+            state.tree.zoomed_node = node  # Zoom to cursor
+        state.tree.cursor_idx = 0
+
+    return state
+
+
+def handle_tree_search_input(key: str, state: State) -> State:
+    """Handle input during search mode."""
+    ts = state.tree
+
+    if key == '\x1b':  # Escape - cancel search
+        ts.search_mode = False
+        ts.search_query = ''
+        ts.search_matches = []
+    elif key in ('\r', '\n'):  # Enter - confirm search, jump to first match
+        ts.search_mode = False
+        if ts.search_matches:
+            target = ts.search_matches[ts.search_index]
+            expand_path_to(target, ts.show_all)
+            flat = flatten_tree(ts.root, zoomed=ts.zoomed_node)
+            idx = find_node_idx(flat, target)
+            if idx >= 0:
+                ts.cursor_idx = idx
+    elif key == '\x7f':  # Backspace
+        ts.search_query = ts.search_query[:-1]
+        if ts.search_query:
+            ts.search_matches = search_tree(ts.root, ts.search_query)
+        else:
+            ts.search_matches = []
+        ts.search_index = 0
+    elif len(key) == 1 and key.isprintable():
+        ts.search_query += key
+        ts.search_matches = search_tree(ts.root, ts.search_query)
+        ts.search_index = 0
+        # Auto-expand to first match
+        if ts.search_matches:
+            expand_path_to(ts.search_matches[0], ts.show_all)
 
     return state
 
@@ -981,6 +1782,21 @@ def render(state: State, width: int, height: int) -> str:
         title = 'help'
         footer = '[Esc]back'
         lines = view_help(width, height)
+    elif state.view == 'tree':
+        title = 'tree'
+        hints = []
+        if state.tree and state.tree.show_all:
+            hints.append('[all]')
+        if state.tree and state.tree.zoomed_node:
+            hints.append('[zoomed]')
+        hint_str = ' ' + ' '.join(hints) if hints else ''
+        if state.tree and state.tree.search_mode:
+            footer = '[Enter]confirm [Esc]cancel'
+        elif state.tree and state.tree.search_matches:
+            footer = f'[n/N]next/prev [/]search [z]oom [t]table [q]uit{hint_str}'
+        else:
+            footer = f'[h/l]expand [o]toggle [/]search [z]oom [t]table [a]ll [q]uit{hint_str}'
+        lines = view_tree(state, width, height)
     elif state.view == 'portfolio':
         title = 'pv'
         filter_hint = ''
@@ -988,7 +1804,7 @@ def render(state: State, width: int, height: int) -> str:
             filter_hint = ' [all]'
         elif state.stalled_only:
             filter_hint = ' [stalled]'
-        footer = f'[s]ort [a]ll [z]stalled [h]elp [q]uit{filter_hint}'
+        footer = f'[s]ort [a]ll [z]stalled [t]ree [h]elp [q]uit{filter_hint}'
         lines = view_portfolio(state.portfolio, state, width, height)
     elif state.view == 'project':
         proj_name = state.current_project.name if state.current_project else 'project'
@@ -1001,7 +1817,7 @@ def render(state: State, width: int, height: int) -> str:
             lines = ['  No project loaded']
     elif state.view == 'epic':
         title = f'epic: {state.current_epic}'
-        footer = '[Esc]back [h]elp [q]uit'
+        footer = '[n]ew [Esc]back [h]elp [q]uit'
         model = state.current_project._detail if state.current_project else None
         if model and state.current_epic:
             lines = view_epic(model, state.current_epic, state, width, height)
@@ -1009,10 +1825,28 @@ def render(state: State, width: int, height: int) -> str:
             lines = ['  No epic selected']
     elif state.view == 'feature':
         title = state.current_feature or 'feature'
-        footer = '[Esc]back [h]elp [q]uit'
         model = state.current_project._detail if state.current_project else None
+
+        # Build footer based on edit state
+        if state.edit and state.edit.confirm_action == 'delete':
+            footer = f"Delete {state.current_feature}? [y]es [n]o"
+        elif state.edit and state.edit.confirm_action == 'quit':
+            footer = "Unsaved changes. [s]ave [d]iscard [c]ancel"
+        elif state.edit and state.edit.mode == 'edit':
+            footer = "[Tab]next [j/k]status [Esc]exit"
+        else:
+            dirty_hint = " [w]rite" if state.dirty else ""
+            footer = f"[e]dit [D]elete{dirty_hint} [Esc]back [q]uit"
+
+        if state.dirty:
+            footer = "[*] " + footer
+
         if model and state.current_feature:
-            lines = view_feature(model, state.current_feature, width, height)
+            feat = model.features.get(state.current_feature)
+            if feat and state.edit and state.edit.mode == 'edit':
+                lines = view_feature_editable(feat, state.edit, width)
+            else:
+                lines = view_feature(model, state.current_feature, width, height)
         else:
             lines = ['  No feature selected']
     else:

@@ -11,7 +11,7 @@
   {
     "id": "pv-002",
     "epic": "pv",
-    "status": "pending",
+    "status": "done",
     "title": "Edit Mode - Add/Delete/Modify Features",
     "description": "Enable editing features.json from within the TUI. Add/remove/modify tickets, change status, edit fields. Track dirty state and save changes back to file.",
     "created_at": "2026-01-24",
@@ -27,7 +27,8 @@
       "Track dirty flag for unsaved changes",
       "Implement save with 'w' key (write to features.json)",
       "Warn on quit if unsaved changes"
-    ]
+    ],
+    "spec_file": "docs/history/20260124_pv-002_edit_mode.md"
   },
   {
     "id": "pv-003",
@@ -50,7 +51,7 @@
   {
     "id": "pv-004",
     "epic": "pv",
-    "status": "pending",
+    "status": "done",
     "title": "Tree View Mode",
     "description": "Add collapsible tree view for portfolio-wide visualization with project→epic→feature hierarchy, inline dependency annotations, and search/filter capabilities.",
     "created_at": "2026-01-24",
