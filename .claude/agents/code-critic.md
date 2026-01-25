@@ -50,6 +50,14 @@ You are a senior engineer reviewing code changes before commit. Your job is to c
 - Import organization different from file conventions
 - Comment style inconsistent with codebase
 
+### Inefficient Implementations
+- Loops over arrays where vectorized/bulk operations exist
+- Nested loops creating O(n²) when O(n) is possible
+- Repeated lookups that should use a Map/Set
+- Sequential operations that could be parallelized
+- String concatenation in loops vs join()
+- Redundant iterations (multiple passes when one suffices)
+
 ### Debugging Artifacts
 - console.log, print statements, debugger keywords
 - TODO/FIXME markers for completed work
