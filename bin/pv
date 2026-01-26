@@ -78,7 +78,7 @@ BOX = {
 
 BLOCKS = ' ▏▎▍▌▋▊▉█'
 SORT_MODES = ['open', 'modified', 'total', 'completion']
-FILTER_MODES = ['open', 'all', 'active', 'stalled']
+FILTER_MODES = ['open', 'all', 'active', 'stalled', 'archived']
 STALL_DAYS = 14
 
 # Edit mode
@@ -349,6 +349,7 @@ class ProjectSummary:
     last_modified: datetime | None = None
     oldest_pending_date: str | None = None
     worked_today: bool = False
+    archived: bool = False
     _detail: Model | None = field(default=None, repr=False)
 
     @classmethod
@@ -370,6 +371,7 @@ class ProjectSummary:
             name = path.name
 
         proj = cls(path=str(path), name=name)
+        proj.archived = os.path.exists(os.path.join(proj.path, '.archived'))
         proj.last_modified = datetime.fromtimestamp(os.path.getmtime(features_path))
         proj.worked_today = proj.last_modified.date() == datetime.now().date()
 
@@ -457,6 +459,10 @@ class Portfolio:
     def complete_projects(self) -> int:
         return sum(1 for p in self.projects if p.is_complete)
 
+    @property
+    def archived_projects(self) -> int:
+        return sum(1 for p in self.projects if p.archived)
+
     def sorted_by(self, mode: str) -> list[ProjectSummary]:
         if mode == 'open':
             # Sort by total open work (pending + active), most first
@@ -473,10 +479,13 @@ class Portfolio:
         if mode == 'all':
             return self.projects
         elif mode == 'active':
-            return [p for p in self.projects if p.active > 0]
+            return [p for p in self.projects if p.active > 0 and not p.archived]
         elif mode == 'stalled':
-            return [p for p in self.projects if p.is_stalled]
-        return [p for p in self.projects if p.has_open_work]
+            return [p for p in self.projects if p.is_stalled and not p.archived]
+        elif mode == 'archived':
+            return [p for p in self.projects if p.archived]
+        # 'open' - default: has open work AND not archived
+        return [p for p in self.projects if p.has_open_work and not p.archived]
 
 
 def scan_projects(root: str) -> Portfolio:
@@ -552,7 +561,7 @@ def build_tree(portfolio: Portfolio, show_all: bool = False) -> TreeNode:
     root = TreeNode(type='root', id='root', label='Portfolio')
 
     for proj in portfolio.projects:
-        if not show_all and proj.is_complete:
+        if not show_all and (proj.is_complete or proj.archived):
             continue
 
         proj_node = TreeNode(
@@ -727,6 +736,8 @@ def view_portfolio(portfolio: Portfolio, state: 'State', width: int, height: int
         status.append(ansi(f"○ {portfolio.stalled_projects} stalled", COLOR_STALLED))
     if portfolio.complete_projects:
         status.append(ansi(f"✓ {portfolio.complete_projects} complete", COLOR_HEALTHY))
+    if portfolio.archived_projects:
+        status.append(ansi(f"⊘ {portfolio.archived_projects} archived", COLOR_MUTED))
     lines.append('  ' + '    '.join(status))
 
     lines.append('')
@@ -752,6 +763,9 @@ def view_portfolio(portfolio: Portfolio, state: 'State', width: int, height: int
             status_str = ansi(f'● {proj.active} active', COLOR_ACTIVE)
         else:
             status_str = ansi(f'○ {proj.pending} pending', COLOR_MUTED)
+
+        if proj.archived:
+            status_str = status_str + ansi(' ⊘', COLOR_MUTED)
 
         if proj.last_modified:
             mod = proj.last_modified.strftime('%b %d')
@@ -1162,7 +1176,8 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append(section_header('PORTFOLIO CONTROLS', inner))
     lines.append('')
     lines.append(f"  {ansi('s', bold=True)}          Cycle sort mode (open/modified/total/completion)")
-    lines.append(f"  {ansi('f', bold=True)}          Cycle filter (open/all/active/stalled)")
+    lines.append(f"  {ansi('f', bold=True)}          Cycle filter (open/all/active/stalled/archived)")
+    lines.append(f"  {ansi('A', bold=True)}          Toggle archive state of selected project")
     lines.append(f"  {ansi('t', bold=True)}          Switch to tree view")
     lines.append('')
     lines.append(section_header('TREE VIEW', inner))
@@ -1352,6 +1367,11 @@ def handle_portfolio_input(key: str, state: State) -> State:
             show_all=show_all,
         )
         state.view = 'tree'
+    elif key == 'A':
+        if display and 0 <= state.project_index < len(display):
+            proj = display[state.project_index]
+            toggle_archive(proj)
+            state.project_index = min(state.project_index, max(0, len(display) - 2))
 
     return state
 
@@ -1613,6 +1633,18 @@ def save_features(project: 'ProjectSummary') -> bool:
     return True
 
 
+def toggle_archive(project: ProjectSummary) -> bool:
+    """Toggle project archive state. Returns new archived state."""
+    marker = os.path.join(project.path, '.archived')
+    if project.archived:
+        os.remove(marker)
+        project.archived = False
+    else:
+        Path(marker).touch()
+        project.archived = True
+    return project.archived
+
+
 def handle_tree_input(key: str, state: State) -> State:
     """Handle input in tree view."""
     if not state.tree:
@@ -1700,6 +1732,13 @@ def handle_tree_input(key: str, state: State) -> State:
         state.tree.root = build_tree(state.portfolio, state.tree.show_all)
         state.tree.cursor_idx = 0
         state.tree.search_matches = []
+
+    elif key == 'A':
+        _, node = flat[cursor_idx]
+        if node.type == 'project' and node.data:
+            toggle_archive(node.data)
+            state.tree.root = build_tree(state.portfolio, state.tree.show_all)
+            state.tree.cursor_idx = min(cursor_idx, len(flatten_tree(state.tree.root, zoomed=state.tree.zoomed_node)) - 1)
 
     elif key == '/':
         state.tree.search_mode = True
@@ -1800,7 +1839,7 @@ def render(state: State, width: int, height: int) -> str:
         lines = view_tree(state, width, height)
     elif state.view == 'portfolio':
         title = 'pv'
-        footer = f'[s]ort:{state.sort_mode} [f]ilter:{state.filter_mode} [t]ree [?]help [q]uit'
+        footer = f'[s]ort:{state.sort_mode} [f]ilter:{state.filter_mode} [A]rchive [t]ree [?]help [q]uit'
         lines = view_portfolio(state.portfolio, state, width, height)
     elif state.view == 'project':
         proj_name = state.current_project.name if state.current_project else 'project'

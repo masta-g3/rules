@@ -33,20 +33,22 @@
   {
     "id": "pv-003",
     "epic": "pv",
-    "status": "pending",
-    "title": "Archive Epics via UI",
-    "description": "Add ability to archive completed epics from within the TUI. Archived epics would be hidden from default view but preserved in features.json with an archived tag/field. Similar interaction pattern to pv-002 editing.",
+    "status": "done",
+    "title": "Archive Projects via UI",
+    "description": "Add ability to archive completed projects from portfolio view. Archived projects are hidden from default view but preserved. Uses a .archived marker file in project directory to avoid schema changes to features.json.",
     "created_at": "2026-01-24",
     "depends_on": [
       "pv-002"
     ],
     "steps": [
-      "Add archived: true field support to epic/feature schema",
-      "Filter archived epics from default view (show with toggle)",
-      "Add archive action in epic view (e.g. A key)",
-      "Persist archived state to features.json",
-      "Add visual indicator for archived items when shown"
-    ]
+      "Detect .archived marker file in scan_projects()",
+      "Filter archived projects from default portfolio view",
+      "Add toggle to show/hide archived (extend filter modes or separate key)",
+      "Add archive action in portfolio view (e.g. A key on selected project)",
+      "Create/remove .archived file to toggle state",
+      "Add visual indicator for archived projects when shown"
+    ],
+    "spec_file": "docs/history/20260125_pv-003_archive_projects.md"
   },
   {
     "id": "pv-004",
