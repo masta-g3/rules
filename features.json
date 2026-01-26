@@ -59,5 +59,15 @@
       "pv-001"
     ],
     "spec_file": "docs/plans/pv-004.md"
+  },
+  {
+    "id": "pv-005",
+    "epic": "pv",
+    "status": "done",
+    "title": "Unified filter cycling",
+    "description": "Replace a/z toggle filters with single f key that cycles through filter modes: open → all → active → stalled. Reduces hotkey sprawl and follows existing sort cycle pattern.",
+    "created_at": "2026-01-25",
+    "depends_on": [],
+    "spec_file": "docs/history/20260125_pv-005_unified_filter.md"
   }
 ]

@@ -99,8 +99,7 @@ fv                    # Project view (./features.json in current dir)
 
 **Portfolio controls:**
 - `s` - Cycle sort mode (open/modified/total/completion)
-- `a` - Toggle show all projects (including complete)
-- `z` - Show stalled projects only
+- `f` - Cycle filter mode (open/all/active/stalled)
 - `t` - Switch to tree view
 
 **Tree view:**

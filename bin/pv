@@ -16,8 +16,7 @@ Navigation:
     Enter       Drill down (project/epic/feature)
     b/Esc       Go back
     s           Cycle sort mode (portfolio)
-    a           Toggle show all (portfolio)
-    z           Show stalled only (portfolio)
+    f           Cycle filter (open/all/active/stalled)
     h/?         Show help
     q           Quit
 """
@@ -79,6 +78,7 @@ BOX = {
 
 BLOCKS = ' ▏▎▍▌▋▊▉█'
 SORT_MODES = ['open', 'modified', 'total', 'completion']
+FILTER_MODES = ['open', 'all', 'active', 'stalled']
 STALL_DAYS = 14
 
 # Edit mode
@@ -469,11 +469,13 @@ class Portfolio:
             return sorted(self.projects, key=lambda p: p.percent)
         return self.projects
 
-    def filtered(self, show_all: bool = False, stalled_only: bool = False) -> list[ProjectSummary]:
-        if stalled_only:
-            return [p for p in self.projects if p.is_stalled]
-        if show_all:
+    def filtered(self, mode: str = 'open') -> list[ProjectSummary]:
+        if mode == 'all':
             return self.projects
+        elif mode == 'active':
+            return [p for p in self.projects if p.active > 0]
+        elif mode == 'stalled':
+            return [p for p in self.projects if p.is_stalled]
         return [p for p in self.projects if p.has_open_work]
 
 
@@ -728,10 +730,10 @@ def view_portfolio(portfolio: Portfolio, state: 'State', width: int, height: int
     lines.append('  ' + '    '.join(status))
 
     lines.append('')
-    lines.append(section_header(f'PROJECTS (sort: {state.sort_mode})', inner))
+    lines.append(section_header('PROJECTS', inner))
     lines.append('')
 
-    filtered = portfolio.filtered(state.show_all, state.stalled_only)
+    filtered = portfolio.filtered(state.filter_mode)
     sorted_projects = portfolio.sorted_by(state.sort_mode)
     display = [p for p in sorted_projects if p in filtered]
 
@@ -763,7 +765,7 @@ def view_portfolio(portfolio: Portfolio, state: 'State', width: int, height: int
         lines.append(f"  {ansi('No projects match current filter', COLOR_MUTED)}")
 
     stalled = [p for p in portfolio.projects if p.is_stalled]
-    if stalled and not state.stalled_only:
+    if stalled and state.filter_mode != 'stalled':
         lines.append('')
         lines.append(section_header('ATTENTION', inner))
         lines.append('')
@@ -1159,9 +1161,8 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append('')
     lines.append(section_header('PORTFOLIO CONTROLS', inner))
     lines.append('')
-    lines.append(f"  {ansi('s', bold=True)}          Cycle sort mode (pending/modified/total/completion)")
-    lines.append(f"  {ansi('a', bold=True)}          Toggle show all projects (including complete)")
-    lines.append(f"  {ansi('z', bold=True)}          Show only stalled projects")
+    lines.append(f"  {ansi('s', bold=True)}          Cycle sort mode (open/modified/total/completion)")
+    lines.append(f"  {ansi('f', bold=True)}          Cycle filter (open/all/active/stalled)")
     lines.append(f"  {ansi('t', bold=True)}          Switch to tree view")
     lines.append('')
     lines.append(section_header('TREE VIEW', inner))
@@ -1202,8 +1203,7 @@ class State:
     portfolio: Portfolio | None = None
     project_index: int = 0
     sort_mode: str = 'open'
-    show_all: bool = False
-    stalled_only: bool = False
+    filter_mode: str = 'open'
 
     # Project level
     current_project: ProjectSummary | None = None
@@ -1320,7 +1320,7 @@ def handle_portfolio_input(key: str, state: State) -> State:
     if not portfolio:
         return state
 
-    filtered = portfolio.filtered(state.show_all, state.stalled_only)
+    filtered = portfolio.filtered(state.filter_mode)
     sorted_projects = portfolio.sorted_by(state.sort_mode)
     display = [p for p in sorted_projects if p in filtered]
 
@@ -1332,13 +1332,9 @@ def handle_portfolio_input(key: str, state: State) -> State:
         idx = SORT_MODES.index(state.sort_mode)
         state.sort_mode = SORT_MODES[(idx + 1) % len(SORT_MODES)]
         state.project_index = 0
-    elif key == 'a':
-        state.show_all = not state.show_all
-        state.stalled_only = False
-        state.project_index = 0
-    elif key == 'z':
-        state.stalled_only = not state.stalled_only
-        state.show_all = False
+    elif key == 'f':
+        idx = FILTER_MODES.index(state.filter_mode)
+        state.filter_mode = FILTER_MODES[(idx + 1) % len(FILTER_MODES)]
         state.project_index = 0
     elif key in ('\r', '\n'):
         if display and 0 <= state.project_index < len(display):
@@ -1347,9 +1343,10 @@ def handle_portfolio_input(key: str, state: State) -> State:
             state.view = 'project'
             state.epic_index = 0
     elif key == 't':
+        show_all = (state.filter_mode == 'all')
         state.tree = TreeState(
-            root=build_tree(state.portfolio, state.show_all),
-            show_all=state.show_all,
+            root=build_tree(state.portfolio, show_all),
+            show_all=show_all,
         )
         state.view = 'tree'
 
@@ -1695,7 +1692,8 @@ def handle_tree_input(key: str, state: State) -> State:
         state.view = 'portfolio'
 
     elif key == 'a':
-        state.tree.show_all = not state.tree.show_all
+        state.filter_mode = 'all' if state.filter_mode != 'all' else 'open'
+        state.tree.show_all = (state.filter_mode == 'all')
         state.tree.root = build_tree(state.portfolio, state.tree.show_all)
         state.tree.cursor_idx = 0
         state.tree.search_matches = []
@@ -1799,12 +1797,7 @@ def render(state: State, width: int, height: int) -> str:
         lines = view_tree(state, width, height)
     elif state.view == 'portfolio':
         title = 'pv'
-        filter_hint = ''
-        if state.show_all:
-            filter_hint = ' [all]'
-        elif state.stalled_only:
-            filter_hint = ' [stalled]'
-        footer = f'[s]ort [a]ll [z]stalled [t]ree [h]elp [q]uit{filter_hint}'
+        footer = f'[s]ort:{state.sort_mode} [f]ilter:{state.filter_mode} [t]ree [?]help [q]uit'
         lines = view_portfolio(state.portfolio, state, width, height)
     elif state.view == 'project':
         proj_name = state.current_project.name if state.current_project else 'project'
