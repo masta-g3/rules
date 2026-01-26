@@ -1,7 +1,21 @@
 ---
-description: Archive planning document first, then commit files from session.
+description: Review code, archive planning document, then commit files from session.
 disable-model-invocation: false
 ---
+
+### Code Review (Non-Trivial Changes Only)
+
+For changes involving multiple files or significant logic: invoke the **code-critic** subagent via Task tool to review modified files. Skip for trivial edits (typos, single-line fixes). Address valid concerns before continuing.
+
+### Verify Clean State
+
+Check modified files for:
+
+- No debugging artifacts (console.logs, print statements, TODO markers for this feature)
+- No AI slop: excess comments, defensive try/catch in trusted paths, unrequested default values, `any` casts to bypass types, etc.
+- Code matches surrounding file conventions—if it looks out of place, fix it
+
+### Archive Planning Document
 
 If a markdown planning file exists for this work, archive it:
 
@@ -13,17 +27,7 @@ Keep `{short_desc}` to 2-4 words, snake_case. The feature ID enables visual epic
 
 Transform into permanent spec: remove implementation details, keep completed checklist as summary. Delete the original planning file after archiving.
 
-### Code Review (Non-Trivial Changes Only)
-
-For changes involving multiple files or significant logic: invoke the **code-critic** subagent via Task tool to review modified files. Skip for trivial edits (typos, single-line fixes). Address valid concerns before committing.
-
-### Verify Clean State
-
-Check modified files for:
-
-- No debugging artifacts (console.logs, print statements, TODO markers for this feature)
-- No AI slop: excess comments, defensive try/catch in trusted paths, unrequested default values, `any` casts to bypass types, etc.
-- Code matches surrounding file conventions—if it looks out of place, fix it
+### Update features.json
 
 Update features.json (if tracked feature):
 
