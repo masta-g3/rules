@@ -58,7 +58,7 @@
     "depends_on": [
       "pv-001"
     ],
-    "spec_file": "docs/plans/pv-004.md"
+    "spec_file": "docs/history/20260124_pv-004_tree_view.md"
   },
   {
     "id": "pv-005",
