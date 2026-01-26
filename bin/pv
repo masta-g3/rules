@@ -1796,7 +1796,7 @@ def render(state: State, width: int, height: int) -> str:
         elif state.tree and state.tree.search_matches:
             footer = f'[n/N]next/prev [/]search [z]oom [t]table [q]uit{hint_str}'
         else:
-            footer = f'[h/l]expand [o]toggle [/]search [z]oom [t]table [f]ilter:{state.filter_mode} [q]uit{hint_str}'
+            footer = f'[/]search [z]oom [f]ilter:{state.filter_mode} [t]able [q]uit{hint_str}'
         lines = view_tree(state, width, height)
     elif state.view == 'portfolio':
         title = 'pv'
