@@ -1172,6 +1172,9 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append(f"  {ansi('o', bold=True)}          Toggle expand/collapse")
     lines.append(f"  {ansi('O', bold=True)}          Expand all under cursor")
     lines.append(f"  {ansi('M', bold=True)}          Collapse all")
+    lines.append(f"  {ansi('/', bold=True)}          Search, {ansi('n', bold=True)}/{ansi('N', bold=True)} next/prev match")
+    lines.append(f"  {ansi('z', bold=True)}          Zoom to node")
+    lines.append(f"  {ansi('f', bold=True)}          Toggle filter (open/all)")
     lines.append(f"  {ansi('t', bold=True)}          Switch back to table view")
     lines.append('')
     lines.append(section_header('STATUS SYMBOLS', inner))
@@ -1691,7 +1694,7 @@ def handle_tree_input(key: str, state: State) -> State:
     elif key == 't':
         state.view = 'portfolio'
 
-    elif key == 'a':
+    elif key == 'f':
         state.filter_mode = 'all' if state.filter_mode != 'all' else 'open'
         state.tree.show_all = (state.filter_mode == 'all')
         state.tree.root = build_tree(state.portfolio, state.tree.show_all)
@@ -1793,7 +1796,7 @@ def render(state: State, width: int, height: int) -> str:
         elif state.tree and state.tree.search_matches:
             footer = f'[n/N]next/prev [/]search [z]oom [t]table [q]uit{hint_str}'
         else:
-            footer = f'[h/l]expand [o]toggle [/]search [z]oom [t]table [a]ll [q]uit{hint_str}'
+            footer = f'[h/l]expand [o]toggle [/]search [z]oom [t]table [f]ilter:{state.filter_mode} [q]uit{hint_str}'
         lines = view_tree(state, width, height)
     elif state.view == 'portfolio':
         title = 'pv'
