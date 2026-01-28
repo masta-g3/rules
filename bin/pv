@@ -85,6 +85,10 @@ STALL_DAYS = 14
 EDITABLE_FIELDS = ['title', 'status', 'priority', 'description', 'depends_on', 'notes']
 STATUS_OPTIONS = ['pending', 'in_progress', 'done', 'abandoned', 'superseded']
 
+# Creation mode
+CREATION_FIELDS_FEATURE = ['title', 'status', 'priority', 'description', 'depends_on']
+CREATION_FIELDS_EPIC = ['name']
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ANSI RENDERING
@@ -554,6 +558,16 @@ class EditState:
     editing_value: str = ''
     pending_changes: dict = field(default_factory=dict)
     confirm_action: str | None = None  # 'quit' | 'delete' | None
+
+
+@dataclass
+class CreationState:
+    """State for entity creation flow."""
+    entity_type: str  # 'feature' | 'epic'
+    epic_context: str | None = None  # parent epic for features
+    fields: dict = field(default_factory=dict)  # draft values, NOT in model
+    preview_mode: bool = False
+    return_view: str = 'epic'  # where to return after creation
 
 
 def build_tree(portfolio: Portfolio, show_all: bool = False) -> TreeNode:
@@ -1182,15 +1196,21 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append('')
     lines.append(section_header('TREE VIEW', inner))
     lines.append('')
-    lines.append(f"  {ansi('h', bold=True)} / {ansi('←', bold=True)}      Collapse node or move to parent")
-    lines.append(f"  {ansi('l', bold=True)} / {ansi('→', bold=True)}      Expand node or drill into feature")
-    lines.append(f"  {ansi('o', bold=True)}          Toggle expand/collapse")
-    lines.append(f"  {ansi('O', bold=True)}          Expand all under cursor")
+    lines.append(f"  {ansi('←', bold=True)}          Collapse node or move to parent")
+    lines.append(f"  {ansi('→', bold=True)}          Expand node or drill into feature")
+    lines.append(f"  {ansi('o', bold=True)}          Expand all under cursor")
     lines.append(f"  {ansi('M', bold=True)}          Collapse all")
     lines.append(f"  {ansi('/', bold=True)}          Search, {ansi('n', bold=True)}/{ansi('N', bold=True)} next/prev match")
     lines.append(f"  {ansi('z', bold=True)}          Zoom to node")
     lines.append(f"  {ansi('f', bold=True)}          Toggle filter (open/all)")
     lines.append(f"  {ansi('t', bold=True)}          Switch back to table view")
+    lines.append('')
+    lines.append(section_header('CREATION', inner))
+    lines.append('')
+    lines.append(f"  {ansi('n', bold=True)}          Create new (context-aware: epic on project, feature on epic)")
+    lines.append(f"  {ansi('Tab', bold=True)}        Next field")
+    lines.append(f"  {ansi('j/k', bold=True)}        Cycle status options")
+    lines.append(f"  {ansi('Esc', bold=True)}        Preview / Confirm")
     lines.append('')
     lines.append(section_header('STATUS SYMBOLS', inner))
     lines.append('')
@@ -1206,6 +1226,80 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append(f"  {ansi('fv', bold=True)}                   Project view for ./features.json")
     lines.append('')
 
+    return lines
+
+
+def view_creation(state: 'State', width: int) -> list[str]:
+    """Render creation view with field editor."""
+    lines = []
+    inner = width - 4
+    cs = state.creation
+
+    if cs.preview_mode:
+        return view_creation_preview(state, width)
+
+    entity_label = 'Feature' if cs.entity_type == 'feature' else 'Epic'
+    lines.append('')
+    lines.append(f"  {ansi(f'New {entity_label}', bold=True)}")
+    if cs.entity_type == 'feature':
+        lines.append(f"  {ansi(f'Epic: {cs.epic_context}', COLOR_EPIC)}")
+    lines.append('')
+    lines.append(section_header('FIELDS', inner))
+    lines.append('')
+
+    fields = CREATION_FIELDS_FEATURE if cs.entity_type == 'feature' else CREATION_FIELDS_EPIC
+
+    for i, fld in enumerate(fields):
+        is_current = (i == state.edit.field_idx)
+        value = state.edit.editing_value if is_current else cs.fields.get(fld, '')
+
+        if fld == 'status':
+            options = []
+            for opt in STATUS_OPTIONS:
+                marker = '◉' if value == opt else '○'
+                color = STATUS_COLOR.get(opt, 0)
+                options.append(ansi(f'{marker} {opt}', color))
+            display = '  '.join(options)
+        elif fld == 'depends_on':
+            if isinstance(value, list):
+                display = f"[{', '.join(value)}]"
+            else:
+                display = f"[{value}]"
+        else:
+            display = f"[{value}]"
+
+        prefix = '▸ ' if is_current else '  '
+        label = f"{fld}:".ljust(14)
+        lines.append(f"{prefix}{ansi(label, COLOR_MUTED)}{display}")
+
+    lines.append('')
+    return lines
+
+
+def view_creation_preview(state: 'State', width: int) -> list[str]:
+    """Show JSON preview before commit."""
+    lines = []
+    cs = state.creation
+
+    lines.append('')
+    lines.append(f"  {ansi('Review before creating:', bold=True)}")
+    lines.append('')
+
+    if cs.entity_type == 'feature':
+        preview = op_preview_feature(cs.epic_context, cs.fields)
+    else:
+        preview = op_preview_epic(cs.fields.get('name', ''))
+
+    for key, val in preview.items():
+        if val:
+            val_str = json.dumps(val) if isinstance(val, (list, dict)) else str(val)
+            lines.append(f"  {ansi(key + ':', COLOR_MUTED)} {val_str}")
+
+    lines.append('')
+    lines.append(f"  {ansi('[c] Confirm and create', COLOR_HEALTHY)}")
+    lines.append(f"  {ansi('[e] Edit more', COLOR_MUTED)}")
+    lines.append(f"  {ansi('[Esc] Cancel', COLOR_MUTED)}")
+    lines.append('')
     return lines
 
 
@@ -1244,8 +1338,21 @@ class State:
     edit: EditState | None = None
     dirty: bool = False
 
+    # Creation mode
+    creation: CreationState | None = None
+
+    # Flash message (clears on next keypress)
+    flash_message: str | None = None
+
 
 def handle_input(key: str, state: State) -> State | None:
+    # Clear flash on any keypress
+    state.flash_message = None
+
+    # Handle creation view
+    if state.view == 'creation':
+        return handle_creation_input(key, state)
+
     # Handle quit confirmation when dirty
     if state.edit and state.edit.confirm_action == 'quit':
         if key == 's':
@@ -1258,8 +1365,7 @@ def handle_input(key: str, state: State) -> State | None:
             state.edit.confirm_action = None
         return state
 
-    # Help toggle (h conflicts with tree navigation, so only use ? in tree view)
-    if key == '?' or (key == 'h' and state.view != 'tree'):
+    if key in ('?', 'h'):
         if state.view == 'help':
             state.view = state.prev_view or 'portfolio'
             state.prev_view = None
@@ -1392,6 +1498,14 @@ def handle_project_input(key: str, state: State) -> State:
             state.current_epic = epic_names[state.epic_index]
             state.view = 'epic'
             state.feature_index = 0
+    elif key == 'n':
+        state.creation = CreationState(
+            entity_type='epic',
+            return_view='project',
+        )
+        state.edit = EditState(mode='edit', field_idx=0)
+        state.view = 'creation'
+        load_creation_field(state)
 
     return state
 
@@ -1417,12 +1531,14 @@ def handle_epic_input(key: str, state: State) -> State:
             state.view = 'feature'
             state.edit = None  # Reset edit state when entering feature
     elif key == 'n':
-        feat = create_feature(model, state.current_epic)
-        state.current_feature = feat.id
-        state.view = 'feature'
-        state.edit = EditState(mode='edit')
-        load_field_value(state)
-        state.dirty = True
+        state.creation = CreationState(
+            entity_type='feature',
+            epic_context=state.current_epic,
+            return_view='epic',
+        )
+        state.edit = EditState(mode='edit', field_idx=0)
+        state.view = 'creation'
+        load_creation_field(state)
 
     return state
 
@@ -1440,26 +1556,63 @@ def next_feature_id(model: 'Model', epic: str) -> str:
     return f"{epic}-{max_num + 1:03d}"
 
 
-def create_feature(model: 'Model', epic_name: str) -> 'Feature':
-    """Create new feature in epic."""
-    new_id = next_feature_id(model, epic_name)
+# ═══════════════════════════════════════════════════════════════════════════════
+# ENTITY OPERATIONS (AI-agent friendly)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def op_create_feature(model: Model, epic: str, fields: dict = None) -> Feature:
+    """Create feature in epic. Adds to model immediately."""
+    fields = fields or {}
+    new_id = next_feature_id(model, epic)
     today = datetime.now().strftime('%Y-%m-%d')
 
     feat = Feature(
         id=new_id,
-        status='pending',
-        title='',
-        epic=epic_name,
+        status=fields.get('status', 'pending'),
+        title=fields.get('title', ''),
+        description=fields.get('description', ''),
+        epic=epic,
+        depends_on=fields.get('depends_on', []),
+        priority=fields.get('priority'),
         created_at=today,
+        notes=fields.get('notes'),
     )
 
     model.features[new_id] = feat
-
-    if epic_name not in model.epics:
-        model.epics[epic_name] = Epic(name=epic_name)
-    model.epics[epic_name].features.append(feat)
+    if epic not in model.epics:
+        model.epics[epic] = Epic(name=epic)
+    model.epics[epic].features.append(feat)
 
     return feat
+
+
+def op_create_epic(model: Model, name: str) -> Epic:
+    """Create new epic. Adds to model immediately."""
+    if name in model.epics:
+        raise ValueError(f"Epic '{name}' already exists")
+
+    epic = Epic(name=name)
+    model.epics[name] = epic
+    return epic
+
+
+def op_preview_feature(epic: str, fields: dict) -> dict:
+    """Preview feature as JSON without modifying model. For confirmation UI."""
+    return {
+        'id': f'{epic}-???',
+        'status': fields.get('status', 'pending'),
+        'title': fields.get('title', ''),
+        'epic': epic,
+        'description': fields.get('description', ''),
+        'depends_on': fields.get('depends_on', []),
+        'priority': fields.get('priority'),
+        'created_at': datetime.now().strftime('%Y-%m-%d'),
+    }
+
+
+def op_preview_epic(name: str) -> dict:
+    """Preview epic as JSON without modifying model."""
+    return {'name': name, 'features': []}
 
 
 def handle_feature_input(key: str, state: State) -> State:
@@ -1587,6 +1740,48 @@ def commit_field_edit(state: State) -> None:
     state.edit.pending_changes[field] = value
 
 
+def load_creation_field(state: State) -> None:
+    """Load current field value into editing_value for creation mode."""
+    cs = state.creation
+    if not cs or not state.edit:
+        return
+
+    fields = CREATION_FIELDS_FEATURE if cs.entity_type == 'feature' else CREATION_FIELDS_EPIC
+    fld = fields[state.edit.field_idx]
+
+    value = cs.fields.get(fld, '')
+
+    # Default status to 'pending' for new features
+    if fld == 'status' and not value:
+        value = 'pending'
+
+    if fld == 'depends_on' and isinstance(value, list):
+        value = ', '.join(value)
+
+    state.edit.editing_value = str(value) if value else ''
+
+
+def commit_creation_field(state: State) -> None:
+    """Store current editing_value in creation fields dict."""
+    cs = state.creation
+    if not cs or not state.edit:
+        return
+
+    fields = CREATION_FIELDS_FEATURE if cs.entity_type == 'feature' else CREATION_FIELDS_EPIC
+    fld = fields[state.edit.field_idx]
+    value = state.edit.editing_value
+
+    if fld == 'depends_on':
+        value = [x.strip() for x in value.split(',') if x.strip()]
+    elif fld == 'priority':
+        try:
+            value = int(value) if value else None
+        except ValueError:
+            value = None
+
+    cs.fields[fld] = value
+
+
 def apply_pending_changes(state: State) -> None:
     """Apply pending edits to Feature object."""
     if not state.edit:
@@ -1682,7 +1877,7 @@ def handle_tree_input(key: str, state: State) -> State:
         if cursor_idx > 0:
             state.tree.cursor_idx = cursor_idx - 1
 
-    elif key in ('l', 'right', '\r', '\n'):
+    elif key in ('right', '\r', '\n'):
         _, node = flat[cursor_idx]
         if node.type == 'epic' and not node.expanded:
             expand_epic(node, state.tree.show_all)
@@ -1698,7 +1893,7 @@ def handle_tree_input(key: str, state: State) -> State:
                 state.current_feature = node.data.id
                 state.view = 'feature'
 
-    elif key in ('h', 'left'):
+    elif key == 'left':
         _, node = flat[cursor_idx]
         if node.expanded:
             node.expanded = False
@@ -1708,13 +1903,6 @@ def handle_tree_input(key: str, state: State) -> State:
                 state.tree.cursor_idx = parent_idx
 
     elif key == 'o':
-        _, node = flat[cursor_idx]
-        if node.type == 'epic' and not node.expanded:
-            expand_epic(node, state.tree.show_all)
-        if node.has_children:
-            node.expanded = not node.expanded
-
-    elif key == 'O':
         _, node = flat[cursor_idx]
         expand_all(node, state.tree.show_all)
 
@@ -1745,6 +1933,33 @@ def handle_tree_input(key: str, state: State) -> State:
         state.tree.search_query = ''
         state.tree.search_matches = []
         state.tree.search_index = 0
+
+    elif key == 'n' and not state.tree.search_matches:
+        # Create new entity (only when not navigating search matches)
+        _, node = flat[cursor_idx]
+        if node.type == 'project':
+            proj = node.project_ref
+            proj.load_detail()
+            state.current_project = proj
+            state.creation = CreationState(
+                entity_type='epic',
+                return_view='tree',
+            )
+            state.edit = EditState(mode='edit', field_idx=0)
+            state.view = 'creation'
+            load_creation_field(state)
+        elif node.type == 'epic':
+            proj = node.project_ref
+            proj.load_detail()
+            state.current_project = proj
+            state.creation = CreationState(
+                entity_type='feature',
+                epic_context=node.label,
+                return_view='tree',
+            )
+            state.edit = EditState(mode='edit', field_idx=0)
+            state.view = 'creation'
+            load_creation_field(state)
 
     elif key == 'n' and state.tree.search_matches:
         # Next match
@@ -1813,12 +2028,96 @@ def handle_tree_search_input(key: str, state: State) -> State:
     return state
 
 
+def handle_creation_input(key: str, state: State) -> State:
+    """Handle input in creation view."""
+    cs = state.creation
+
+    # Preview mode
+    if cs.preview_mode:
+        if key == 'c':
+            commit_creation(state)
+            return state
+        elif key == 'e':
+            cs.preview_mode = False
+            state.edit.field_idx = 0
+            load_creation_field(state)
+            return state
+        elif key == '\x1b':
+            state.creation = None
+            state.edit = None
+            state.view = cs.return_view
+            return state
+        return state
+
+    # Edit mode
+    if key == '\x1b':
+        commit_creation_field(state)
+        cs.preview_mode = True
+        return state
+
+    if key == '\t':
+        commit_creation_field(state)
+        fields = CREATION_FIELDS_FEATURE if cs.entity_type == 'feature' else CREATION_FIELDS_EPIC
+        state.edit.field_idx = (state.edit.field_idx + 1) % len(fields)
+        load_creation_field(state)
+        return state
+
+    fields = CREATION_FIELDS_FEATURE if cs.entity_type == 'feature' else CREATION_FIELDS_EPIC
+    fld = fields[state.edit.field_idx]
+
+    if fld == 'status':
+        if key in ('j', 'down'):
+            current = state.edit.editing_value or 'pending'
+            idx = STATUS_OPTIONS.index(current) if current in STATUS_OPTIONS else 0
+            state.edit.editing_value = STATUS_OPTIONS[(idx + 1) % len(STATUS_OPTIONS)]
+        elif key in ('k', 'up'):
+            current = state.edit.editing_value or 'pending'
+            idx = STATUS_OPTIONS.index(current) if current in STATUS_OPTIONS else 0
+            state.edit.editing_value = STATUS_OPTIONS[(idx - 1) % len(STATUS_OPTIONS)]
+    else:
+        if key == '\x7f':
+            state.edit.editing_value = state.edit.editing_value[:-1]
+        elif len(key) == 1 and key.isprintable():
+            state.edit.editing_value += key
+
+    return state
+
+
+def commit_creation(state: State) -> None:
+    """Commit creation to model and save."""
+    cs = state.creation
+    model = state.current_project._detail
+
+    if cs.entity_type == 'feature':
+        feat = op_create_feature(model, cs.epic_context, cs.fields)
+        state.current_feature = feat.id
+        state.flash_message = f"Created {feat.id}"
+        state.view = 'feature'
+        state.edit = None
+    else:
+        epic = op_create_epic(model, cs.fields.get('name', ''))
+        state.flash_message = f"Created epic: {epic.name}"
+        state.view = cs.return_view
+        state.edit = None
+
+    save_features(state.current_project)
+    state.creation = None
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def render(state: State, width: int, height: int) -> str:
-    if state.view == 'help':
+    if state.view == 'creation':
+        cs = state.creation
+        title = f"new {cs.entity_type}"
+        if cs.preview_mode:
+            footer = '[c]onfirm [e]dit [Esc]cancel'
+        else:
+            footer = '[Tab]next [j/k]status [Esc]preview'
+        lines = view_creation(state, width)
+    elif state.view == 'help':
         title = 'help'
         footer = '[Esc]back'
         lines = view_help(width, height)
@@ -1833,18 +2132,18 @@ def render(state: State, width: int, height: int) -> str:
         if state.tree and state.tree.search_mode:
             footer = '[Enter]confirm [Esc]cancel'
         elif state.tree and state.tree.search_matches:
-            footer = f'[n/N]next/prev [/]search [z]oom [t]table [q]uit{hint_str}'
+            footer = f'[n/N]next/prev [/]search [z]oom [t]able [h]elp [q]uit{hint_str}'
         else:
-            footer = f'[/]search [z]oom [f]ilter:{state.filter_mode} [t]able [q]uit{hint_str}'
+            footer = f'[/]search [z]oom [f]ilter:{state.filter_mode} [t]able [h]elp [q]uit{hint_str}'
         lines = view_tree(state, width, height)
     elif state.view == 'portfolio':
         title = 'pv'
-        footer = f'[s]ort:{state.sort_mode} [f]ilter:{state.filter_mode} [A]rchive [t]ree [?]help [q]uit'
+        footer = f'[s]ort:{state.sort_mode} [f]ilter:{state.filter_mode} [A]rchive [t]ree [h]elp [q]uit'
         lines = view_portfolio(state.portfolio, state, width, height)
     elif state.view == 'project':
         proj_name = state.current_project.name if state.current_project else 'project'
         title = proj_name
-        footer = '[Esc]back [h]elp [q]uit'
+        footer = '[n]ew epic [Esc]back [h]elp [q]uit'
         model = state.current_project._detail if state.current_project else None
         if model:
             lines = view_project(model, state, width, height)
@@ -1888,6 +2187,10 @@ def render(state: State, width: int, height: int) -> str:
         lines = ['  Unknown view']
         title = ''
         footer = ''
+
+    # Prepend flash message to footer
+    if state.flash_message:
+        footer = f"✓ {state.flash_message}  │  {footer}"
 
     framed = frame(lines, width, title, footer)
     return '\n'.join(framed)
