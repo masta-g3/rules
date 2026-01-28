@@ -83,12 +83,12 @@
   },
   {
     "id": "pv-007",
-    "status": "pending",
+    "status": "done",
     "title": "Homogenize hotkey mappings across pv/fv views",
     "epic": "pv",
     "description": "Fix inconsistent hotkey behavior: unify f filter cycling, remove dead a key, separate search nav (^n/^p) from new (n), normalize n for new entities, change M to O for collapse-all",
     "priority": 2,
     "created_at": "2026-01-27",
-    "spec_file": "docs/plans/pv-007.md"
+    "spec_file": "docs/history/20260127_pv-007_hotkey_homogenization.md"
   }
 ]

@@ -16,7 +16,7 @@ Navigation:
     Enter       Drill down (project/epic/feature)
     b/Esc       Go back
     s           Cycle sort mode (portfolio)
-    f           Cycle filter (open/all/active/stalled)
+    f           Cycle filter (open/all/active/stalled/archived)
     h/?         Show help
     q           Quit
 """
@@ -1069,7 +1069,7 @@ def view_tree(state: 'State', width: int, height: int) -> list[str]:
         lines.append('')
         filter_msg = '(all items filtered)' if not state.tree.show_all else '(no projects)'
         lines.append(f"  {ansi(f'Empty tree {filter_msg}', COLOR_MUTED)}")
-        lines.append(f"  {ansi('Press [a] to show all', COLOR_MUTED)}")
+        lines.append(f"  {ansi('Press [f] to cycle filters', COLOR_MUTED)}")
         return lines
 
     # Search mode header
@@ -1199,10 +1199,10 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append(f"  {ansi('←', bold=True)}          Collapse node or move to parent")
     lines.append(f"  {ansi('→', bold=True)}          Expand node or drill into feature")
     lines.append(f"  {ansi('o', bold=True)}          Expand all under cursor")
-    lines.append(f"  {ansi('M', bold=True)}          Collapse all")
-    lines.append(f"  {ansi('/', bold=True)}          Search, {ansi('n', bold=True)}/{ansi('N', bold=True)} next/prev match")
+    lines.append(f"  {ansi('O', bold=True)}          Collapse all")
+    lines.append(f"  {ansi('/', bold=True)}          Search, {ansi('^n', bold=True)}/{ansi('^p', bold=True)} next/prev match")
     lines.append(f"  {ansi('z', bold=True)}          Zoom to node")
-    lines.append(f"  {ansi('f', bold=True)}          Toggle filter (open/all)")
+    lines.append(f"  {ansi('f', bold=True)}          Cycle filter (open/all/active/stalled/archived)")
     lines.append(f"  {ansi('t', bold=True)}          Switch back to table view")
     lines.append('')
     lines.append(section_header('CREATION', inner))
@@ -1855,8 +1855,10 @@ def handle_tree_input(key: str, state: State) -> State:
     if not flat:
         if key == 't':
             state.view = 'portfolio'
-        elif key == 'a':
-            state.tree.show_all = not state.tree.show_all
+        elif key == 'f':
+            idx = FILTER_MODES.index(state.filter_mode)
+            state.filter_mode = FILTER_MODES[(idx + 1) % len(FILTER_MODES)]
+            state.tree.show_all = (state.filter_mode != 'open')
             state.tree.root = build_tree(state.portfolio, state.tree.show_all)
             state.tree.cursor_idx = 0
         elif key == '/':
@@ -1906,7 +1908,7 @@ def handle_tree_input(key: str, state: State) -> State:
         _, node = flat[cursor_idx]
         expand_all(node, state.tree.show_all)
 
-    elif key == 'M':
+    elif key == 'O':
         collapse_all(state.tree.root)
         state.tree.cursor_idx = 0
         state.tree.search_matches = []
@@ -1915,8 +1917,9 @@ def handle_tree_input(key: str, state: State) -> State:
         state.view = 'portfolio'
 
     elif key == 'f':
-        state.filter_mode = 'all' if state.filter_mode != 'all' else 'open'
-        state.tree.show_all = (state.filter_mode == 'all')
+        idx = FILTER_MODES.index(state.filter_mode)
+        state.filter_mode = FILTER_MODES[(idx + 1) % len(FILTER_MODES)]
+        state.tree.show_all = (state.filter_mode != 'open')
         state.tree.root = build_tree(state.portfolio, state.tree.show_all)
         state.tree.cursor_idx = 0
         state.tree.search_matches = []
@@ -1961,8 +1964,7 @@ def handle_tree_input(key: str, state: State) -> State:
             state.view = 'creation'
             load_creation_field(state)
 
-    elif key == 'n' and state.tree.search_matches:
-        # Next match
+    elif key == '\x0e' and state.tree.search_matches:  # Ctrl+n: next match
         state.tree.search_index = (state.tree.search_index + 1) % len(state.tree.search_matches)
         target = state.tree.search_matches[state.tree.search_index]
         expand_path_to(target, state.tree.show_all)
@@ -1971,8 +1973,7 @@ def handle_tree_input(key: str, state: State) -> State:
         if idx >= 0:
             state.tree.cursor_idx = idx
 
-    elif key == 'N' and state.tree.search_matches:
-        # Previous match
+    elif key == '\x10' and state.tree.search_matches:  # Ctrl+p: prev match
         state.tree.search_index = (state.tree.search_index - 1) % len(state.tree.search_matches)
         target = state.tree.search_matches[state.tree.search_index]
         expand_path_to(target, state.tree.show_all)
@@ -2132,7 +2133,7 @@ def render(state: State, width: int, height: int) -> str:
         if state.tree and state.tree.search_mode:
             footer = '[Enter]confirm [Esc]cancel'
         elif state.tree and state.tree.search_matches:
-            footer = f'[n/N]next/prev [/]search [z]oom [t]able [h]elp [q]uit{hint_str}'
+            footer = f'[^n/^p]nav [/]search [n]ew [z]oom [t]able [h]elp [q]uit{hint_str}'
         else:
             footer = f'[/]search [z]oom [f]ilter:{state.filter_mode} [t]able [h]elp [q]uit{hint_str}'
         lines = view_tree(state, width, height)
