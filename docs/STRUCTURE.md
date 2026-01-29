@@ -11,6 +11,7 @@ rules/
 │   ├── commit.md       # Archive plan, commit changes
 │   ├── epic-init.md    # Initialize new epic with features
 │   ├── execute.md      # Implement with baseline verification
+│   ├── ticket-init.md  # Add single ticket to features.json
 │   ├── next-feature.md # Select next ready feature
 │   ├── plan-md.md      # Create implementation plan
 │   ├── prime.md        # Context prime for task

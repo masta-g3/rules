@@ -90,5 +90,16 @@
     "priority": 2,
     "created_at": "2026-01-27",
     "spec_file": "docs/history/20260127_pv-007_hotkey_homogenization.md"
+  },
+  {
+    "id": "cmd-001",
+    "epic": "cmd",
+    "status": "done",
+    "title": "ticket-init command for adding individual features",
+    "description": "Create ticket-init.md slash command that adds single tickets to features.json with optional epic assignment",
+    "priority": 1,
+    "depends_on": [],
+    "created_at": "2026-01-28",
+    "spec_file": "docs/history/20260128_cmd-001_ticket_init.md"
   }
 ]

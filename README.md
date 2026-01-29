@@ -64,6 +64,7 @@ Stops on exceptions (baseline fails, tests fail, conflicts) with resume instruct
 | `autopilot.md` | Autonomous feature cycle (Claude Code) |
 | `project-init.md` | Initialize project with features.json |
 | `epic-init.md` | Initialize new epic with features |
+| `ticket-init.md` | Add a single ticket to features.json |
 | `next-feature.md` | Select next ready feature |
 | `prime.md` | Context prime: structure docs, git history |
 | `plan-md.md` | Create implementation plan |
