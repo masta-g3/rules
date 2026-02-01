@@ -29,10 +29,11 @@ This makes the claim visible to other agents immediately.
 git worktree add ../wt-$1 -b feat/$1
 ```
 
-Copy the plan file into the worktree:
+Copy the plan file and symlink `.env` (if it exists) into the worktree:
 
 ```bash
 cp docs/plans/$1.md ../wt-$1/
+[ -f .env ] && ln -s "$(pwd)/.env" ../wt-$1/.env
 ```
 
 ### Report
