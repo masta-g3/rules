@@ -3,6 +3,22 @@ description: Review code, archive planning document, then commit files from sess
 disable-model-invocation: false
 ---
 
+### Worktree Mode
+
+If in a worktree (`test -f .git`): commit on the feature branch, then switch to main and merge.
+
+```bash
+BRANCH=$(git branch --show-current)
+git add <files> && git commit -m "..."
+MAIN=$(cat .git | sed 's|gitdir: ||; s|/.git/worktrees/.*||')
+cd "$MAIN"
+git merge "$BRANCH"
+git worktree remove ../wt-*  # matching worktree
+git branch -d "$BRANCH"
+```
+
+If merge conflicts: stop, report to user, do not auto-resolve. After merge, continue with the normal flow below (archive, features.yaml update, final commit on main).
+
 ### Code Review (Non-Trivial Changes Only)
 
 For changes involving multiple files or significant logic: invoke the **code-critic** subagent via Task tool to review modified files. Skip for trivial edits (typos, single-line fixes). Address valid concerns before continuing.
@@ -37,13 +53,6 @@ Use yq to update the feature entry:
 3. Verify any discovered items are properly logged
 
 Include features.yaml in the commit.
-
-### Release File Reservations
-
-If `docs/plans/.file-locks.json` exists:
-1. Remove all entries where `by` matches the current feature ID
-2. If the lock file is now empty (`{}`), delete it
-3. Include the lock file change (or deletion) in the commit
 
 Commit all files modified during this session:
 
