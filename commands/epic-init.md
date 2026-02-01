@@ -23,25 +23,23 @@ Think through: foundation → core functionality → integration → polish. Fol
 
 ### 2. Generate Features
 
-Choose a short, descriptive epic prefix (e.g., `auth`, `cart`, `notif`, `dash`). If `features.json` exists, extract existing prefixes via jq—extend an existing epic if this work belongs there, otherwise create a new prefix.
+Choose a short, descriptive epic prefix (e.g., `auth`, `cart`, `notif`, `dash`). If `features.yaml` exists, extract existing prefixes via yq—extend an existing epic if this work belongs there, otherwise create a new prefix.
 
-Create or append to `features.json` with entries following this schema:
+Create or append to `features.yaml` with entries following this schema:
 
-```json
-{
-  "id": "{epic}-{nnn}",
-  "description": "User can [action] with [context]",
-  "steps": [
-    "Step to verify feature works",
-    "Another verification step"
-  ],
-  "status": "pending",
-  "priority": 1,
-  "depends_on": ["epic-001"],
-  "discovered_from": null,
-  "spec_file": null,
-  "created_at": "YYYY-MM-DD"
-}
+```yaml
+- id: "{epic}-{nnn}"
+  description: "User can [action] with [context]"
+  steps:
+    - "Step to verify feature works"
+    - "Another verification step"
+  status: pending
+  priority: 1
+  depends_on:
+    - epic-001
+  discovered_from: null
+  spec_file: null
+  created_at: YYYY-MM-DD
 ```
 
 Requirements:
@@ -53,10 +51,10 @@ Requirements:
 - `depends_on` explicitly lists blocking feature IDs
 - `created_at` set to today's date
 
-**If appending to existing `features.json`:**
-Use jq to append without reading full file into context:
+**If appending to existing `features.yaml`:**
+Use yq to append without reading full file into context:
 ```bash
-jq '. += [<new_features>]' features.json > tmp.$$ && mv tmp.$$ features.json
+yq -i '. += [<new_features>]' features.yaml
 ```
 
 ### 3. Report to User

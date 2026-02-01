@@ -23,10 +23,10 @@ For quick tasks without multi-session tracking:
 
 ### Feature-Driven (Multi-Session Projects)
 
-For projects with backlog tracking via `features.json`:
+For projects with backlog tracking via `features.yaml`:
 
 ```
-/project-init "description"   → scaffold project, generate features.json
+/project-init "description"   → scaffold project, generate features.yaml
 /next-feature                 → select next ready feature
 /plan-md "feature-id"         → create plan (feature-id.md)
 /execute                      → implement, update status
@@ -62,9 +62,9 @@ Stops on exceptions (baseline fails, tests fail, conflicts) with resume instruct
 | Command | Purpose |
 |---------|---------|
 | `autopilot.md` | Autonomous feature cycle (Claude Code) |
-| `project-init.md` | Initialize project with features.json |
+| `project-init.md` | Initialize project with features.yaml |
 | `epic-init.md` | Initialize new epic with features |
-| `ticket-init.md` | Add a single ticket to features.json |
+| `ticket-init.md` | Add a single ticket to features.yaml |
 | `next-feature.md` | Select next ready feature |
 | `prime.md` | Context prime: structure docs, git history |
 | `plan-md.md` | Create implementation plan |
@@ -76,7 +76,7 @@ Stops on exceptions (baseline fails, tests fail, conflicts) with resume instruct
 
 ### pv - Portfolio & Feature Viewer
 
-Terminal TUI for visualizing and editing `features.json` across projects.
+Terminal TUI for visualizing and editing `features.yaml` across projects.
 
 **Install:**
 ```bash
@@ -87,8 +87,8 @@ Terminal TUI for visualizing and editing `features.json` across projects.
 ```bash
 pv                    # Portfolio view (scan ~/Code)
 pv /path/to/dir       # Portfolio view (scan specific directory)
-pv features.json      # Project view (specific file)
-fv                    # Project view (./features.json in current dir)
+pv features.yaml      # Project view (specific file)
+fv                    # Project view (./features.yaml in current dir)
 ```
 
 **Navigation:**
@@ -114,29 +114,31 @@ fv                    # Project view (./features.json in current dir)
 - `e` - Enter edit mode
 - `Tab` - Next field, `j/k` - Cycle status options
 - `Esc` - Exit edit mode
-- `w` - Write changes to features.json
+- `w` - Write changes to features.yaml
 - `D` - Delete feature (with confirmation)
 
 **Epic view:**
 - `n` - Create new feature in epic
 
-## features.json Schema
+## features.yaml Schema
 
-```json
-{
-  "id": "auth-001",
-  "epic": "auth",
-  "status": "pending",
-  "title": "User can sign up",
-  "description": "Implement signup flow with email validation",
-  "priority": 1,
-  "depends_on": ["auth-000"],
-  "steps": ["Create form", "Add validation", "Connect API"],
-  "created_at": "2024-01-15",
-  "spec_file": "docs/plans/auth-001.md",
-  "discovered_from": null,
-  "notes": null
-}
+```yaml
+- id: auth-001
+  epic: auth
+  status: pending
+  title: User can sign up
+  description: Implement signup flow with email validation
+  priority: 1
+  depends_on:
+    - auth-000
+  steps:
+    - Create form
+    - Add validation
+    - Connect API
+  created_at: 2024-01-15
+  spec_file: docs/plans/auth-001.md
+  discovered_from: null
+  notes: null
 ```
 
 **Required:** `id`, `status`

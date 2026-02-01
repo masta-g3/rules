@@ -10,7 +10,7 @@ Current system is single-agent: one feature at a time, sequential execution. For
 
 **Challenges:**
 - Multiple agents need isolated working directories
-- features.json must remain the single source of truth for coordination
+- features.yaml must remain the single source of truth for coordination
 - Merge conflicts must be minimized and handled gracefully
 - Agents need to detect their context (main vs worktree)
 
@@ -22,7 +22,7 @@ Git worktrees provide isolated working directories linked to the same repo. Each
 
 ```
 Main repo (coordinator):
-├── features.json (source of truth)
+├── features.yaml (source of truth)
 ├── src/...
 └── docs/...
 
@@ -37,7 +37,7 @@ Main repo (coordinator):
 └── chat-001.md
 ```
 
-**Key principle:** features.json lives ONLY in main. Worktrees are code-only.
+**Key principle:** features.yaml lives ONLY in main. Worktrees are code-only.
 
 ---
 
@@ -47,7 +47,7 @@ Main repo (coordinator):
 ┌─────────────────────────────────────────────────────────────────┐
 │                        MAIN WORKTREE                            │
 │  ┌─────────────────┐                                            │
-│  │ features.json   │ ← source of truth                          │
+│  │ features.yaml   │ ← source of truth                          │
 │  │ - auth-001: in_progress                                      │
 │  │ - chat-001: in_progress                                      │
 │  │ - data-001: pending                                          │
@@ -66,8 +66,8 @@ Main repo (coordinator):
           ▼                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                        MAIN WORKTREE                            │
-│  Merge feat/auth-001, update features.json → done               │
-│  Merge feat/chat-001, update features.json → done               │
+│  Merge feat/auth-001, update features.yaml → done               │
+│  Merge feat/chat-001, update features.yaml → done               │
 │  Remove worktrees, delete branches                              │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -83,7 +83,7 @@ Main repo (coordinator):
 /next-feature --parallel
 
 # Agent does:
-# - Reads features.json, selects auth-001
+# - Reads features.yaml, selects auth-001
 # - Updates: auth-001.status = "in_progress"
 # - Commits to main (claim is now visible to other agents)
 # - Creates worktree:
@@ -102,16 +102,16 @@ git worktree add ../wt-auth-001 -b feat/auth-001
 cd ../wt-auth-001
 
 /plan-md "auth-001: user can sign up"
-# Creates auth-001.md, no features.json changes
+# Creates auth-001.md, no features.yaml changes
 
 /execute
 # Implements feature
-# NO features.json updates (already claimed in main)
+# NO features.yaml updates (already claimed in main)
 # Discovered work noted in plan document only
 
 /commit
 # Commits code only
-# NO features.json changes
+# NO features.yaml changes
 # NO archiving (happens in finalize)
 ```
 
@@ -125,8 +125,8 @@ cd /path/to/main
 # Agent does:
 # - git merge feat/auth-001 (report conflicts if any)
 # - Move auth-001.md to docs/history/auth-001.md
-# - Update features.json: status → "done", spec_file → path
-# - Add discovered work to features.json (if any noted in plan)
+# - Update features.yaml: status → "done", spec_file → path
+# - Add discovered work to features.yaml (if any noted in plan)
 # - Commit
 # - git worktree remove ../wt-auth-001
 # - git branch -d feat/auth-001
@@ -166,7 +166,7 @@ Add `--parallel` flag handling:
 ### Parallel Mode (if --parallel flag or worktree workflow)
 
 After selecting feature:
-1. Update features.json: status → "in_progress"
+1. Update features.yaml: status → "in_progress"
 2. Commit: `git commit -am "Claim auth-001 for parallel work"`
 3. Create worktree: `git worktree add ../wt-{id} -b feat/{id}`
 4. Report:
@@ -188,8 +188,8 @@ Add worktree-aware behavior:
 Detect via `test -f .git` (worktrees have .git as file).
 
 If in worktree:
-- Skip features.json status update (already claimed in main)
-- Note discovered work in plan document only (not features.json)
+- Skip features.yaml status update (already claimed in main)
+- Note discovered work in plan document only (not features.yaml)
 - Keep changes modular and targeted to reduce merge conflicts
 - Avoid modifying shared files unless necessary
 ```
@@ -203,7 +203,7 @@ Add worktree-aware behavior:
 
 If in worktree (`test -f .git`):
 - Commit code changes only
-- Do NOT update features.json (lives in main)
+- Do NOT update features.yaml (lives in main)
 - Do NOT archive plan document (happens in finalize)
 - Report: "Committed in worktree. Run /finalize {id} in main to complete."
 ```
@@ -240,14 +240,14 @@ Finalize feature **$1** by merging its worktree branch and updating tracking.
    - Copy from worktree: `cp ../wt-$1/$1.md docs/history/$1.md`
    - Transform to spec (remove implementation details, keep checklist)
 
-4. **Update features.json:**
+4. **Update features.yaml:**
    - Set status → "done"
    - Set spec_file → "docs/history/$1.md"
    - Add any discovered work noted in plan document
 
 5. **Commit:**
    ```bash
-   git add docs/history/$1.md features.json
+   git add docs/history/$1.md features.yaml
    git commit -m "Finalize $1: merge feature and update tracking"
    ```
 
@@ -291,12 +291,12 @@ When working in a worktree:
 **Solution:** First agent to commit claims the work.
 
 ```
-Agent 1: selects auth-001, updates features.json
+Agent 1: selects auth-001, updates features.yaml
 Agent 1: git commit → succeeds, auth-001 claimed
 
-Agent 2: selects auth-001, updates features.json
-Agent 2: git commit → fails (features.json changed upstream)
-Agent 2: git pull, re-reads features.json
+Agent 2: selects auth-001, updates features.yaml
+Agent 2: git commit → fails (features.yaml changed upstream)
+Agent 2: git pull, re-reads features.yaml
 Agent 2: auth-001 now in_progress, selects next available (auth-002)
 ```
 
@@ -314,11 +314,11 @@ When agent discovers sub-tasks (e.g., auth-001.1) while in worktree:
    - [ ] auth-001.1: Email validation helper (blocks auth-001)
    ```
 
-2. **Do NOT update features.json** (lives in main)
+2. **Do NOT update features.yaml** (lives in main)
 
 3. **During finalize:**
    - Parse discovered work from plan document
-   - Add entries to features.json in main
+   - Add entries to features.yaml in main
    - Set discovered_from: "auth-001"
 
 ---
@@ -347,12 +347,12 @@ When agent discovers sub-tasks (e.g., auth-001.1) while in worktree:
 
 **Key changes:**
 - `next-feature --parallel`: claim + create worktree
-- `execute` in worktree: skip features.json, note discovered work in plan
+- `execute` in worktree: skip features.yaml, note discovered work in plan
 - `commit` in worktree: code only, no tracking updates
 - **NEW** `finalize`: merge, archive, update tracking, cleanup
 
 **Key principle:**
-features.json is the coordination point. It lives in main only. Worktrees are isolated code sandboxes.
+features.yaml is the coordination point. It lives in main only. Worktrees are isolated code sandboxes.
 
 **Conflict strategy:**
 Prevention (modular changes) + graceful handling (report to user, no auto-resolve).

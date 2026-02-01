@@ -11,7 +11,7 @@ Given the request: **$1**, create and maintain a detailed Markdown implementatio
 Store plans in `docs/plans/`:
 
 - **If input is a feature ID** (e.g., `auth-001: description`): use that ID → `auth-001.md`
-- **If `features.json` exists** and input isn't an ID: auto-register (infer epic, assign next number) → `{new-id}.md`
+- **If `features.yaml` exists** and input isn't an ID: auto-register (infer epic, assign next number) → `{new-id}.md`
 - **Otherwise**: standalone mode → `FEATURE_NAME.md`
 
 ### Clarify Before Planning
@@ -51,7 +51,19 @@ Keep it lean—only what's needed to start confidently.
    - For pure logic: test with realistic inputs and edge cases
    - If a function's only test is that it exists, it's not tested
 
-Don't execute on this plan yet; the user will provide feedback and finally approve. Keep scope limited to the feature request (especially when working with `features.json`).
+Don't execute on this plan yet; the user will provide feedback and finally approve. Keep scope limited to the feature request (especially when working with `features.yaml`).
+
+### Parallel Mode (File Reservations)
+
+If `$1` contains `--parallel`:
+1. If `docs/plans/.file-locks.json` doesn't exist, create it with `{}`
+2. After creating the plan, check the lock file against files in the Context Files section
+3. Report any conflicts: "⚠ {file} is reserved by {feature-id}"
+4. Informational only — no reservations placed during planning
+
+### Mark Feature Active
+
+**If plan file is named `{epic}-{nnn}.md` (tracked feature):** set its `status` to `"in_progress"` via yq. A finished plan is a commitment artifact—the feature is no longer pending.
 
 ### Plan Review (Non-Trivial Plans Only)
 

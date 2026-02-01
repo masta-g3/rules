@@ -11,7 +11,7 @@ rules/
 │   ├── commit.md       # Archive plan, commit changes
 │   ├── epic-init.md    # Initialize new epic with features
 │   ├── execute.md      # Implement with baseline verification
-│   ├── ticket-init.md  # Add single ticket to features.json
+│   ├── ticket-init.md  # Add single ticket to features.yaml
 │   ├── next-feature.md # Select next ready feature
 │   ├── plan-md.md      # Create implementation plan
 │   ├── prime.md        # Context prime for task
@@ -32,7 +32,7 @@ rules/
 │   ├── STRUCTURE.md    # This file
 │   └── PARALLEL_AGENTS.md
 │
-├── features.json       # This project's feature backlog
+├── features.yaml       # This project's feature backlog
 ├── AGENTS.md           # Coding style & behavioral guidelines
 ├── README.md           # Usage documentation
 ├── sync-prompts.sh     # Deploy commands to ~/.claude, ~/.codex, ~/.cursor
@@ -43,7 +43,7 @@ rules/
 
 ### Feature-Driven Workflow
 
-Projects track work in `features.json`:
+Projects track work in `features.yaml`:
 ```
 [feature] → /plan-md → [plan.md] → /execute → /commit → [done]
 ```
@@ -63,9 +63,9 @@ graph LR
 
 ### pv/fv TUI
 
-Terminal dashboard for `features.json` visualization and editing:
+Terminal dashboard for `features.yaml` visualization and editing:
 - **pv**: Portfolio view - scans directory tree for all projects
-- **fv**: Feature view - single project's features.json
+- **fv**: Feature view - single project's features.yaml
 
 Navigation: Portfolio → Project → Epic → Feature (4-level drill-down)
 
@@ -78,13 +78,13 @@ Modes:
 
 | File | Purpose |
 |------|---------|
-| `features.json` | Feature backlog (array of feature objects) |
+| `features.yaml` | Feature backlog (sequence of feature objects) |
 | `AGENTS.md` | Agent behavior rules, copied to project roots |
 | `sync-prompts.sh` | Deploys commands to IDE agent directories |
 
 ## Design Patterns
 
-- **Single-file tools**: `bin/pv` is self-contained Python, no dependencies
+- **Single-file tools**: `bin/pv` is self-contained Python (requires PyYAML)
 - **Markdown prompts**: Commands are `.md` files loaded as system prompts
 - **State in filenames**: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone
-- **jq for JSON ops**: Avoid loading large features.json into context
+- **yq for YAML ops**: Avoid loading large features.yaml into context

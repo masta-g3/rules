@@ -60,24 +60,59 @@ When a Stop hook blocks with reason starting with "AUTOPILOT:", execute the slas
 Example: "AUTOPILOT: Run /prime auth-001" → immediately run /prime auth-001
 </Autopilot>
 
-<features_json_operations>
-`features.json` is a project backlog file tracking features through the development cycle. Minimal schema:
+<features_yaml_operations>
+`features.yaml` is a project backlog file tracking features through the development cycle. Minimal schema:
 
-```json
-{"id": "auth-001", "status": "pending|in_progress|done", "description": "...", "priority": 1, "depends_on": [], "created_at": "2024-01-15"}
+```yaml
+- id: auth-001
+  status: pending  # pending | in_progress | done | abandoned | superseded
+  description: "..."
+  priority: 1
+  depends_on: []
+  created_at: 2024-01-15
 ```
 
 Optional fields: `discovered_from`, `spec_file`, or custom metadata as needed.
 
-When `features.json` exists, avoid reading the full file into context—it may contain hundreds of entries. Use `jq` for lightweight extraction:
+When `features.yaml` exists, avoid reading the full file into context—it may contain hundreds of entries. Use `yq` for lightweight extraction:
 
 - Extract specific fields (epic prefixes, status counts, recent by created_at)
 - Filter to relevant subset before reading details
-- Update in-place with jq rather than read-modify-write in context
+- Update in-place with `yq -i` rather than read-modify-write in context
 
-Note: features.json is a root-level array `[{...}, ...]`, not wrapped in an object.
+Note: features.yaml is a root-level sequence `- {...}`, not wrapped in a mapping.
 
-For in-place updates, use: `jq '...' file.json > tmp.$$ && mv -f tmp.$$ file.json`
+For in-place updates, use: `yq -i '.expression' features.yaml`
 
 This keeps context lean for large projects.
-</features_json_operations>
+</features_yaml_operations>
+
+<file_reservations>
+Cooperative file-lock for parallel agents. Presence-based toggle: if `docs/plans/.file-locks.json` exists, reservations are active.
+
+Schema — top-level object, file path → reservation:
+```json
+{"src/auth/login.py": {"by": "auth-001", "at": "2026-01-30T10:30:00Z"}}
+```
+
+Before modifying any file, check if it's reserved by another feature:
+```bash
+LOCK_FILE="docs/plans/.file-locks.json"
+HOLDER=$(jq -r --arg f "$FILE" --arg me "$FEATURE_ID" \
+  '.[$f] // null | if . != null and .by != $me then .by else empty end' \
+  "$LOCK_FILE")
+```
+
+If held: `sleep 15`, retry up to 5 times. If still held, report to user and pause.
+
+Reserve before modifying, release after:
+```bash
+# reserve
+jq --arg f "$FILE" --arg id "$FEATURE_ID" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '.[$f] = {"by": $id, "at": $ts}' "$LOCK_FILE" > tmp.$$ && mv -f tmp.$$ "$LOCK_FILE"
+# release
+jq --arg f "$FILE" 'del(.[$f])' "$LOCK_FILE" > tmp.$$ && mv -f tmp.$$ "$LOCK_FILE"
+```
+
+One file at a time. Derive feature ID from active plan file name (e.g., `auth-001.md` → `auth-001`).
+</file_reservations>

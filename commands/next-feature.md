@@ -1,5 +1,5 @@
 ---
-description: Select the next feature to implement from features.json and prepare for the atomic cycle.
+description: Select the next feature to implement from features.yaml and prepare for the atomic cycle.
 model: claude-haiku-4-5
 disable-model-invocation: true
 ---
@@ -7,19 +7,19 @@ disable-model-invocation: true
 ### 1. Review State
 
 - Run `git log --oneline -10` to understand recent work
-- Use this jq query to find the next ready feature in one pass:
+- Use this yq query to find the next ready feature in one pass:
 
 ```bash
-jq '
+yq '
   ([.[] | select(.status == "done") | .id]) as $done |
   [.[] | select(
     .status == "pending" and
-    ((.depends_on // []) | all(. as $dep | $done | index($dep)))
+    ((.depends_on // []) | all_c(. as $dep | $done | any_c(. == $dep)))
   )] |
   unique_by(.id) |
   sort_by(.priority, .created_at) |
   .[0]
-' features.json
+' features.yaml
 ```
 
 - Read `docs/STRUCTURE.md` only if feature context is unclear
@@ -49,4 +49,4 @@ Dependencies: [list or "none"]
 Suggested plan file: [id].md
 ```
 
-**Do not modify features.json.** Status changes happen in execute/commit.
+**Do not modify features.yaml.** Status changes happen in execute/commit.

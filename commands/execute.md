@@ -11,21 +11,27 @@ Run a minimal smoke test before starting—run relevant tests if they exist, or 
 
 ### Begin Implementation
 
-**If plan file is named `{epic}-{nnn}.md` (e.g., `auth-001.md`):**
-- This is a tracked feature—set its `status` to `"in_progress"` via jq
-- This is the commitment point
-
 Iterate through each phase incrementally—implement, test, and seek user feedback before moving to the next phase. Mark completed steps with `[x]` and update the plan if scope or approach shifts.
 
 Before implementing new functionality, verify that existing features affected by your changes still work. If you discover broken state, report it to the user before proceeding.
+
+### File Reservations (Parallel Mode)
+
+If `docs/plans/.file-locks.json` exists, apply the reservation protocol (see AGENTS.md `<file_reservations>`) before each file modification. Derive feature ID from the active plan file name.
+
+1. Check if file is locked by another feature
+2. If locked: sleep 15s, retry (up to 5 attempts). If still locked, report to user and pause
+3. Reserve the file → modify it → release the reservation
+
+One file at a time. Do not batch-reserve.
 
 ### Discovered Work
 
 During implementation, you may encounter sub-tasks not in the original plan.
 
 **If working on a tracked feature (plan file matches `{epic}-{nnn}.md`):**
-1. Check if this work already exists in features.json—if so, note the dependency but don't duplicate
-2. If genuinely new, add to features.json via jq (all fields, matching existing schema):
+1. Check if this work already exists in features.yaml—if so, note the dependency but don't duplicate
+2. If genuinely new, add to features.yaml via yq (all fields, matching existing schema):
    - `id`: `{parent-id}.n` (e.g., `auth-001.1`)
    - `discovered_from`: parent feature ID, `status`: `"pending"`
 3. Assess impact:

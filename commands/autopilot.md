@@ -1,6 +1,7 @@
 ---
 argument-hint: [feature-id | --epic prefix]
 description: Run complete feature cycle autonomously (Claude Code only).
+model: claude-sonnet-4-5
 disable-model-invocation: true
 ---
 
@@ -29,20 +30,18 @@ Then stop.
 
 ## Single Mode
 
-If mode=single, select feature as before.
-
-If `$1` is blank, query `features.json` for the next ready feature (status=pending, dependencies satisfied):
+If `$1` is blank, query `features.yaml` for the next ready feature (status=pending, dependencies satisfied):
 
 ```bash
-jq -r '
+yq '
   ([.[] | select(.status == "done") | .id]) as $done |
   [.[] | select(
     .status == "pending" and
-    ((.depends_on // []) | all(. as $dep | $done | index($dep)))
+    ((.depends_on // []) | all_c(. as $dep | $done | any_c(. == $dep)))
   )] |
   sort_by(.priority, .created_at) |
-  .[0].id // empty
-' features.json
+  .[0].id // ""
+' features.yaml
 ```
 
 If none found:
@@ -51,7 +50,7 @@ AUTOPILOT EXCEPTION: no_ready_features
 
 No features with status "pending" and satisfied dependencies.
 
-To add features: edit features.json or use /plan-md
+To add features: edit features.yaml or use /plan-md
 ```
 
 Write to `.claude/workflow.json`:
@@ -78,35 +77,24 @@ If mode=continuous:
 
 If epic prefix provided (`$2`): use it.
 
-Otherwise, find next globally ready feature and extract its epic prefix:
+Otherwise, use the Single Mode yq query to get `FEATURE`, then extract epic prefix:
 ```bash
-FEATURE=$(jq -r '
-  ([.[] | select(.status == "done") | .id]) as $done |
-  [.[] | select(
-    .status == "pending" and
-    ((.depends_on // []) | all(. as $dep | $done | index($dep)))
-  )] |
-  sort_by(.priority, .created_at) |
-  .[0].id // empty
-' features.json)
-
-# Extract epic prefix (e.g., "auth-001" → "auth")
 EPIC=$(echo "$FEATURE" | sed 's/-[0-9]*$//')
 ```
 
 ### 2. Find first ready feature in epic
 
 ```bash
-jq -r --arg e "$EPIC" '
+EPIC="$EPIC" yq '
   ([.[] | select(.status == "done") | .id]) as $done |
   [.[] | select(
     .status == "pending" and
-    (.id | startswith($e)) and
-    ((.depends_on // []) | all(. as $dep | $done | index($dep)))
+    (.id | test(env(EPIC))) and
+    ((.depends_on // []) | all_c(. as $dep | $done | any_c(. == $dep)))
   )] |
   sort_by(.priority, .created_at) |
-  .[0].id // empty
-' features.json
+  .[0].id // ""
+' features.yaml
 ```
 
 If none found:

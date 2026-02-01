@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""Migrate features.json → features.yaml.
+
+Usage:
+    migrate-features                       # Convert ./features.json
+    migrate-features --scan /path          # Scan directory tree
+    migrate-features --delete              # Delete .json after conversion
+    migrate-features features.json         # Convert specific file
+"""
+
+import json
+import os
+import sys
+
+import yaml
+
+
+# Prevents PyYAML from parsing unquoted dates as datetime.date
+class SafeYAMLLoader(yaml.SafeLoader):
+    pass
+
+
+SafeYAMLLoader.yaml_implicit_resolvers = {
+    k: [(tag, regexp) for tag, regexp in v if tag != 'tag:yaml.org,2002:timestamp']
+    for k, v in yaml.SafeLoader.yaml_implicit_resolvers.copy().items()
+}
+
+
+# Field order for consistent YAML output
+FIELD_ORDER = [
+    'id', 'epic', 'status', 'title', 'description', 'steps',
+    'priority', 'depends_on', 'discovered_from', 'spec_file',
+    'notes', 'created_at',
+]
+
+
+def ordered_feature(feat: dict) -> dict:
+    """Return feature dict with fields in canonical order."""
+    result = {}
+    for key in FIELD_ORDER:
+        if key in feat:
+            result[key] = feat[key]
+    # Append any extra fields not in FIELD_ORDER
+    for key in feat:
+        if key not in result:
+            result[key] = feat[key]
+    return result
+
+
+def convert_file(json_path: str, delete: bool = False) -> bool:
+    """Convert a single features.json to features.yaml. Returns True on success."""
+    yaml_path = json_path.rsplit('.json', 1)[0] + '.yaml'
+
+    with open(json_path) as f:
+        data = json.load(f)
+
+    if not isinstance(data, list):
+        print(f"  SKIP {json_path}: root is not an array")
+        return False
+
+    ordered = [ordered_feature(feat) for feat in data]
+
+    with open(yaml_path, 'w') as f:
+        yaml.dump(ordered, f, default_flow_style=False, sort_keys=False)
+
+    # Roundtrip validation
+    with open(yaml_path) as f:
+        back = yaml.load(f, Loader=SafeYAMLLoader) or []
+
+    if data != back:
+        print(f"  FAIL {json_path}: roundtrip mismatch")
+        os.remove(yaml_path)
+        return False
+
+    print(f"  OK {json_path} → {yaml_path} ({len(data)} features)")
+
+    if delete:
+        os.remove(json_path)
+        print(f"  DELETED {json_path}")
+
+    return True
+
+
+def scan_directory(root: str, delete: bool = False) -> tuple[int, int]:
+    """Walk directory tree converting all features.json files."""
+    converted = 0
+    failed = 0
+    for dirpath, dirnames, filenames in os.walk(os.path.expanduser(root)):
+        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+        if 'features.json' in filenames:
+            if convert_file(os.path.join(dirpath, 'features.json'), delete):
+                converted += 1
+            else:
+                failed += 1
+    return converted, failed
+
+
+def main():
+    args = sys.argv[1:]
+    delete = '--delete' in args
+    if delete:
+        args.remove('--delete')
+
+    scan_mode = '--scan' in args
+    if scan_mode:
+        args.remove('--scan')
+        root = args[0] if args else '.'
+        print(f"Scanning {root}...")
+        converted, failed = scan_directory(root, delete)
+        print(f"\nDone: {converted} converted, {failed} failed")
+        sys.exit(1 if failed else 0)
+
+    target = args[0] if args else 'features.json'
+    if not os.path.exists(target):
+        print(f"Error: {target} not found")
+        sys.exit(1)
+
+    if not convert_file(target, delete):
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

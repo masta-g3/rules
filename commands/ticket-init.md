@@ -1,17 +1,18 @@
 ---
 argument-hint: [ticket description]
-description: Add a single ticket to features.json.
+description: Add a single ticket to features.yaml.
+model: claude-sonnet-4-5
 disable-model-invocation: true
 ---
 
-Given the ticket request: **$1**, add a single feature entry to `features.json`.
+Given the ticket request: **$1**, add a single feature entry to `features.yaml`.
 
 ### 1. Determine Epic
 
 Use the epic if mentioned in the description (e.g., "Auth: fix login bug"). Otherwise, extract existing prefixes and match semantically. If ambiguous or no match, ask the user.
 
 ```bash
-jq -r '[.[] | .id | split("-")[:-1] | join("-")] | unique | .[]' features.json
+yq '.[].id | sub("-[0-9]+$", "")' features.yaml | sort -u
 ```
 
 ### 2. Generate ID
@@ -19,34 +20,30 @@ jq -r '[.[] | .id | split("-")[:-1] | join("-")] | unique | .[]' features.json
 Next sequential number within the epic, zero-padded to 3 digits (`pv-008`):
 
 ```bash
-jq -r --arg e "$EPIC" '
-  [.[] | select(.id | startswith($e + "-")) | .id | split("-")[-1] | tonumber] |
-  (max // 0) + 1
-' features.json
+EPIC="$EPIC" yq '[.[] | select(.id | test(env(EPIC) + "-")) | .id | sub(".*-", "") | to_number] | max // 0 | . + 1' features.yaml
 ```
 
 ### 3. Build & Append
 
-```json
-{
-  "id": "{epic}-{nnn}",
-  "epic": "{epic}",
-  "status": "pending",
-  "title": "{concise title}",
-  "description": "{action-oriented: 'User can [action] with [context]'}",
-  "steps": ["{implementation details if user provided, otherwise empty}"],
-  "priority": 2,
-  "depends_on": [],
-  "discovered_from": null,
-  "spec_file": null,
-  "created_at": "YYYY-MM-DD"
-}
+```yaml
+- id: "{epic}-{nnn}"
+  epic: "{epic}"
+  status: pending
+  title: "{concise title}"
+  description: "{action-oriented: 'User can [action] with [context]'}"
+  steps:
+    - "{implementation details if user provided, otherwise empty}"
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  spec_file: null
+  created_at: YYYY-MM-DD
 ```
 
 Priority: `1`=foundation, `2`=core (default), `3`=polish — adjust if obvious from context.
 
 ```bash
-jq --argjson entry '<json>' '. += [$entry]' features.json > tmp.$$ && mv tmp.$$ features.json
+yq -i '. += [{"id": "...", "epic": "...", "status": "pending", "title": "...", "description": "...", "priority": 2, "depends_on": [], "discovered_from": null, "spec_file": null, "created_at": "YYYY-MM-DD"}]' features.yaml
 ```
 
 ### 4. Report

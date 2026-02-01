@@ -27,16 +27,23 @@ Keep `{short_desc}` to 2-4 words, snake_case. The feature ID enables visual epic
 
 Transform into permanent spec: remove implementation details, keep completed checklist as summary. Delete the original planning file after archiving.
 
-### Update features.json
+### Update features.yaml
 
-Update features.json (if tracked feature):
+Update features.yaml (if tracked feature):
 
-Use jq to update the feature entry:
+Use yq to update the feature entry:
 1. Set `status` to `"done"`
 2. Set `spec_file` to the archive path (this maps feature ID → human-readable spec)
 3. Verify any discovered items are properly logged
 
-Include features.json in the commit.
+Include features.yaml in the commit.
+
+### Release File Reservations
+
+If `docs/plans/.file-locks.json` exists:
+1. Remove all entries where `by` matches the current feature ID
+2. If the lock file is now empty (`{}`), delete it
+3. Include the lock file change (or deletion) in the commit
 
 Commit all files modified during this session:
 
@@ -94,16 +101,16 @@ if [[ "$MODE" == "continuous" ]]; then
   EPIC=$(jq -r '.epic' .claude/workflow.json)
 
   # Find next ready feature in epic (status=pending, deps satisfied)
-  NEXT_FEATURE=$(jq -r --arg e "$EPIC" '
+  NEXT_FEATURE=$(EPIC="$EPIC" yq '
     ([.[] | select(.status == "done") | .id]) as $done |
     [.[] | select(
       .status == "pending" and
-      (.id | startswith($e)) and
-      ((.depends_on // []) | all(. as $dep | $done | index($dep)))
+      (.id | test(env(EPIC))) and
+      ((.depends_on // []) | all_c(. as $dep | $done | any_c(. == $dep)))
     )] |
     sort_by(.priority, .created_at) |
-    .[0].id // empty
-  ' features.json)
+    .[0].id // ""
+  ' features.yaml)
 
   if [[ -n "$NEXT_FEATURE" ]]; then
     # Loop back

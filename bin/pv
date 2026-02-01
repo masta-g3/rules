@@ -2,14 +2,14 @@
 """
 pv - Portfolio & Feature Viewer
 
-Unified TUI for features.json tracking.
+Unified TUI for features.yaml tracking.
 Navigate: Portfolio → Project → Epic → Feature
 
 Usage:
     pv                    # Scan ~/Code, portfolio view
     pv /path              # Scan specific directory
-    pv features.json      # Project view for specific file
-    fv                    # Alias: project view for ./features.json
+    pv features.yaml      # Project view for specific file
+    fv                    # Alias: project view for ./features.yaml
 
 Navigation:
     j/k or ↑/↓  Move selection
@@ -29,6 +29,8 @@ import re
 import sys
 import tty
 import termios
+
+import yaml
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -40,7 +42,22 @@ from typing import Any
 # CONSTANTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+BACKLOG_FILE = 'features.yaml'
+
 ANSI_ESCAPE = re.compile(r'\033\[[0-9;]*m')
+
+
+# Custom loader: prevents PyYAML from parsing dates as datetime.date.
+# Without this, yq-written `created_at: 2026-01-15` becomes datetime.date,
+# breaking string comparisons throughout pv.
+class SafeYAMLLoader(yaml.SafeLoader):
+    pass
+
+
+SafeYAMLLoader.yaml_implicit_resolvers = {
+    k: [(tag, regexp) for tag, regexp in v if tag != 'tag:yaml.org,2002:timestamp']
+    for k, v in yaml.SafeLoader.yaml_implicit_resolvers.copy().items()
+}
 
 STATUS_DONE = {'done', 'complete'}
 STATUS_ACTIVE = {'in_progress'}
@@ -284,7 +301,7 @@ class Model:
     @classmethod
     def load(cls, path: str) -> Model:
         with open(path) as f:
-            data = json.load(f)
+            data = yaml.load(f, Loader=SafeYAMLLoader) or []
 
         features = {}
         epics: dict[str, Epic] = {}
@@ -360,8 +377,8 @@ class ProjectSummary:
     def from_path(cls, features_path: str) -> ProjectSummary | None:
         try:
             with open(features_path) as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, IOError):
+                data = yaml.load(f, Loader=SafeYAMLLoader) or []
+        except (yaml.YAMLError, IOError):
             return None
 
         if not isinstance(data, list):
@@ -409,7 +426,7 @@ class ProjectSummary:
 
     def load_detail(self) -> Model:
         if self._detail is None:
-            features_path = os.path.join(self.path, 'features.json')
+            features_path = os.path.join(self.path, BACKLOG_FILE)
             self._detail = Model.load(features_path)
         return self._detail
 
@@ -504,8 +521,8 @@ def scan_projects(root: str) -> Portfolio:
         # Prune directories in-place BEFORE os.walk descends into them
         dirnames[:] = [d for d in dirnames if not d.startswith('.') and d not in skip_dirs]
 
-        if 'features.json' in filenames:
-            features_path = os.path.join(dirpath, 'features.json')
+        if BACKLOG_FILE in filenames:
+            features_path = os.path.join(dirpath, BACKLOG_FILE)
             proj = ProjectSummary.from_path(features_path)
             if proj and proj.total > 0:
                 projects.append(proj)
@@ -1192,6 +1209,7 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append(f"  {ansi('s', bold=True)}          Cycle sort mode (open/modified/total/completion)")
     lines.append(f"  {ansi('f', bold=True)}          Cycle filter (open/all/active/stalled/archived)")
     lines.append(f"  {ansi('A', bold=True)}          Toggle archive state of selected project")
+    lines.append(f"  {ansi('r', bold=True)}          Refresh data from disk")
     lines.append(f"  {ansi('t', bold=True)}          Switch to tree view")
     lines.append('')
     lines.append(section_header('TREE VIEW', inner))
@@ -1222,8 +1240,8 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append('')
     lines.append(f"  {ansi('pv', bold=True)}                   Scan ~/Code, portfolio view")
     lines.append(f"  {ansi('pv /path', bold=True)}             Scan specific directory")
-    lines.append(f"  {ansi('pv features.json', bold=True)}     Project view for specific file")
-    lines.append(f"  {ansi('fv', bold=True)}                   Project view for ./features.json")
+    lines.append(f"  {ansi('pv features.yaml', bold=True)}     Project view for specific file")
+    lines.append(f"  {ansi('fv', bold=True)}                   Project view for ./features.yaml")
     lines.append('')
 
     return lines
@@ -1313,6 +1331,7 @@ class State:
 
     # Portfolio level
     portfolio: Portfolio | None = None
+    scan_root: str | None = None  # For refresh
     project_index: int = 0
     sort_mode: str = 'open'
     filter_mode: str = 'open'
@@ -1478,6 +1497,10 @@ def handle_portfolio_input(key: str, state: State) -> State:
             proj = display[state.project_index]
             toggle_archive(proj)
             state.project_index = min(state.project_index, max(0, len(display) - 2))
+    elif key == 'r':
+        state.portfolio = scan_projects(state.scan_root or '~/Code')
+        state.project_index = min(state.project_index, len(portfolio.filtered(state.filter_mode)) - 1)
+        state.flash_message = 'Refreshed'
 
     return state
 
@@ -1506,6 +1529,10 @@ def handle_project_input(key: str, state: State) -> State:
         state.edit = EditState(mode='edit', field_idx=0)
         state.view = 'creation'
         load_creation_field(state)
+    elif key == 'r':
+        features_path = os.path.join(state.current_project.path, BACKLOG_FILE)
+        state.current_project._detail = Model.load(features_path)
+        state.flash_message = 'Refreshed'
 
     return state
 
@@ -1539,6 +1566,10 @@ def handle_epic_input(key: str, state: State) -> State:
         state.edit = EditState(mode='edit', field_idx=0)
         state.view = 'creation'
         load_creation_field(state)
+    elif key == 'r':
+        features_path = os.path.join(state.current_project.path, BACKLOG_FILE)
+        state.current_project._detail = Model.load(features_path)
+        state.flash_message = 'Refreshed'
 
     return state
 
@@ -1660,6 +1691,10 @@ def handle_feature_input(key: str, state: State) -> State:
             if save_features(state.current_project):
                 state.dirty = False
                 state.edit.pending_changes.clear()
+        elif key == 'r' and not state.dirty:
+            features_path = os.path.join(state.current_project.path, BACKLOG_FILE)
+            state.current_project._detail = Model.load(features_path)
+            state.flash_message = 'Refreshed'
         return state
 
     # Edit mode
@@ -1803,8 +1838,8 @@ def apply_pending_changes(state: State) -> None:
 
 
 def save_features(project: 'ProjectSummary') -> bool:
-    """Save features.json. Returns True on success."""
-    features_path = os.path.join(project.path, 'features.json')
+    """Save features.yaml. Returns True on success."""
+    features_path = os.path.join(project.path, BACKLOG_FILE)
     model = project._detail
     if not model:
         return False
@@ -1815,15 +1850,14 @@ def save_features(project: 'ProjectSummary') -> bool:
         for attr in ['title', 'description', 'epic', 'depends_on', 'priority',
                      'created_at', 'spec_file', 'steps', 'discovered_from', 'notes']:
             val = getattr(feat, attr, None)
-            if val:
+            if val is not None:
                 item[attr] = val
         data.append(item)
 
     data.sort(key=lambda x: x['id'])
 
     with open(features_path, 'w') as f:
-        json.dump(data, f, indent=2)
-        f.write('\n')
+        yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
     return True
 
@@ -1991,6 +2025,14 @@ def handle_tree_input(key: str, state: State) -> State:
             state.tree.zoomed_node = node  # Zoom to cursor
         state.tree.cursor_idx = 0
 
+    elif key == 'r':
+        state.portfolio = scan_projects(state.scan_root or '~/Code')
+        state.tree.root = build_tree(state.portfolio, state.tree.show_all)
+        state.tree.cursor_idx = 0
+        state.tree.zoomed_node = None
+        state.tree.search_matches = []
+        state.flash_message = 'Refreshed'
+
     return state
 
 
@@ -2133,18 +2175,18 @@ def render(state: State, width: int, height: int) -> str:
         if state.tree and state.tree.search_mode:
             footer = '[Enter]confirm [Esc]cancel'
         elif state.tree and state.tree.search_matches:
-            footer = f'[^n/^p]nav [/]search [n]ew [z]oom [t]able [h]elp [q]uit{hint_str}'
+            footer = f'[^n/^p]nav [/]search [r]efresh [z]oom [t]able [h]elp [q]uit{hint_str}'
         else:
-            footer = f'[/]search [z]oom [f]ilter:{state.filter_mode} [t]able [h]elp [q]uit{hint_str}'
+            footer = f'[/]search [r]efresh [f]ilter:{state.filter_mode} [t]able [h]elp [q]uit{hint_str}'
         lines = view_tree(state, width, height)
     elif state.view == 'portfolio':
         title = 'pv'
-        footer = f'[s]ort:{state.sort_mode} [f]ilter:{state.filter_mode} [A]rchive [t]ree [h]elp [q]uit'
+        footer = f'[s]ort:{state.sort_mode} [f]ilter:{state.filter_mode} [r]efresh [t]ree [h]elp [q]uit'
         lines = view_portfolio(state.portfolio, state, width, height)
     elif state.view == 'project':
         proj_name = state.current_project.name if state.current_project else 'project'
         title = proj_name
-        footer = '[n]ew epic [Esc]back [h]elp [q]uit'
+        footer = '[n]ew epic [r]efresh [Esc]back [h]elp [q]uit'
         model = state.current_project._detail if state.current_project else None
         if model:
             lines = view_project(model, state, width, height)
@@ -2152,7 +2194,7 @@ def render(state: State, width: int, height: int) -> str:
             lines = ['  No project loaded']
     elif state.view == 'epic':
         title = f'epic: {state.current_epic}'
-        footer = '[n]ew [Esc]back [h]elp [q]uit'
+        footer = '[n]ew [r]efresh [Esc]back [h]elp [q]uit'
         model = state.current_project._detail if state.current_project else None
         if model and state.current_epic:
             lines = view_epic(model, state.current_epic, state, width, height)
@@ -2199,7 +2241,7 @@ def render(state: State, width: int, height: int) -> str:
 
 def init_portfolio_state(root: str) -> State:
     portfolio = scan_projects(root)
-    return State(view='portfolio', portfolio=portfolio)
+    return State(view='portfolio', portfolio=portfolio, scan_root=root)
 
 
 def init_project_state(features_path: str) -> State:
@@ -2223,11 +2265,11 @@ def detect_entry_point() -> State:
 
     if len(sys.argv) < 2:
         if is_fv_mode:
-            if os.path.exists('features.json'):
-                return init_project_state('features.json')
+            if os.path.exists(BACKLOG_FILE):
+                return init_project_state(BACKLOG_FILE)
             else:
-                print("Error: features.json not found")
-                print("Run from a directory containing features.json, or specify path.")
+                print(f"Error: {BACKLOG_FILE} not found")
+                print(f"Run from a directory containing {BACKLOG_FILE}, or specify path.")
                 sys.exit(1)
         else:
             return init_portfolio_state('~/Code')
@@ -2238,7 +2280,7 @@ def detect_entry_point() -> State:
         print(__doc__)
         sys.exit(0)
 
-    if arg.endswith('.json'):
+    if arg.endswith(('.yaml', '.yml', '.json')):
         if not os.path.exists(arg):
             print(f"Error: {arg} not found")
             sys.exit(1)
@@ -2254,8 +2296,8 @@ def detect_entry_point() -> State:
 def main():
     try:
         state = detect_entry_point()
-    except json.JSONDecodeError as e:
-        print(f"Error parsing JSON: {e}")
+    except yaml.YAMLError as e:
+        print(f"Error parsing YAML: {e}")
         sys.exit(1)
     except KeyError as e:
         print(f"Error: missing required field {e}")
