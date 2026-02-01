@@ -86,3 +86,33 @@ For in-place updates, use: `yq -i '.expression' features.yaml`
 
 This keeps context lean for large projects.
 </features_yaml_operations>
+
+<file_reservations>
+Cooperative file-lock for parallel agents. Presence-based toggle: if `docs/plans/.file-locks.json` exists, reservations are active.
+
+Schema — top-level object, file path → reservation:
+```json
+{"src/auth/login.py": {"by": "auth-001", "at": "2026-01-30T10:30:00Z"}}
+```
+
+Before modifying any file, check if it's reserved by another feature:
+```bash
+LOCK_FILE="docs/plans/.file-locks.json"
+HOLDER=$(jq -r --arg f "$FILE" --arg me "$FEATURE_ID" \
+  '.[$f] // null | if . != null and .by != $me then .by else empty end' \
+  "$LOCK_FILE")
+```
+
+If held: `sleep 15`, retry up to 5 times. If still held, report to user and pause.
+
+Reserve before modifying, release after:
+```bash
+# reserve
+jq --arg f "$FILE" --arg id "$FEATURE_ID" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '.[$f] = {"by": $id, "at": $ts}' "$LOCK_FILE" > tmp.$$ && mv -f tmp.$$ "$LOCK_FILE"
+# release
+jq --arg f "$FILE" 'del(.[$f])' "$LOCK_FILE" > tmp.$$ && mv -f tmp.$$ "$LOCK_FILE"
+```
+
+One file at a time. Derive feature ID from active plan file name (e.g., `auth-001.md` → `auth-001`).
+</file_reservations>

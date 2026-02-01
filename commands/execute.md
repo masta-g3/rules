@@ -15,6 +15,16 @@ Iterate through each phase incrementally—implement, test, and seek user feedba
 
 Before implementing new functionality, verify that existing features affected by your changes still work. If you discover broken state, report it to the user before proceeding.
 
+### File Reservations (Parallel Mode)
+
+If `docs/plans/.file-locks.json` exists, apply the reservation protocol (see AGENTS.md `<file_reservations>`) before each file modification. Derive feature ID from the active plan file name.
+
+1. Check if file is locked by another feature
+2. If locked: sleep 15s, retry (up to 5 attempts). If still locked, report to user and pause
+3. Reserve the file → modify it → release the reservation
+
+One file at a time. Do not batch-reserve.
+
 ### Discovered Work
 
 During implementation, you may encounter sub-tasks not in the original plan.

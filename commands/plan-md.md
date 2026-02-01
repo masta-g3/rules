@@ -53,6 +53,14 @@ Keep it lean—only what's needed to start confidently.
 
 Don't execute on this plan yet; the user will provide feedback and finally approve. Keep scope limited to the feature request (especially when working with `features.yaml`).
 
+### Parallel Mode (File Reservations)
+
+If `$1` contains `--parallel`:
+1. If `docs/plans/.file-locks.json` doesn't exist, create it with `{}`
+2. After creating the plan, check the lock file against files in the Context Files section
+3. Report any conflicts: "⚠ {file} is reserved by {feature-id}"
+4. Informational only — no reservations placed during planning
+
 ### Mark Feature Active
 
 **If plan file is named `{epic}-{nnn}.md` (tracked feature):** set its `status` to `"in_progress"` via yq. A finished plan is a commitment artifact—the feature is no longer pending.
