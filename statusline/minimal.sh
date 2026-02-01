@@ -37,7 +37,7 @@ class G:
 data = json.loads('''$INPUT_JSON''')
 
 ctx = data.get("context_window", {})
-ctx_size = ctx.get("context_window_size", 200000)
+ctx_size = ctx["context_window_size"]
 current_usage = ctx.get("current_usage")
 
 model = data.get("model", {}).get("display_name", "Claude").upper()
@@ -56,8 +56,8 @@ else:
     used = 0
 
 AUTOCOMPACT_BUFFER = 45_000
-available = ctx_size - used - AUTOCOMPACT_BUFFER
-pct_used = int(used * 100 / ctx_size) if ctx_size else 0
+effective_total = ctx_size - AUTOCOMPACT_BUFFER
+pct_used = int(used * 100 / effective_total) if effective_total > 0 else 0
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers
@@ -128,10 +128,7 @@ parts.append(f"{health} {model}")
 
 # Context bar (the hero element)
 ctx_bar = progress_bar(pct_used, width=14)
-parts.append(f"ctx {ctx_bar} {pct_used:>2}%")
-
-# Available / Total tokens
-parts.append(f"{fmt_tokens(available)}/{fmt_tokens(ctx_size)}")
+parts.append(f"ctx {ctx_bar} {pct_used:>2}% {fmt_tokens(used)}/{fmt_tokens(effective_total)}")
 
 # Costs: session / daily
 daily_cost = get_daily_cost()
