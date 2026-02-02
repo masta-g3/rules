@@ -82,7 +82,7 @@
   created_at: '2026-01-28'
 - id: cmd-002
   epic: cmd
-  status: in_progress
+  status: done
   title: File reservation system for parallel agents
   description: Cooperative file-lock mechanism so multiple agents working on different features can avoid modifying the same file simultaneously. Presence-based toggle via docs/plans/.file-locks.json.
   steps:
@@ -93,8 +93,9 @@
   priority: 2
   depends_on: []
   discovered_from: null
-  spec_file: null
+  spec_file: docs/history/20260130_cmd-002_file_reservations.md
   created_at: '2026-01-30'
+  completed_at: "2026-02-01"
 - id: cmd-003
   epic: cmd
   status: done
