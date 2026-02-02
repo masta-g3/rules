@@ -10,16 +10,16 @@ disable-model-invocation: true
 - Use this yq query to find the next ready feature in one pass:
 
 ```bash
-yq '
+yq -o=json features.yaml | jq '
   ([.[] | select(.status == "done") | .id]) as $done |
   [.[] | select(
     .status == "pending" and
-    ((.depends_on // []) | all_c(. as $dep | $done | any_c(. == $dep)))
+    ((.depends_on // []) | all(. as $dep | $done | any(. == $dep)))
   )] |
   unique_by(.id) |
   sort_by(.priority, .created_at) |
   .[0]
-' features.yaml
+'
 ```
 
 - Read `docs/STRUCTURE.md` only if feature context is unclear

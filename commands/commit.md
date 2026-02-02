@@ -102,16 +102,16 @@ if [[ "$MODE" == "continuous" ]]; then
   EPIC=$(jq -r '.epic' .claude/workflow.json)
 
   # Find next ready feature in epic (status=pending, deps satisfied)
-  NEXT_FEATURE=$(EPIC="$EPIC" yq '
+  NEXT_FEATURE=$(yq -o=json features.yaml | jq -r --arg epic "$EPIC" '
     ([.[] | select(.status == "done") | .id]) as $done |
     [.[] | select(
       .status == "pending" and
-      (.id | test(env(EPIC))) and
-      ((.depends_on // []) | all_c(. as $dep | $done | any_c(. == $dep)))
+      (.id | test($epic)) and
+      ((.depends_on // []) | all(. as $dep | $done | any(. == $dep)))
     )] |
     sort_by(.priority, .created_at) |
     .[0].id // ""
-  ' features.yaml)
+  ')
 
   if [[ -n "$NEXT_FEATURE" ]]; then
     # Loop back

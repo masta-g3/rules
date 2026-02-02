@@ -33,15 +33,15 @@ Then stop.
 If `$1` is blank, query `features.yaml` for the next ready feature (status=pending, dependencies satisfied):
 
 ```bash
-yq '
+yq -o=json features.yaml | jq '
   ([.[] | select(.status == "done") | .id]) as $done |
   [.[] | select(
     .status == "pending" and
-    ((.depends_on // []) | all_c(. as $dep | $done | any_c(. == $dep)))
+    ((.depends_on // []) | all(. as $dep | $done | any(. == $dep)))
   )] |
   sort_by(.priority, .created_at) |
   .[0].id // ""
-' features.yaml
+'
 ```
 
 If none found:
@@ -85,16 +85,16 @@ EPIC=$(echo "$FEATURE" | sed 's/-[0-9]*$//')
 ### 2. Find first ready feature in epic
 
 ```bash
-EPIC="$EPIC" yq '
+yq -o=json features.yaml | jq --arg epic "$EPIC" '
   ([.[] | select(.status == "done") | .id]) as $done |
   [.[] | select(
     .status == "pending" and
-    (.id | test(env(EPIC))) and
-    ((.depends_on // []) | all_c(. as $dep | $done | any_c(. == $dep)))
+    (.id | test($epic)) and
+    ((.depends_on // []) | all(. as $dep | $done | any(. == $dep)))
   )] |
   sort_by(.priority, .created_at) |
   .[0].id // ""
-' features.yaml
+'
 ```
 
 If none found:
