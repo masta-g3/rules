@@ -70,6 +70,7 @@ Example: "AUTOPILOT: Run /prime auth-001" → immediately run /prime auth-001
   priority: 1
   depends_on: []
   created_at: 2024-01-15
+  completed_at: null  # set on terminal status
 ```
 
 Optional fields: `discovered_from`, `spec_file`, or custom metadata as needed.

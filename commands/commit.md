@@ -33,8 +33,9 @@ Update features.yaml (if tracked feature):
 
 Use yq to update the feature entry:
 1. Set `status` to `"done"`
-2. Set `spec_file` to the archive path (this maps feature ID → human-readable spec)
-3. Verify any discovered items are properly logged
+2. Set `completed_at` to today's date (`YYYY-MM-DD`)
+3. Set `spec_file` to the archive path (this maps feature ID → human-readable spec)
+4. Verify any discovered items are properly logged
 
 Include features.yaml in the commit.
 
