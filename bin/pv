@@ -32,7 +32,7 @@ import termios
 
 import yaml
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from shutil import get_terminal_size
 from typing import Any
@@ -91,6 +91,15 @@ COLOR_STALLED = 131
 COLOR_BORDER = 237
 COLOR_FOOTER = 245
 COLOR_HOTKEY = 252
+
+# Heatmap intensity colors (blue theme to match activity indicators)
+COLOR_HEAT_0 = 236     # no activity (dark gray)
+COLOR_HEAT_1 = 24      # dark blue
+COLOR_HEAT_2 = 31      # medium blue
+COLOR_HEAT_3 = 38      # bright blue
+COLOR_HEAT_4 = 45      # cyan-blue
+HEAT_CHARS = '·░▒▓█'
+HEAT_COLORS = [COLOR_HEAT_0, COLOR_HEAT_1, COLOR_HEAT_2, COLOR_HEAT_3, COLOR_HEAT_4]
 
 BOX = {
     'tl': '┌', 'tr': '┐', 'bl': '└', 'br': '┘',
@@ -248,6 +257,7 @@ class Feature:
     steps: list[str] = field(default_factory=list)
     discovered_from: str | None = None
     notes: str | None = None
+    completed_at: str | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Feature:
@@ -269,6 +279,7 @@ class Feature:
             steps=d.get('steps', []),
             discovered_from=d.get('discovered_from'),
             notes=d.get('notes'),
+            completed_at=d.get('completed_at'),
         )
 
     @property
@@ -622,6 +633,106 @@ class CreationState:
     fields: dict = field(default_factory=dict)  # draft values, NOT in model
     preview_mode: bool = False
     return_view: str = 'epic'  # where to return after creation
+
+
+@dataclass
+class ActivityData:
+    completions: dict[str, int]  # date string -> count
+    features_with_dates: list[tuple[str, str | None, str | None]]  # (id, created, completed)
+    total_done: int
+    active_days: int
+    total_days: int
+    longest_streak: int
+    current_streak: int
+    avg_cycle_time: float | None
+    most_active_day: str | None
+    features_per_week: float
+
+    @classmethod
+    def from_portfolio(cls, portfolio: 'Portfolio') -> 'ActivityData':
+        completions: dict[str, int] = {}
+        features_with_dates = []
+
+        for proj in portfolio.projects:
+            model = proj.load_detail()
+            for feat in model.features.values():
+                if feat.completed_at:
+                    d = feat.completed_at
+                    completions[d] = completions.get(d, 0) + 1
+                    features_with_dates.append((feat.id, feat.created_at, feat.completed_at))
+
+        stats = compute_activity_stats(completions, features_with_dates)
+        return cls(completions=completions, features_with_dates=features_with_dates, **stats)
+
+
+def compute_activity_stats(completions: dict[str, int],
+                           features: list[tuple[str, str | None, str | None]]) -> dict:
+    today = date.today()
+    dates = sorted(completions.keys())
+
+    if not dates:
+        return {
+            'total_done': 0, 'active_days': 0, 'total_days': 0,
+            'longest_streak': 0, 'current_streak': 0,
+            'avg_cycle_time': None, 'most_active_day': None,
+            'features_per_week': 0.0,
+        }
+
+    first_date = datetime.strptime(dates[0], '%Y-%m-%d').date()
+    total_days = (today - first_date).days + 1
+
+    # Current streak: count consecutive days ending at today
+    current_streak = 0
+    for i in range(total_days):
+        d = today - timedelta(days=i)
+        date_str = d.strftime('%Y-%m-%d')
+        if completions.get(date_str, 0) > 0:
+            current_streak += 1
+        else:
+            break
+
+    # Longest streak: scan entire range
+    longest_streak = 0
+    streak = 0
+    for i in range(total_days):
+        d = first_date + timedelta(days=i)
+        date_str = d.strftime('%Y-%m-%d')
+        if completions.get(date_str, 0) > 0:
+            streak += 1
+            longest_streak = max(longest_streak, streak)
+        else:
+            streak = 0
+
+    # Cycle time (created_at → completed_at)
+    cycle_times = []
+    for _, created, completed in features:
+        if created and completed:
+            try:
+                c = datetime.strptime(created, '%Y-%m-%d')
+                d = datetime.strptime(completed, '%Y-%m-%d')
+                cycle_times.append((d - c).days)
+            except ValueError:
+                pass
+
+    avg_cycle = sum(cycle_times) / len(cycle_times) if cycle_times else None
+
+    # Most active day
+    most_active = max(completions.items(), key=lambda x: x[1])[0] if completions else None
+
+    # Velocity
+    weeks = total_days / 7
+    features_per_week = sum(completions.values()) / weeks if weeks > 0 else 0.0
+
+    return {
+        'total_done': sum(completions.values()),
+        'active_days': len([d for d, c in completions.items() if c > 0]),
+        'total_days': total_days,
+        'longest_streak': longest_streak,
+        'current_streak': current_streak,
+        'avg_cycle_time': avg_cycle,
+        'most_active_day': most_active,
+        'features_per_week': features_per_week,
+    }
 
 
 def build_tree(portfolio: Portfolio, show_all: bool = False) -> TreeNode:
@@ -1257,6 +1368,237 @@ def render_tree_node(depth: int, node: TreeNode, is_cursor: bool, width: int, is
     return f"{cursor}{indent}{arrow}{match_marker}{prefix}{label}{progress}{deps}"
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACTIVITY VIEW
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def render_heatmap(completions: dict[str, int], width: int) -> list[str]:
+    today = date.today()
+
+    max_count = max(completions.values()) if completions else 1
+    if max_count == 0:
+        max_count = 1
+
+    # Calculate grid dimensions - fit to terminal width
+    max_weeks = (width - 12) // 2  # Each cell is 2 chars (char + space)
+    num_weeks = min(52, max_weeks)  # Cap at 1 year
+
+    # Align end to this week's Monday, then go back num_weeks
+    this_monday = today - timedelta(days=today.weekday())
+    grid_start = this_monday - timedelta(weeks=num_weeks - 1)
+
+    lines = []
+
+    # Month labels (build from grid_start to today)
+    month_line = '       '
+    current = grid_start
+    last_month = None
+    for _ in range(num_weeks):
+        if current.month != last_month:
+            month_line += current.strftime('%b') + ' '
+            last_month = current.month
+        else:
+            month_line += '  '
+        current += timedelta(days=7)
+    lines.append(month_line[:width - 8])
+
+    # Grid frame top
+    lines.append('      ┌' + '─' * (num_weeks * 2 + 1) + '┐')
+
+    # Day rows
+    for day_of_week in range(7):
+        row_label = ['Mon', '', 'Wed', '', 'Fri', '', ''][day_of_week]
+        cells = []
+
+        for week in range(num_weeks):
+            current = grid_start + timedelta(days=day_of_week, weeks=week)
+            if current > today:
+                cells.append(' ')  # Future date
+            else:
+                date_str = current.strftime('%Y-%m-%d')
+                count = completions.get(date_str, 0)
+
+                if count == 0:
+                    level = 0
+                else:
+                    level = min(4, 1 + int(count / max_count * 3))
+
+                cells.append(ansi(HEAT_CHARS[level], HEAT_COLORS[level]))
+
+        lines.append(f"  {row_label:3} │ {' '.join(cells)} │")
+
+    # Grid frame bottom
+    lines.append('      └' + '─' * (num_weeks * 2 + 1) + '┘')
+
+    # Legend
+    legend_parts = [ansi(c, HEAT_COLORS[i]) for i, c in enumerate(HEAT_CHARS)]
+    lines.append('  Less ' + ' '.join(legend_parts) + ' More')
+
+    return lines
+
+
+def render_bar_chart(completions: dict[str, int], width: int, height: int = 8) -> list[str]:
+    today = date.today()
+    days = 30
+
+    # Collect daily counts
+    daily = []
+    for i in range(days, -1, -1):
+        d = today - timedelta(days=i)
+        date_str = d.strftime('%Y-%m-%d')
+        daily.append((d, completions.get(date_str, 0)))
+
+    # Fit to available width (2 chars per bar including space)
+    available = (width - 12) // 2
+    if len(daily) > available:
+        daily = daily[-available:]
+
+    max_count = max(c for _, c in daily) if daily else 1
+    if max_count == 0:
+        max_count = 1
+
+    lines = []
+    lines.append('  Last 30 Days')
+    lines.append('')
+
+    # Y-axis labels + bars (top to bottom)
+    for row in range(height, 0, -1):
+        threshold = max_count * row / height
+        if row == height:
+            label = f"{max_count:3}"
+        elif row == 1:
+            label = "  0"
+        else:
+            label = "   "
+
+        cells = []
+        for _, count in daily:
+            if count >= threshold:
+                cells.append(ansi('█', COLOR_HEALTHY))
+            else:
+                cells.append(' ')
+
+        lines.append(f"  {label} │{' '.join(cells)}")
+
+    # X-axis
+    bar_width = len(daily) * 2 - 1
+    lines.append(f"      └{'─' * bar_width}")
+
+    # Date labels (every ~week)
+    date_line = "       "
+    for i, (d, _) in enumerate(daily):
+        if i % 7 == 0:
+            date_line += d.strftime('%b %-d').ljust(14)
+    lines.append(date_line[:width - 8])
+
+    return lines
+
+
+def render_activity_stats(data: ActivityData, chart_mode: str, width: int) -> list[str]:
+    lines = []
+
+    if chart_mode == 'heatmap':
+        # Heatmap stats: long-term overview
+        left = [
+            f"Features done: {data.total_done}",
+            f"Active days: {data.active_days}/{data.total_days}",
+            f"Most active: {data.most_active_day or 'N/A'}",
+            f"Current streak: {data.current_streak} days",
+        ]
+        right = [
+            f"Avg cycle time: {data.avg_cycle_time:.1f} days" if data.avg_cycle_time else "Avg cycle time: N/A",
+            f"Completion rate: {(data.active_days / data.total_days * 100):.0f}%" if data.total_days else "Completion rate: N/A",
+            f"Longest streak: {data.longest_streak} days",
+            f"Features/week: {data.features_per_week:.1f}",
+        ]
+    else:
+        # Bar chart stats: recent velocity
+        today = date.today()
+        this_month = sum(data.completions.get((today - timedelta(days=i)).strftime('%Y-%m-%d'), 0)
+                         for i in range(30))
+        last_month = sum(data.completions.get((today - timedelta(days=i)).strftime('%Y-%m-%d'), 0)
+                         for i in range(30, 60))
+        pct_change = ((this_month - last_month) / last_month * 100) if last_month else 0
+
+        best_day = max(((d, c) for d, c in data.completions.items()
+                        if (today - datetime.strptime(d, '%Y-%m-%d').date()).days <= 30),
+                       key=lambda x: x[1], default=(None, 0))
+
+        left = [
+            f"This month: {this_month} features",
+            f"Best day: {best_day[0]} ({best_day[1]})" if best_day[0] else "Best day: N/A",
+            f"Active days: {sum(1 for d, c in data.completions.items() if c > 0 and (today - datetime.strptime(d, '%Y-%m-%d').date()).days <= 30)}/30",
+        ]
+        right = [
+            f"Avg cycle time: {data.avg_cycle_time:.1f} days" if data.avg_cycle_time else "Avg cycle time: N/A",
+            f"vs last month: {'+' if pct_change >= 0 else ''}{pct_change:.0f}%",
+            f"Current streak: {data.current_streak} days",
+        ]
+
+    # Render two columns
+    col_width = (width - 8) // 2
+    for l, r in zip(left, right):
+        lines.append(f"  {l:<{col_width}}{r}")
+
+    # Add any remaining from longer column
+    for extra in left[len(right):]:
+        lines.append(f"  {extra}")
+    for extra in right[len(left):]:
+        lines.append(f"  {' ' * col_width}{extra}")
+
+    return lines
+
+
+def view_activity(data: ActivityData, state: 'State', width: int, height: int) -> list[str]:
+    lines = []
+    inner = width - 4
+
+    lines.append('')
+    lines.append(section_header('ACTIVITY', inner))
+    lines.append('')
+
+    # Chart mode tabs
+    heatmap_tab = '[Heatmap]' if state.activity_chart_mode == 'heatmap' else ' Heatmap '
+    bar_tab = '[Bar Chart]' if state.activity_chart_mode == 'bar' else ' Bar Chart '
+
+    if state.activity_chart_mode == 'heatmap':
+        heatmap_tab = ansi(heatmap_tab, bold=True)
+    else:
+        bar_tab = ansi(bar_tab, bold=True)
+
+    lines.append(f"  {heatmap_tab}  {bar_tab}  {ansi('(tab to cycle)', COLOR_MUTED)}")
+    lines.append('')
+
+    # No data case
+    if data.total_done == 0:
+        lines.append('')
+        lines.append(f"  {ansi('No completion data yet.', COLOR_MUTED)}")
+        lines.append('')
+        lines.append(f"  {ansi('Tip:', bold=True)} Use /commit to mark features as done with completed_at dates.")
+        lines.append('')
+        return lines
+
+    # Render chart
+    if state.activity_chart_mode == 'heatmap':
+        chart_lines = render_heatmap(data.completions, inner)
+    else:
+        chart_lines = render_bar_chart(data.completions, inner)
+
+    lines.extend(chart_lines)
+    lines.append('')
+
+    # Separator
+    lines.append('  ' + '═' * (inner - 4))
+    lines.append('')
+
+    # Stats
+    stat_lines = render_activity_stats(data, state.activity_chart_mode, inner)
+    lines.extend(stat_lines)
+    lines.append('')
+
+    return lines
+
+
 def view_help(width: int, height: int) -> list[str]:
     lines = []
     inner = width - 4
@@ -1278,6 +1620,13 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append(f"  {ansi('A', bold=True)}          Toggle archive state of selected project")
     lines.append(f"  {ansi('r', bold=True)}          Refresh data from disk")
     lines.append(f"  {ansi('t', bold=True)}          Switch to tree view")
+    lines.append(f"  {ansi('a', bold=True)}          Toggle activity dashboard")
+    lines.append('')
+    lines.append(section_header('ACTIVITY VIEW', inner))
+    lines.append('')
+    lines.append(f"  {ansi('Tab', bold=True)}        Toggle between heatmap and bar chart")
+    lines.append(f"  {ansi('←/→', bold=True)}        Toggle chart mode")
+    lines.append(f"  {ansi('a', bold=True)}          Return to portfolio")
     lines.append('')
     lines.append(section_header('TREE VIEW', inner))
     lines.append('')
@@ -1431,6 +1780,10 @@ class State:
     # Flash message (clears on next keypress)
     flash_message: str | None = None
 
+    # Activity view
+    activity_data: ActivityData | None = None
+    activity_chart_mode: str = 'heatmap'  # 'heatmap' | 'bar'
+
 
 def handle_input(key: str, state: State) -> State | None:
     # Clear flash on any keypress
@@ -1506,6 +1859,9 @@ def handle_input(key: str, state: State) -> State | None:
         elif state.view == 'tree':
             state.view = 'portfolio'
             state.tree = None
+        elif state.view == 'activity':
+            state.view = 'portfolio'
+            state.activity_data = None
         elif state.view == 'portfolio':
             # At top level, Esc quits (natural "escape out" pattern)
             return None
@@ -1522,6 +1878,8 @@ def handle_input(key: str, state: State) -> State | None:
         return handle_feature_input(key, state)
     elif state.view == 'tree':
         return handle_tree_input(key, state)
+    elif state.view == 'activity':
+        return handle_activity_input(key, state)
 
     return state
 
@@ -1571,7 +1929,20 @@ def handle_portfolio_input(key: str, state: State) -> State:
         state.portfolio = scan_projects(state.scan_root or '~/Code')
         state.project_index = min(state.project_index, len(portfolio.filtered(state.filter_mode)) - 1)
         state.flash_message = 'Refreshed'
+    elif key == 'a':
+        state.activity_data = ActivityData.from_portfolio(state.portfolio)
+        state.activity_chart_mode = 'heatmap'
+        state.view = 'activity'
 
+    return state
+
+
+def handle_activity_input(key: str, state: State) -> State:
+    if key in ('\t', 'left', 'right', 'h', 'l'):
+        state.activity_chart_mode = 'bar' if state.activity_chart_mode == 'heatmap' else 'heatmap'
+    elif key == 'a':
+        state.view = 'portfolio'
+        state.activity_data = None
     return state
 
 
@@ -2251,7 +2622,7 @@ def render(state: State, width: int, height: int) -> str:
         lines = view_tree(state, width, height)
     elif state.view == 'portfolio':
         title = 'pv'
-        footer = f'[s]ort:{state.sort_mode} [f]ilter:{state.filter_mode} [r]efresh [t]ree [h]elp [q]uit'
+        footer = f'[s]ort:{state.sort_mode} [f]ilter:{state.filter_mode} [a]ctivity [t]ree [h]elp [q]uit'
         lines = view_portfolio(state.portfolio, state, width, height)
     elif state.view == 'project':
         proj_name = state.current_project.name if state.current_project else 'project'
@@ -2296,6 +2667,13 @@ def render(state: State, width: int, height: int) -> str:
                 lines = view_feature(model, state.current_feature, width, height)
         else:
             lines = ['  No feature selected']
+    elif state.view == 'activity':
+        title = 'activity'
+        footer = '[tab]chart [a]back [q]uit'
+        if state.activity_data:
+            lines = view_activity(state.activity_data, state, width, height)
+        else:
+            lines = ['  No activity data']
     else:
         lines = ['  Unknown view']
         title = ''
