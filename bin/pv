@@ -80,6 +80,8 @@ STATUS_COLOR = {
 }
 
 COLOR_MUTED = 240
+COLOR_BAR_ACTIVE = 75     # lighter blue for active in progress bars
+COLOR_BAR_ABANDONED = 236 # dark gray for abandoned/superseded
 COLOR_EPIC = 39
 COLOR_PROJECT = 39
 COLOR_DEP = 213
@@ -87,6 +89,8 @@ COLOR_HEALTHY = 34
 COLOR_ACTIVE = 33
 COLOR_STALLED = 131
 COLOR_BORDER = 237
+COLOR_FOOTER = 245
+COLOR_HOTKEY = 252
 
 BOX = {
     'tl': '┌', 'tr': '┐', 'bl': '└', 'br': '┘',
@@ -128,31 +132,43 @@ def visible_len(text: str) -> int:
     return len(ANSI_ESCAPE.sub('', text))
 
 
-def progress_bar(done: int, total: int, width: int = 40) -> str:
+def progress_bar(done: int, total: int, width: int = 40,
+                 active: int = 0, pending: int = 0, abandoned: int = 0) -> str:
     if total == 0:
         return ansi('░' * width, COLOR_MUTED)
 
-    ratio = done / total
-    filled_full = int(ratio * width)
-    remainder = (ratio * width) - filled_full
-    partial_idx = int(remainder * 8)
+    # Ensure non-zero counts get at least 1 pixel
+    counts = [done, active, pending, abandoned]
+    widths = [max(1, int(c / total * width)) if c > 0 else 0 for c in counts]
 
-    filled_chars = filled_full
-    bar = '█' * filled_full
-    if filled_full < width and partial_idx > 0:
-        bar += BLOCKS[partial_idx]
-        filled_chars += 1
-    bar += '░' * (width - filled_chars)
+    # Adjust largest segment to fit total width
+    diff = sum(widths) - width
+    if diff != 0:
+        largest = max(range(4), key=lambda i: widths[i])
+        widths[largest] -= diff
 
-    done_part = ansi(bar[:filled_chars], COLOR_HEALTHY)
-    remaining = ansi(bar[filled_chars:], COLOR_MUTED)
-    return done_part + remaining
+    return (ansi('█' * widths[0], COLOR_HEALTHY) +
+            ansi('█' * widths[1], COLOR_BAR_ACTIVE) +
+            ansi('░' * widths[2], COLOR_MUTED) +
+            ansi('░' * widths[3], COLOR_BAR_ABANDONED))
 
 
 def truncate(text: str, width: int) -> str:
     if len(text) <= width:
         return text
     return text[:width - 1] + '…'
+
+
+def style_footer(text: str) -> str:
+    """Style footer: readable text with brighter hotkey indicators."""
+    parts = re.split(r'(\[[^\]]+\])', text)
+    result = ''
+    for part in parts:
+        if part.startswith('[') and part.endswith(']'):
+            result += ansi(part, COLOR_HOTKEY)
+        else:
+            result += ansi(part, COLOR_FOOTER)
+    return result
 
 
 def frame(lines: list[str], width: int, title: str = '', footer: str = '') -> list[str]:
@@ -174,13 +190,15 @@ def frame(lines: list[str], width: int, title: str = '', footer: str = '') -> li
         result.append(ansi(BOX['v'], COLOR_BORDER) + line + ' ' * padding + ansi(BOX['v'], COLOR_BORDER))
 
     if footer:
-        footer_str = f' {footer} '
+        footer_plain = f' {footer} '
         pad_right = 2
-        pad_left = max(0, inner_width - len(footer_str) - pad_right)
-        bottom = BOX['bl'] + BOX['h'] * pad_left + footer_str + BOX['h'] * pad_right + BOX['br']
+        pad_left = max(0, inner_width - len(footer_plain) - pad_right)
+        bottom = (ansi(BOX['bl'] + BOX['h'] * pad_left, COLOR_BORDER) +
+                  style_footer(footer_plain) +
+                  ansi(BOX['h'] * pad_right + BOX['br'], COLOR_BORDER))
     else:
-        bottom = BOX['bl'] + BOX['h'] * inner_width + BOX['br']
-    result.append(ansi(bottom, COLOR_BORDER))
+        bottom = ansi(BOX['bl'] + BOX['h'] * inner_width + BOX['br'], COLOR_BORDER)
+    result.append(bottom)
 
     return result
 
@@ -284,6 +302,11 @@ class Epic:
         return sum(1 for f in self.features if f.is_pending)
 
     @property
+    def abandoned(self) -> int:
+        return sum(1 for f in self.features
+                   if f.status in ('abandoned', 'superseded'))
+
+    @property
     def total(self) -> int:
         return len(self.features)
 
@@ -340,6 +363,11 @@ class Model:
     def pending(self) -> int:
         return sum(1 for f in self.features.values() if f.is_pending)
 
+    @property
+    def abandoned(self) -> int:
+        return sum(1 for f in self.features.values()
+                   if f.status in ('abandoned', 'superseded'))
+
     def upcoming(self) -> list[Feature]:
         upcoming = [f for f in self.features.values() if f.is_active or f.is_pending]
         return sorted(upcoming, key=lambda f: (
@@ -385,11 +413,7 @@ class ProjectSummary:
             return None
 
         path = Path(features_path).parent
-        code_root = Path.home() / 'Code'
-        try:
-            name = str(path.relative_to(code_root))
-        except ValueError:
-            name = path.name
+        name = path.name
 
         proj = cls(path=str(path), name=name)
         proj.archived = os.path.exists(os.path.join(proj.path, '.archived'))
@@ -431,8 +455,13 @@ class ProjectSummary:
         return self._detail
 
     @property
+    def scope(self) -> int:
+        """Active scope: excludes abandoned/superseded."""
+        return self.done + self.active + self.pending
+
+    @property
     def percent(self) -> float:
-        return (self.done / self.total * 100) if self.total else 0
+        return (self.done / self.scope * 100) if self.scope else 0
 
     @property
     def is_complete(self) -> bool:
@@ -462,11 +491,19 @@ class Portfolio:
 
     @property
     def total_features(self) -> int:
-        return sum(p.total for p in self.projects)
+        return sum(p.scope for p in self.projects)
 
     @property
     def total_done(self) -> int:
         return sum(p.done for p in self.projects)
+
+    @property
+    def total_active(self) -> int:
+        return sum(p.active for p in self.projects)
+
+    @property
+    def total_pending(self) -> int:
+        return sum(p.pending for p in self.projects)
 
     @property
     def active_projects(self) -> int:
@@ -498,7 +535,7 @@ class Portfolio:
 
     def filtered(self, mode: str = 'open') -> list[ProjectSummary]:
         if mode == 'all':
-            return self.projects
+            return [p for p in self.projects if not p.archived]
         elif mode == 'active':
             return [p for p in self.projects if p.active > 0 and not p.archived]
         elif mode == 'stalled':
@@ -757,7 +794,7 @@ def view_portfolio(portfolio: Portfolio, state: 'State', width: int, height: int
     pct = (portfolio.total_done / portfolio.total_features * 100) if portfolio.total_features else 0
     bar_width = min(30, inner - 50)
     lines.append(f"  {portfolio.total_projects} projects   {portfolio.total_features} features   "
-                 f"{progress_bar(portfolio.total_done, portfolio.total_features, bar_width)}  "
+                 f"{progress_bar(portfolio.total_done, portfolio.total_features, bar_width, active=portfolio.total_active, pending=portfolio.total_pending)}  "
                  f"{portfolio.total_done} done ({pct:.0f}%)")
 
     status = []
@@ -779,11 +816,23 @@ def view_portfolio(portfolio: Portfolio, state: 'State', width: int, height: int
     sorted_projects = portfolio.sorted_by(state.sort_mode)
     display = [p for p in sorted_projects if p in filtered]
 
-    for i, proj in enumerate(display):
-        cursor = ansi('▸', COLOR_PROJECT, bold=True) if i == state.project_index else ' '
+    # Scroll: reserve lines for header (~9) + footer (~6) + frame (2)
+    visible_projects = max(1, height - 17)
+    scroll = state.project_scroll
+    if state.project_index < scroll:
+        scroll = state.project_index
+    elif state.project_index >= scroll + visible_projects:
+        scroll = state.project_index - visible_projects + 1
+    state.project_scroll = max(0, scroll)
+
+    visible_slice = display[scroll:scroll + visible_projects]
+
+    for i, proj in enumerate(visible_slice):
+        actual_idx = i + scroll
+        cursor = ansi('▸', COLOR_PROJECT, bold=True) if actual_idx == state.project_index else ' '
         name = truncate(proj.name, 16).ljust(16)
-        bar = progress_bar(proj.done, proj.total, 16)
-        count = f"{proj.done}/{proj.total}".rjust(7)
+        bar = progress_bar(proj.done, proj.scope, 16, active=proj.active, pending=proj.pending)
+        count = f"{proj.done}/{proj.scope}".rjust(7)
         pct_str = f"{proj.percent:3.0f}%"
 
         if proj.is_complete:
@@ -806,8 +855,26 @@ def view_portfolio(portfolio: Portfolio, state: 'State', width: int, height: int
 
         lines.append(f" {cursor}{ansi(name, COLOR_PROJECT)}  {bar}  {count} {pct_str}  {status_str}  {today_mark} {mod}")
 
+    if len(display) > visible_projects:
+        lines.append(ansi(f"  ({state.project_index + 1}/{len(display)})", COLOR_MUTED))
+
     if not display:
         lines.append(f"  {ansi('No projects match current filter', COLOR_MUTED)}")
+
+    # Up next preview for selected project
+    if display and 0 <= state.project_index < len(display):
+        proj = display[state.project_index]
+        if proj.has_open_work:
+            model = proj.load_detail()
+            upcoming = model.upcoming()
+            if upcoming:
+                feat = upcoming[0]
+                sym = STATUS_SYMBOL.get(feat.status, '?')
+                color = STATUS_COLOR.get(feat.status, 0)
+                label = 'active:' if feat.is_active else 'up next:'
+                title = truncate(feat.title, inner - len(feat.id) - 16)
+                lines.append('')
+                lines.append(f"  {ansi(label, COLOR_MUTED)} {ansi(feat.id, color)} {ansi(sym, color)} {ansi(title, COLOR_MUTED)}")
 
     stalled = [p for p in portfolio.projects if p.is_stalled]
     if stalled and state.filter_mode != 'stalled':
@@ -832,7 +899,7 @@ def view_project(model: Model, state: 'State', width: int, height: int) -> list[
 
     pct = (model.done / model.total * 100) if model.total else 0
     bar_width = min(50, inner - 20)
-    lines.append(f"  {progress_bar(model.done, model.total, bar_width)}  {model.done}/{model.total}  {pct:.1f}%")
+    lines.append(f"  {progress_bar(model.done, model.total, bar_width, active=model.active, pending=model.pending, abandoned=model.abandoned)}  {model.done}/{model.total}  {pct:.1f}%")
 
     status_parts = []
     if model.done:
@@ -855,7 +922,7 @@ def view_project(model: Model, state: 'State', width: int, height: int) -> list[
 
     for i, (epic_name, epic) in enumerate(model.epics.items()):
         bar_w = 16
-        bar = progress_bar(epic.done, epic.total, bar_w)
+        bar = progress_bar(epic.done, epic.total, bar_w, active=epic.active, pending=epic.pending, abandoned=epic.abandoned)
         pct_str = f"{epic.percent:3.0f}%" if epic.total else "  -"
         name = truncate(epic_name, 12).ljust(12)
         count = f"{epic.done}/{epic.total}".rjust(5)
@@ -927,7 +994,7 @@ def view_epic(model: Model, epic_name: str, state: 'State', width: int, height: 
 
     lines.append('')
     bar_w = min(50, inner - 30)
-    lines.append(f"  {progress_bar(epic.done, epic.total, bar_w)}  {epic.done}/{epic.total} completed  {epic.percent:.0f}%")
+    lines.append(f"  {progress_bar(epic.done, epic.total, bar_w, active=epic.active, pending=epic.pending, abandoned=epic.abandoned)}  {epic.done}/{epic.total} completed  {epic.percent:.0f}%")
 
     lines.append('')
     lines.append(section_header('FEATURES', inner))
@@ -1164,12 +1231,12 @@ def render_tree_node(depth: int, node: TreeNode, is_cursor: bool, width: int, is
     progress = ''
     if node.type == 'project':
         proj = node.data
-        bar = progress_bar(proj.done, proj.total, 12)
+        bar = progress_bar(proj.done, proj.scope, 12, active=proj.active, pending=proj.pending)
         pct = f"{proj.percent:.0f}%"
-        progress = f"  {proj.done}/{proj.total} {bar} {pct}"
+        progress = f"  {proj.done}/{proj.scope} {bar} {pct}"
     elif node.type == 'epic' and node.data and node.expanded:
         epic = node.data
-        bar = progress_bar(epic.done, epic.total, 12)
+        bar = progress_bar(epic.done, epic.total, 12, active=epic.active, pending=epic.pending, abandoned=epic.abandoned)
         pct = f"{epic.percent:.0f}%"
         progress = f"  {epic.done}/{epic.total} {bar} {pct}"
 
@@ -1333,8 +1400,9 @@ class State:
     portfolio: Portfolio | None = None
     scan_root: str | None = None  # For refresh
     project_index: int = 0
-    sort_mode: str = 'open'
-    filter_mode: str = 'open'
+    project_scroll: int = 0
+    sort_mode: str = 'modified'
+    filter_mode: str = 'all'
 
     # Project level
     current_project: ProjectSummary | None = None
@@ -1475,10 +1543,12 @@ def handle_portfolio_input(key: str, state: State) -> State:
         idx = SORT_MODES.index(state.sort_mode)
         state.sort_mode = SORT_MODES[(idx + 1) % len(SORT_MODES)]
         state.project_index = 0
+        state.project_scroll = 0
     elif key == 'f':
         idx = FILTER_MODES.index(state.filter_mode)
         state.filter_mode = FILTER_MODES[(idx + 1) % len(FILTER_MODES)]
         state.project_index = 0
+        state.project_scroll = 0
     elif key in ('\r', '\n'):
         if display and 0 <= state.project_index < len(display):
             state.current_project = display[state.project_index]
