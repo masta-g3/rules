@@ -115,3 +115,14 @@
   created_at: '2026-02-03'
   spec_file: docs/history/20260203_pv-008_activity_dashboard.md
   completed_at: "2026-02-03"
+- id: pv-009
+  status: done
+  title: Stacked bar chart by epic in activity view
+  description: Toggle bar chart into stacked bar chart showing epic breakdown with smart grouping to avoid clutter
+  epic: pv
+  priority: 2
+  depends_on:
+    - pv-008
+  created_at: "2026-02-07"
+  completed_at: "2026-02-07"
+  spec_file: docs/history/20260207_pv-009_stacked_bar_epic.md

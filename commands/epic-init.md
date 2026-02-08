@@ -29,6 +29,7 @@ Create or append to `features.yaml` with entries following this schema:
 
 ```yaml
 - id: "{epic}-{nnn}"
+  epic: "{epic}"
   description: "User can [action] with [context]"
   steps:
     - "Step to verify feature works"

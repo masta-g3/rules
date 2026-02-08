@@ -101,6 +101,10 @@ COLOR_HEAT_4 = 45      # cyan-blue
 HEAT_CHARS = '·░▒▓█'
 HEAT_COLORS = [COLOR_HEAT_0, COLOR_HEAT_1, COLOR_HEAT_2, COLOR_HEAT_3, COLOR_HEAT_4]
 
+# Stacked bar chart: top 4 epics + "other" bucket
+EPIC_COLORS = [75, 114, 180, 139, 243]  # steel blue, sage green, warm sand, muted purple, gray
+MAX_EPIC_LEGEND = 4
+
 BOX = {
     'tl': '┌', 'tr': '┐', 'bl': '└', 'br': '┘',
     'h': '─', 'v': '│', 'title': '═',
@@ -638,6 +642,7 @@ class CreationState:
 @dataclass
 class ActivityData:
     completions: dict[str, int]  # date string -> count
+    epic_completions: dict[str, dict[str, int]]  # epic -> {date -> count}
     features_with_dates: list[tuple[str, str | None, str | None]]  # (id, created, completed)
     total_done: int
     active_days: int
@@ -651,6 +656,7 @@ class ActivityData:
     @classmethod
     def from_portfolio(cls, portfolio: 'Portfolio') -> 'ActivityData':
         completions: dict[str, int] = {}
+        epic_completions: dict[str, dict[str, int]] = {}
         features_with_dates = []
 
         for proj in portfolio.projects:
@@ -660,9 +666,14 @@ class ActivityData:
                     d = feat.completed_at
                     completions[d] = completions.get(d, 0) + 1
                     features_with_dates.append((feat.id, feat.created_at, feat.completed_at))
+                    epic = feat.epic or '(no epic)'
+                    if epic not in epic_completions:
+                        epic_completions[epic] = {}
+                    epic_completions[epic][d] = epic_completions[epic].get(d, 0) + 1
 
         stats = compute_activity_stats(completions, features_with_dates)
-        return cls(completions=completions, features_with_dates=features_with_dates, **stats)
+        return cls(completions=completions, epic_completions=epic_completions,
+                   features_with_dates=features_with_dates, **stats)
 
 
 def compute_activity_stats(completions: dict[str, int],
@@ -733,6 +744,20 @@ def compute_activity_stats(completions: dict[str, int],
         'most_active_day': most_active,
         'features_per_week': features_per_week,
     }
+
+
+def rank_epics(epic_completions: dict[str, dict[str, int]],
+               max_shown: int = MAX_EPIC_LEGEND) -> list[tuple[str, int]]:
+    """Rank epics by total completions, return top N + 'other'."""
+    totals = [(epic, sum(dates.values())) for epic, dates in epic_completions.items()]
+    totals.sort(key=lambda x: -x[1])
+    if len(totals) <= max_shown:
+        return totals
+    top = totals[:max_shown]
+    other_count = sum(c for _, c in totals[max_shown:])
+    if other_count > 0:
+        top.append(('other', other_count))
+    return top
 
 
 def build_tree(portfolio: Portfolio, show_all: bool = False) -> TreeNode:
@@ -1437,7 +1462,9 @@ def render_heatmap(completions: dict[str, int], width: int) -> list[str]:
     return lines
 
 
-def render_bar_chart(completions: dict[str, int], width: int, height: int = 8) -> list[str]:
+def render_bar_chart(completions: dict[str, int], width: int, height: int = 8,
+                     epic_completions: dict[str, dict[str, int]] | None = None,
+                     ranked_epics: list[tuple[str, int]] | None = None) -> list[str]:
     today = date.today()
     days = 30
 
@@ -1457,8 +1484,29 @@ def render_bar_chart(completions: dict[str, int], width: int, height: int = 8) -
     if max_count == 0:
         max_count = 1
 
+    stacked = ranked_epics and epic_completions
+
+    # Pre-compute stacked segments per day: list of (count, color) bottom-to-top
+    day_segments: list[list[tuple[int, int]]] = []
+    if stacked:
+        epic_names = [e for e, _ in ranked_epics]
+        if epic_names and epic_names[-1] == 'other':
+            other_epics = set(epic_completions.keys()) - set(epic_names[:-1])
+        else:
+            other_epics = set()
+        for d, _ in daily:
+            date_str = d.strftime('%Y-%m-%d')
+            segments = []
+            for i, (epic, _) in enumerate(ranked_epics):
+                if epic == 'other':
+                    count = sum(epic_completions.get(e, {}).get(date_str, 0) for e in other_epics)
+                else:
+                    count = epic_completions.get(epic, {}).get(date_str, 0)
+                segments.append((count, EPIC_COLORS[i]))
+            day_segments.append(segments)
+
     lines = []
-    lines.append('  Last 30 Days')
+    lines.append('  Last 30 Days' + (' (by epic)' if stacked else ''))
     lines.append('')
 
     # Y-axis labels + bars (top to bottom)
@@ -1472,11 +1520,22 @@ def render_bar_chart(completions: dict[str, int], width: int, height: int = 8) -
             label = "   "
 
         cells = []
-        for _, count in daily:
-            if count >= threshold:
-                cells.append(ansi('█', COLOR_HEALTHY))
-            else:
-                cells.append(' ')
+        if stacked:
+            for day_idx, (_, total) in enumerate(daily):
+                cumulative = 0
+                char = ' '
+                for count, color in day_segments[day_idx]:
+                    cumulative += count
+                    if cumulative >= threshold and (cumulative - count) < threshold:
+                        char = ansi('█', color)
+                        break
+                cells.append(char)
+        else:
+            for _, count in daily:
+                if count >= threshold:
+                    cells.append(ansi('█', COLOR_HEALTHY))
+                else:
+                    cells.append(' ')
 
         lines.append(f"  {label} │{' '.join(cells)}")
 
@@ -1492,6 +1551,22 @@ def render_bar_chart(completions: dict[str, int], width: int, height: int = 8) -
     lines.append(date_line[:width - 8])
 
     return lines
+
+
+def render_epic_legend(ranked_epics: list[tuple[str, int]], width: int) -> str:
+    """Single-line legend: ■ epic (count)  ■ epic (count) ..."""
+    parts = []
+    for i, (name, count) in enumerate(ranked_epics):
+        color = EPIC_COLORS[i]
+        parts.append(f"{ansi('■', color)} {name} ({count})")
+    legend = ''
+    for part in parts:
+        candidate = part if not legend else legend + '  ' + part
+        if visible_len(candidate) > width - 6:
+            legend += '  ' + ansi('…', COLOR_MUTED)
+            break
+        legend = candidate
+    return f"  {legend}"
 
 
 def render_activity_stats(data: ActivityData, chart_mode: str, width: int) -> list[str]:
@@ -1559,7 +1634,10 @@ def view_activity(data: ActivityData, state: 'State', width: int, height: int) -
 
     # Chart mode tabs
     heatmap_tab = '[Heatmap]' if state.activity_chart_mode == 'heatmap' else ' Heatmap '
-    bar_tab = '[Bar Chart]' if state.activity_chart_mode == 'bar' else ' Bar Chart '
+    if state.activity_chart_mode == 'bar':
+        bar_tab = '[Bar \u2195 Epic]' if state.activity_stacked else '[Bar Chart]'
+    else:
+        bar_tab = ' Bar Chart '
 
     if state.activity_chart_mode == 'heatmap':
         heatmap_tab = ansi(heatmap_tab, bold=True)
@@ -1581,6 +1659,13 @@ def view_activity(data: ActivityData, state: 'State', width: int, height: int) -
     # Render chart
     if state.activity_chart_mode == 'heatmap':
         chart_lines = render_heatmap(data.completions, inner)
+    elif state.activity_stacked and data.epic_completions:
+        ranked = rank_epics(data.epic_completions)
+        chart_lines = render_bar_chart(data.completions, inner,
+                                       epic_completions=data.epic_completions,
+                                       ranked_epics=ranked)
+        chart_lines.append('')
+        chart_lines.append(render_epic_legend(ranked, inner))
     else:
         chart_lines = render_bar_chart(data.completions, inner)
 
@@ -1626,6 +1711,7 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append('')
     lines.append(f"  {ansi('Tab', bold=True)}        Toggle between heatmap and bar chart")
     lines.append(f"  {ansi('←/→', bold=True)}        Toggle chart mode")
+    lines.append(f"  {ansi('e', bold=True)}          Toggle epic breakdown (bar chart only)")
     lines.append(f"  {ansi('a', bold=True)}          Return to portfolio")
     lines.append('')
     lines.append(section_header('TREE VIEW', inner))
@@ -1783,6 +1869,7 @@ class State:
     # Activity view
     activity_data: ActivityData | None = None
     activity_chart_mode: str = 'heatmap'  # 'heatmap' | 'bar'
+    activity_stacked: bool = False
 
 
 def handle_input(key: str, state: State) -> State | None:
@@ -1938,8 +2025,10 @@ def handle_portfolio_input(key: str, state: State) -> State:
 
 
 def handle_activity_input(key: str, state: State) -> State:
-    if key in ('\t', 'left', 'right', 'h', 'l'):
+    if key in ('\t', 'left', 'right', 'l'):
         state.activity_chart_mode = 'bar' if state.activity_chart_mode == 'heatmap' else 'heatmap'
+    elif key == 'e' and state.activity_chart_mode == 'bar':
+        state.activity_stacked = not state.activity_stacked
     elif key == 'a':
         state.view = 'portfolio'
         state.activity_data = None
@@ -2669,7 +2758,10 @@ def render(state: State, width: int, height: int) -> str:
             lines = ['  No feature selected']
     elif state.view == 'activity':
         title = 'activity'
-        footer = '[tab]chart [a]back [q]uit'
+        if state.activity_chart_mode == 'bar':
+            footer = '[tab]chart [e]epic [a]back [q]uit'
+        else:
+            footer = '[tab]chart [a]back [q]uit'
         if state.activity_data:
             lines = view_activity(state.activity_data, state, width, height)
         else:
