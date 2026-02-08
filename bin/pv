@@ -2032,6 +2032,10 @@ def handle_activity_input(key: str, state: State) -> State:
     elif key == 'a':
         state.view = 'portfolio'
         state.activity_data = None
+    elif key == 'r':
+        state.portfolio = scan_projects(state.scan_root or '~/Code')
+        state.activity_data = ActivityData.from_portfolio(state.portfolio)
+        state.flash_message = 'Refreshed'
     return state
 
 
