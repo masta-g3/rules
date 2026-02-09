@@ -21,7 +21,11 @@ Break down into **atomic features**—each with one testable outcome, completabl
 
 Think through: foundation → core functionality → integration → polish. Fold trivial setup into the first feature that needs it.
 
-### 2. Generate Features
+### 2. Create Epic Doc
+
+Write `docs/plans/{prefix}-000.md` — the durable context for the epic. Keep it under ~20 lines: one-line goal, scope boundaries, key constraints/decisions, and a list of planned feature IDs with one-line descriptions. Features reference this as their `spec_file`.
+
+### 3. Generate Features
 
 Choose a short, descriptive epic prefix (e.g., `auth`, `cart`, `notif`, `dash`). If `features.yaml` exists, extract existing prefixes via yq—extend an existing epic if this work belongs there, otherwise create a new prefix.
 
@@ -39,7 +43,7 @@ Create or append to `features.yaml` with entries following this schema:
   depends_on:
     - epic-001
   discovered_from: null
-  spec_file: null
+  spec_file: "docs/plans/{epic}-000.md"
   created_at: YYYY-MM-DD
 ```
 
@@ -58,7 +62,7 @@ Use yq to append without reading full file into context:
 yq -i '. += [<new_features>]' features.yaml
 ```
 
-### 3. Report to User
+### 4. Report to User
 
 Summarize the decomposition: epic prefix, feature count by priority, key dependencies, and recommended starting feature. List any assumptions made or clarifications needed before starting.
 
