@@ -1,6 +1,5 @@
 ---
 description: Context prime the model by reading files relevant to a task.
-model: claude-haiku-4-5
 disable-model-invocation: false
 ---
 
