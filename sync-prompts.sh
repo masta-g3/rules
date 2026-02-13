@@ -93,11 +93,6 @@ sync_file "${repo_root}/AGENTS.md" "${codex_root}/AGENTS.md" "agents_md"
 sync_file "${repo_root}/AGENTS.md" "${claude_root}/CLAUDE.md" "agents_md"
 sync_file "${repo_root}/AGENTS.md" "${cursor_root}/AGENTS.md" "agents_md"
 
-mkdir -p "${codex_root}/prompts" "${claude_root}/commands" "${cursor_root}/commands"
-sync_dir "${repo_root}/commands/" "${codex_root}/prompts/" "commands"
-sync_dir "${repo_root}/commands/" "${claude_root}/commands/" "commands"
-sync_dir "${repo_root}/commands/" "${cursor_root}/commands/" "commands"
-
 sync_dir "${repo_root}/skills/" "${codex_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${claude_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${cursor_root}/skills/" "skills"
@@ -159,7 +154,6 @@ if [[ "$SILENT" == false ]]; then
   echo ""
 
   print_row "AGENTS.md" "agents_md" "codex, claude, cursor"
-  print_row "commands" "commands" "codex, claude, cursor"
   print_row "skills" "skills" "codex, claude, cursor"
   print_row "subagents" "subagents" "claude"
   print_row "statusline" "statusline" "claude"

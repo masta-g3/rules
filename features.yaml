@@ -126,3 +126,14 @@
   created_at: "2026-02-07"
   completed_at: "2026-02-07"
   spec_file: docs/history/20260207_pv-009_stacked_bar_epic.md
+- id: cmd-004
+  epic: cmd
+  status: done
+  title: Migrate custom commands to skills with cross-provider frontmatter
+  description: Design and execute migration from command-first prompts to skill-first workflows, with a frontmatter spec compatible across Claude/Codex/Cursor while preserving Claude-first behavior.
+  priority: 1
+  depends_on: []
+  discovered_from: null
+  spec_file: docs/plans/cmd-004.md
+  created_at: "2026-02-13"
+  completed_at: "2026-02-13"

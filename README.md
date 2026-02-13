@@ -1,6 +1,6 @@
-# AI IDE Agent Command Set
+# AI IDE Agent Skill Set
 
-Minimal commands for AI agents in developer IDEs.
+Minimal skills for AI agents in developer IDEs.
 
 ## Philosophy
 
@@ -14,24 +14,13 @@ Minimal commands for AI agents in developer IDEs.
 
 For quick tasks without multi-session tracking:
 
-```
-/prime "task"       → gather codebase context
-/plan-md "task"     → create implementation plan
-/execute            → implement with baseline verification
-/commit             → archive plan, commit changes
-```
+`prime` → `plan-md` → `execute` → `commit`
 
 ### Feature-Driven (Multi-Session Projects)
 
 For projects with backlog tracking via `features.yaml`:
 
-```
-/project-init "description"   → scaffold project, generate features.yaml
-/next-feature                 → select next ready feature
-/plan-md "feature-id"         → create plan (feature-id.md)
-/execute                      → implement, update status
-/commit                       → archive, mark done
-```
+`project-init` → `next-feature` → `plan-md` → `execute` → `commit`
 
 Plan file name carries state: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone.
 
@@ -39,14 +28,9 @@ Plan file name carries state: `auth-001.md` = tracked feature, `DARK_MODE.md` = 
 
 Autonomous feature cycle via Stop hooks:
 
-```
-/autopilot              → picks next feature, runs full cycle
-/autopilot feature-id   → runs cycle for specific feature
-/autopilot --epic       → completes all ready features in auto-detected epic
-/autopilot --epic auth  → completes all ready features in auth-* epic
-```
+`autopilot` starts the same feature cycle and is provider-gated to Claude hook environments.
 
-Chains: `/prime` → `/plan-md` → `/execute` → `/commit`
+Chain: `prime` → `plan-md` → `execute` → `commit`
 
 Single mode stops after one feature. Continuous mode (`--epic`) loops back after each commit until no ready features remain in the epic.
 
@@ -57,20 +41,20 @@ Stops on exceptions (baseline fails, tests fail, conflicts) with resume instruct
 /path/to/rules/setup-autopilot.sh /your/project
 ```
 
-## Commands
+## Skills
 
-| Command | Purpose |
+| Skill | Purpose |
 |---------|---------|
-| `autopilot.md` | Autonomous feature cycle (Claude Code) |
-| `project-init.md` | Initialize project with features.yaml |
-| `epic-init.md` | Initialize new epic with features |
-| `ticket-init.md` | Add a single ticket to features.yaml |
-| `next-feature.md` | Select next ready feature |
-| `prime.md` | Context prime: structure docs, git history |
-| `plan-md.md` | Create implementation plan |
-| `execute.md` | Implement with baseline verification |
-| `commit.md` | Archive plan, commit |
-| `test-coverage.md` | Analyze test coverage |
+| `skills/autopilot` | Autonomous feature cycle (Claude Code) |
+| `skills/project-init` | Initialize project with features.yaml |
+| `skills/epic-init` | Initialize new epic with features |
+| `skills/ticket-init` | Add a single ticket to features.yaml |
+| `skills/next-feature` | Select next ready feature |
+| `skills/prime` | Context prime: structure docs, git history |
+| `skills/plan-md` | Create implementation plan |
+| `skills/execute` | Implement with baseline verification |
+| `skills/commit` | Archive plan, commit |
+| `skills/test-coverage` | Analyze test coverage |
 
 ## CLI Tools
 
@@ -155,7 +139,7 @@ fv                    # Project view (./features.yaml in current dir)
 ## Setup
 
 ```bash
-./sync-prompts.sh   # copies commands to ~/.claude, ~/.codex, ~/.cursor
+./sync-prompts.sh   # copies skills to ~/.claude, ~/.codex, ~/.cursor
 ```
 
 See `AGENTS.md` for coding style and behavioral guidelines.
