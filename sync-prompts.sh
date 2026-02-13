@@ -45,9 +45,16 @@ collect_files() {
   local src="$1" category="$2"
   [[ -n "${all_files[$category]:-}" ]] && return
   for f in "$src"*; do
-    [[ -f "$f" ]] || continue
-    local name=$(strip_ext "$f")
-    [[ "$name" == .* ]] && continue
+    local name
+    if [[ -d "$f" ]]; then
+      name=$(basename "$f")
+      [[ "$name" == .* || "$name" == _* ]] && continue
+    elif [[ -f "$f" ]]; then
+      name=$(strip_ext "$f")
+      [[ "$name" == .* ]] && continue
+    else
+      continue
+    fi
     all_files[$category]+="$name "
   done
 }
@@ -76,8 +83,9 @@ sync_dir() {
     [[ -z "$line" ]] && continue
     local change_type="${line:0:1}"
     local file=$(echo "$line" | awk '{print $2}')
-    local name=$(strip_ext "$file")
-    [[ "$name" == .* ]] && continue
+    local name=$(echo "$file" | cut -d/ -f1)
+    name=$(strip_ext "$name")
+    [[ "$name" == .* || "$name" == _* ]] && continue
 
     if [[ "$change_type" == ">" ]]; then
       if [[ "${line:1:1}" == "f" && "${line:3:1}" == "+" ]]; then
