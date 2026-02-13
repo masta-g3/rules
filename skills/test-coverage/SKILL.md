@@ -1,7 +1,6 @@
 ---
 name: test-coverage
 description: Assess test coverage and propose critical tests.
-disable-model-invocation: true
 ---
 
 Analyze:

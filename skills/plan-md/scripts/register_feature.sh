@@ -16,7 +16,7 @@ fi
 
 ID=$("$(dirname "$0")/../../_lib/feature_id.sh" "$FEATURES_FILE" "$EPIC")
 TODAY=$(date +%F)
-DESC=$(echo "$REQUEST" | sed 's/"/\"/g')
+DESC=$(echo "$REQUEST" | sed 's/"/\\"/g')
 
 yq -i ". += [{\"id\":\"${ID}\",\"epic\":\"${EPIC}\",\"status\":\"in_progress\",\"title\":\"${DESC}\",\"description\":\"${DESC}\",\"priority\":2,\"depends_on\":[],\"discovered_from\":null,\"spec_file\":\"docs/plans/${ID}.md\",\"created_at\":\"${TODAY}\",\"completed_at\":null}]" "$FEATURES_FILE"
 

@@ -11,6 +11,4 @@ if [[ -z "$FEATURE_ID" || -z "$SPEC_FILE" ]]; then
 fi
 
 TODAY=$(date +%F)
-yq -i "(.[] | select(.id == \"${FEATURE_ID}\") | .status) = \"done\"" "$FEATURES_FILE"
-yq -i "(.[] | select(.id == \"${FEATURE_ID}\") | .completed_at) = \"${TODAY}\"" "$FEATURES_FILE"
-yq -i "(.[] | select(.id == \"${FEATURE_ID}\") | .spec_file) = \"${SPEC_FILE}\"" "$FEATURES_FILE"
+yq -i "(.[] | select(.id == \"${FEATURE_ID}\")) |= (.status = \"done\" | .completed_at = \"${TODAY}\" | .spec_file = \"${SPEC_FILE}\")" "$FEATURES_FILE"

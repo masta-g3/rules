@@ -2,7 +2,6 @@
 name: project-init
 description: Initialize a new project with multi-session scaffolding.
 argument-hint: "[project description]"
-disable-model-invocation: true
 ---
 
 Given `$1`, scaffold project basics:

@@ -2,7 +2,6 @@
 name: epic-init
 description: Decompose a complex feature into trackable sub-features.
 argument-hint: "[epic description]"
-disable-model-invocation: true
 ---
 
 Given `$1`, decompose into 4-10 atomic features.

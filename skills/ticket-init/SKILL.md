@@ -2,7 +2,6 @@
 name: ticket-init
 description: Add a single ticket to features.yaml.
 argument-hint: "[ticket description]"
-disable-model-invocation: true
 ---
 
 Given `$1`, append one feature entry to `features.yaml`.
