@@ -6,8 +6,6 @@ AI IDE agent skills set for feature-driven development workflows.
 
 ```
 rules/
-├── commands/           # Legacy prompts retained for migration input only
-│
 ├── bin/                # CLI tools
 │   ├── pv              # Portfolio & Feature Viewer TUI
 │   ├── fv -> pv        # Symlink: project-level alias
