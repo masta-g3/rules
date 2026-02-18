@@ -105,7 +105,9 @@ sync_dir "${repo_root}/skills/" "${codex_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${claude_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${cursor_root}/skills/" "skills"
 
-sync_dir "${repo_root}/.claude/agents/" "${claude_root}/agents/" "subagents"
+sync_dir "${repo_root}/agents/" "${codex_root}/agents/" "subagents"
+sync_dir "${repo_root}/agents/" "${claude_root}/agents/" "subagents"
+sync_dir "${repo_root}/agents/" "${cursor_root}/agents/" "subagents"
 
 sync_dir "${repo_root}/statusline/" "${claude_root}/statusline/" "statusline"
 
@@ -163,7 +165,7 @@ if [[ "$SILENT" == false ]]; then
 
   print_row "AGENTS.md" "agents_md" "codex, claude, cursor"
   print_row "skills" "skills" "codex, claude, cursor"
-  print_row "subagents" "subagents" "claude"
+  print_row "subagents" "subagents" "codex, claude, cursor"
   print_row "statusline" "statusline" "claude"
 
   echo ""

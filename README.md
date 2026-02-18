@@ -131,7 +131,7 @@ fv                    # Project view (./features.yaml in current dir)
 
 **Key fields:**
 - **epic**: Groups related features (e.g., "auth", "payments")
-- **depends_on**: Feature is "ready" when all deps are done
+- **depends_on**: Feature is "ready" when all deps are done or in progress
 - **steps**: Implementation checklist
 - **discovered_from**: Links emergent work to parent feature
 - **spec_file**: Path to implementation plan

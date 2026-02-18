@@ -11,6 +11,14 @@ fi
 FEATURES_FILE=${1:-features.yaml}
 EPIC_FILTER=${2:-}
 
+if [[ ! -f "$FEATURES_FILE" ]]; then
+  if $ID_ONLY; then
+    exit 1
+  fi
+  echo "No features.yaml found. Create one with /ticket-init or /epic-init."
+  exit 0
+fi
+
 JSON=$(yq -o=json "$FEATURES_FILE")
 
 epic_test=""
