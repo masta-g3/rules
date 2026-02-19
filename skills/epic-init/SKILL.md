@@ -5,6 +5,8 @@ argument-hint: "[epic description]"
 disable-model-invocation: true
 ---
 
+Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor).
+
 Given the epic request: **$1**, break it down into trackable sub-features for multi-session development.
 
 ### Clarify Before Decomposing
@@ -32,7 +34,7 @@ Choose a short, descriptive epic prefix (e.g., `auth`, `cart`, `notif`, `dash`).
 
 Generate sequential IDs within the epic using:
 ```bash
-~/.claude/skills/_lib/feature_id.sh features.yaml "$EPIC"
+$SKILLS_ROOT/_lib/feature_id.sh features.yaml "$EPIC"
 ```
 
 Create or append to `features.yaml` with entries following this schema:

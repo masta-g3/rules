@@ -134,26 +134,27 @@
   priority: 1
   depends_on: []
   discovered_from: null
-  spec_file: docs/plans/cmd-004.md
+  spec_file: docs/history/20260218_cmd-004_skills_frontmatter_contract.md
   created_at: "2026-02-13"
   completed_at: "2026-02-13"
 - id: cmd-005
   epic: cmd
-  status: in_progress
+  status: done
   title: 'cmd-005: Restore full command behavior into skills'
   description: 'cmd-005: Restore full command behavior into skills'
   priority: 2
   depends_on: []
   discovered_from: null
-  spec_file: docs/plans/cmd-005.md
+  spec_file: docs/history/20260218_cmd-005_restore_skill_guidance.md
   created_at: "2026-02-14"
-  completed_at: null
+  completed_at: "2026-02-18"
 - id: cmd-006
   epic: cmd
-  status: in_progress
+  status: done
   title: Move subagents to repo root for multi-harness sync
   description: Relocate .claude/agents/ to top-level agents/ and sync to all three harnesses (codex, claude, cursor)
   priority: 2
   depends_on: []
-  spec_file: docs/plans/cmd-006.md
+  spec_file: docs/history/20260218_cmd-006_subagents_root_sync.md
   created_at: "2026-02-17"
+  completed_at: "2026-02-18"

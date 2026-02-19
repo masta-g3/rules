@@ -4,10 +4,12 @@ description: Select the next feature to implement from features.yaml and prepare
 disable-model-invocation: true
 ---
 
+Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor).
+
 ### 1. Review State
 
 - Run `git log --oneline -10` to understand recent work
-- Run `~/.claude/skills/_lib/select_next_feature.sh features.yaml` to find the next ready feature
+- Run `$SKILLS_ROOT/_lib/select_next_feature.sh features.yaml` to find the next ready feature
 - Read `docs/STRUCTURE.md` only if feature context is unclear
 
 ### 2. Select Feature

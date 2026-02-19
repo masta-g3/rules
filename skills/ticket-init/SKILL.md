@@ -5,6 +5,8 @@ argument-hint: "[ticket description]"
 disable-model-invocation: true
 ---
 
+Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor).
+
 Given the ticket request: **$1**, add a single feature entry to `features.yaml`.
 
 ### 1. Determine Epic
@@ -19,7 +21,7 @@ yq '.[].id | sub("-[0-9]+$", "")' features.yaml | sort -u
 
 Next sequential number within the epic using:
 ```bash
-~/.claude/skills/_lib/feature_id.sh features.yaml "$EPIC"
+$SKILLS_ROOT/_lib/feature_id.sh features.yaml "$EPIC"
 ```
 
 ### 3. Build & Append

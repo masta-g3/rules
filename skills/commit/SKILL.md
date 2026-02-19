@@ -3,6 +3,8 @@ name: commit
 description: Review code, archive planning document, then commit files from session.
 ---
 
+Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor).
+
 ### Code Review (Non-Trivial Changes Only)
 
 For changes involving multiple files or significant logic: invoke the **code-critic** subagent via Task tool to review modified files. Skip for trivial edits (typos, single-line fixes). Address valid concerns before continuing.
@@ -19,7 +21,7 @@ Check modified files for:
 
 If a markdown planning file exists for this work, archive it:
 
-1. Run `~/.claude/skills/commit/scripts/archive_plan.sh <plan-file>` — this copies the plan to `docs/history/{yyyymmdd}_{basename}.md`
+1. Run `$SKILLS_ROOT/commit/scripts/archive_plan.sh <plan-file>` — this copies the plan to `docs/history/{yyyymmdd}_{basename}.md`
 2. Rename the archive to include a descriptive suffix: `docs/history/yyyymmdd_{feature-id}_{short_desc}.md` (e.g., `20241201_auth-001_user_signup.md`). Keep `{short_desc}` to 2-4 words, snake_case. The feature ID enables visual epic grouping when scanning the directory.
 3. Delete the original planning file from `docs/plans/`
 
@@ -29,7 +31,7 @@ Transform into permanent spec: remove implementation details, keep completed che
 
 Update features.yaml (if tracked feature):
 
-Run `~/.claude/skills/commit/scripts/mark_done.sh <feature-id> <archive-path>` — this sets `status` to `"done"`, `completed_at` to today's date, and `spec_file` to the archive path.
+Run `$SKILLS_ROOT/commit/scripts/mark_done.sh <feature-id> <archive-path>` — this sets `status` to `"done"`, `completed_at` to today's date, and `spec_file` to the archive path.
 
 Verify any discovered items are properly logged in features.yaml.
 
@@ -39,7 +41,7 @@ Include features.yaml in the commit.
 
 If `docs/plans/.file-locks.json` exists:
 
-Run `~/.claude/skills/_lib/file_lock.sh release-all "" <feature-id>` — this removes all entries where `by` matches the current feature ID. If the lock file is now empty (`{}`), delete it.
+Run `$SKILLS_ROOT/_lib/file_lock.sh release-all "" <feature-id>` — this removes all entries where `by` matches the current feature ID. If the lock file is now empty (`{}`), delete it.
 
 Include the lock file change (or deletion) in the commit.
 
@@ -101,7 +103,7 @@ if [[ "$MODE" == "continuous" ]]; then
   EPIC=$(jq -r '.epic' .claude/workflow.json)
 
   # Find next ready feature in epic
-  NEXT_FEATURE=$(~/.claude/skills/_lib/select_next_feature.sh --id features.yaml "$EPIC")
+  NEXT_FEATURE=$($SKILLS_ROOT/_lib/select_next_feature.sh --id features.yaml "$EPIC")
 
   if [[ -n "$NEXT_FEATURE" ]]; then
     # Loop back

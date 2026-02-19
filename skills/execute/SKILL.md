@@ -3,6 +3,8 @@ name: execute
 description: Implement the approved plan.
 ---
 
+Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor).
+
 Work directly from the active plan or task we have been discussing.
 
 ### Baseline Verification (First Task Only)
@@ -17,7 +19,7 @@ Before implementing new functionality, verify that existing features affected by
 
 ### File Reservations (Parallel Mode)
 
-If `docs/plans/.file-locks.json` exists, apply the reservation protocol using `~/.claude/skills/_lib/file_lock.sh` before each file modification. Derive feature ID from the active plan file name.
+If `docs/plans/.file-locks.json` exists, apply the reservation protocol using `$SKILLS_ROOT/_lib/file_lock.sh` before each file modification. Derive feature ID from the active plan file name.
 
 1. Check if file is locked by another feature
 2. If locked: sleep 15s, retry (up to 5 attempts). If still locked, report to user and pause
@@ -77,7 +79,7 @@ Report status clearly:
 
 If `.claude/workflow.json` exists (autopilot is active) AND plan is complete, advance the workflow:
 ```bash
-~/.claude/skills/_lib/workflow_state.sh /commit
+$SKILLS_ROOT/_lib/workflow_state.sh /commit
 ```
 
 On exception (baseline/tests/build fail), abort autopilot (`rm -f .claude/workflow.json`) and report the issue to the user.

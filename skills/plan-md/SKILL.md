@@ -4,6 +4,8 @@ description: Create and maintain a Markdown implementation plan from a single re
 argument-hint: "[request]"
 ---
 
+Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor).
+
 Given the request: **$1**, create and maintain a detailed Markdown implementation plan as follows. Be sure to keep the scope limited to the specific request (i.e.: avoid scope creep).
 
 ### Plan File Location & Naming
@@ -14,7 +16,7 @@ Store plans in `docs/plans/`:
 - **If `features.yaml` exists** and input isn't an ID: register the feature inline —
   1. Extract existing epic prefixes: `yq '.[].id | sub("-[0-9]+$", "")' features.yaml | sort -u`
   2. Match the request to an existing epic, or create a new prefix if none fits. If ambiguous, ask the user.
-  3. Generate the next ID: `~/.claude/skills/_lib/feature_id.sh features.yaml "$EPIC"`
+  3. Generate the next ID: `$SKILLS_ROOT/_lib/feature_id.sh features.yaml "$EPIC"`
   4. Append to features.yaml via `yq -i` with all required fields (id, epic, status: "in_progress", title, description, priority: 2, depends_on: [], spec_file: "docs/plans/{id}.md", created_at: today)
   → `{new-id}.md`
 - **Otherwise**: standalone mode → `FEATURE_NAME.md`
@@ -79,7 +81,7 @@ For plans involving architectural decisions, multi-file changes, or complex logi
 
 If `.claude/workflow.json` exists (autopilot is active), advance the workflow:
 ```bash
-~/.claude/skills/_lib/workflow_state.sh /execute
+$SKILLS_ROOT/_lib/workflow_state.sh /execute
 ```
 
 On exception (ambiguous requirements), abort autopilot (`rm -f .claude/workflow.json`) and report the issue to the user.
