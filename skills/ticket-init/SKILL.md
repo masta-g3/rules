@@ -1,13 +1,23 @@
 ---
 name: ticket-init
-description: Add a single ticket to features.yaml.
-argument-hint: "[ticket description]"
+description: Add one or more tickets to features.yaml.
+argument-hint: "[ticket description] or \"ticket 1 || ticket 2\""
 disable-model-invocation: true
 ---
 
 Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor).
 
-Given the ticket request: **$1**, add a single feature entry to `features.yaml`.
+Given the ticket request(s): **$1**, add one or more feature entries to `features.yaml`.
+
+### 0. Normalize Input
+
+- If `$1` contains ` || `, split into multiple ticket requests.
+- Otherwise, treat it as a single ticket request.
+- Process each request independently, in order, using steps 1-4.
+- Backward compatibility: single-ticket behavior stays unchanged.
+
+Example multi-ticket input:
+`$ticket-init "Add GICS industry toggle || Add issuer-first cap-weighted aggregation"`
 
 ### 1. Determine Epic
 
@@ -19,7 +29,7 @@ yq '.[].id | sub("-[0-9]+$", "")' features.yaml | sort -u
 
 ### 2. Generate ID
 
-Next sequential number within the epic using:
+For each ticket request, generate the next sequential number within the epic:
 ```bash
 $SKILLS_ROOT/_lib/feature_id.sh features.yaml "$EPIC"
 ```
@@ -49,6 +59,7 @@ yq -i '. += [{"id": "...", "epic": "...", "status": "pending", "title": "...", "
 
 ### 4. Report
 
+Emit one block per ticket:
 ```
 TICKET CREATED: {id}
 Epic: {epic}
