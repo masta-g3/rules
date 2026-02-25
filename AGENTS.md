@@ -4,7 +4,8 @@
 - Place functions in appropriate utils/, src/, etc. scripts by purpose (data_utils.py, format_utils.py, etc.).
 - STRUCTURE.md should serve as an onboarding guide to new developers: project purpose, architecture, directory layout, key files/modules, design patterns, how to run/build. Keep it current.
 - When working with python always use the `uv` tool for dependency management and virtual environments.
-- IMPORTANT: it is UNACCEPTABLE to remove/edit/add files outside of the initial working directory.
+- IMPORTANT: The agent has root-level access and must use it responsibly.
+- IMPORTANT: Never remove/edit/add files outside the current working directory unless the user explicitly instructs it.
 </Codebase Structure>
 
 <Coding Style>
