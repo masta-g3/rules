@@ -158,3 +158,13 @@
   spec_file: docs/history/20260218_cmd-006_subagents_root_sync.md
   created_at: "2026-02-17"
   completed_at: "2026-02-18"
+- id: skill-001
+  epic: skill
+  status: done
+  title: Extract workflow & file-lock instructions into standalone mini-skills
+  description: Strip autopilot state transition and file reservation instructions out of individual SKILL.md files into standalone _lib docs, replacing inline sections with references.
+  priority: 2
+  depends_on: []
+  spec_file: docs/history/20260302_skill-001_extract_workflow_filelock.md
+  created_at: "2026-03-02"
+  completed_at: "2026-03-02"

@@ -37,14 +37,6 @@ Verify any discovered items are properly logged in features.yaml.
 
 Include features.yaml in the commit.
 
-### Release File Reservations
-
-If `docs/plans/.file-locks.json` exists:
-
-Run `$SKILLS_ROOT/_lib/file_lock.sh release-all "" <feature-id>` — this removes all entries where `by` matches the current feature ID. If the lock file is now empty (`{}`), delete it.
-
-Include the lock file change (or deletion) in the commit.
-
 ### Commit
 
 Commit all files modified during this session:
@@ -73,57 +65,3 @@ Refactor API endpoints for better error handling.
 ```
 
 Finally verify if any updates are needed to the product documentation, mainly docs/STRUCTURE.md. Only document changes worth tracking that keep the document true to the codebase.
-
----
-## Autopilot State Transition
-
-If `.claude/workflow.json` exists (autopilot is active):
-
-### Read mode
-```bash
-MODE=$(jq -r '.mode // "single"' .claude/workflow.json)
-```
-
-### Single mode
-```bash
-if [[ "$MODE" == "single" ]]; then
-  FEATURE=$(jq -r '.feature' .claude/workflow.json)
-  rm -f .claude/workflow.json
-fi
-```
-Output:
-```
-AUTOPILOT COMPLETE: $FEATURE
-Committed: <hash>
-```
-
-### Continuous mode
-```bash
-if [[ "$MODE" == "continuous" ]]; then
-  EPIC=$(jq -r '.epic' .claude/workflow.json)
-
-  # Find next ready feature in epic
-  NEXT_FEATURE=$($SKILLS_ROOT/_lib/select_next_feature.sh --id features.yaml "$EPIC")
-
-  if [[ -n "$NEXT_FEATURE" ]]; then
-    # Loop back
-    jq --arg f "$NEXT_FEATURE" '.feature = $f | .next = "/prime"' .claude/workflow.json > tmp.$$ && mv tmp.$$ .claude/workflow.json
-  else
-    # Epic complete
-    rm -f .claude/workflow.json
-  fi
-fi
-```
-
-Output if looping:
-```
-AUTOPILOT CONTINUING: $NEXT_FEATURE
-```
-
-Output if complete:
-```
-AUTOPILOT COMPLETE: $EPIC epic
-Committed: <hash>
-```
-
-On exception (git conflicts), abort autopilot (`rm -f .claude/workflow.json`) and report the issue to the user.

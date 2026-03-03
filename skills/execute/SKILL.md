@@ -17,16 +17,6 @@ Iterate through each phase incrementally—implement, test, and seek user feedba
 
 Before implementing new functionality, verify that existing features affected by your changes still work. If you discover broken state, report it to the user before proceeding.
 
-### File Reservations (Parallel Mode)
-
-If `docs/plans/.file-locks.json` exists, apply the reservation protocol using `$SKILLS_ROOT/_lib/file_lock.sh` before each file modification. Derive feature ID from the active plan file name.
-
-1. Check if file is locked by another feature
-2. If locked: sleep 15s, retry (up to 5 attempts). If still locked, report to user and pause
-3. Reserve the file → modify it → release the reservation
-
-One file at a time. Do not batch-reserve.
-
 ### Discovered Work
 
 During implementation, you may encounter sub-tasks not in the original plan.
@@ -73,13 +63,3 @@ Report status clearly:
 
 - **PLAN COMPLETE** — all phases done, ready for `/commit`
 - **PENDING STEPS** — list remaining phases/tasks, indicate next action
-
----
-## Autopilot State Transition
-
-If `.claude/workflow.json` exists (autopilot is active) AND plan is complete, advance the workflow:
-```bash
-$SKILLS_ROOT/_lib/workflow_state.sh /commit
-```
-
-On exception (baseline/tests/build fail), abort autopilot (`rm -f .claude/workflow.json`) and report the issue to the user.

@@ -60,14 +60,6 @@ Keep it lean—only what's needed to start confidently.
 
 Don't execute on this plan yet; the user will provide feedback and finally approve. Keep scope limited to the feature request (especially when working with `features.yaml`).
 
-### Parallel Mode (File Reservations)
-
-If `$1` contains `--parallel`:
-1. If `docs/plans/.file-locks.json` doesn't exist, create it with `{}`
-2. After creating the plan, check the lock file against files in the Context Files section
-3. Report any conflicts: "⚠ {file} is reserved by {feature-id}"
-4. Informational only — no reservations placed during planning
-
 ### Mark Feature Active
 
 **If plan file is named `{epic}-{nnn}.md` (tracked feature):** set its `status` to `"in_progress"` via yq. A finished plan is a commitment artifact—the feature is no longer pending.
@@ -75,13 +67,3 @@ If `$1` contains `--parallel`:
 ### Plan Review (Non-Trivial Plans Only)
 
 For plans involving architectural decisions, multi-file changes, or complex logic: invoke the **plan-critic** subagent via Task tool to review. Skip for trivial edits. Address valid concerns; ignore suggestions that add bloat.
-
----
-## Autopilot State Transition
-
-If `.claude/workflow.json` exists (autopilot is active), advance the workflow:
-```bash
-$SKILLS_ROOT/_lib/workflow_state.sh /execute
-```
-
-On exception (ambiguous requirements), abort autopilot (`rm -f .claude/workflow.json`) and report the issue to the user.
