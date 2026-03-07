@@ -1,3 +1,15 @@
+## Experimental Autopilot Workflow
+
+This document is a standalone prompt/reference for the experimental autopilot flow.
+
+It is **not** part of the default workflow and is **not** included in `AGENTS.md`.
+Use it only when explicitly running the autopilot flow or another prompt that links here.
+
+If a Stop hook blocks with a reason starting with `AUTOPILOT:`, execute the slash command specified.
+
+Example:
+`AUTOPILOT: Run /prime auth-001` -> immediately run `/prime auth-001`
+
 ## Autopilot State Transition
 
 If `.claude/workflow.json` does not exist, skip this section entirely.

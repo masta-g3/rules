@@ -60,6 +60,8 @@ graph LR
     next --> prime
 ```
 
+The main workflow excludes experimental autopilot and file-reservation prompts. Those remain available as isolated references under `skills/_lib/` and are not part of `AGENTS.md`.
+
 ### pv/fv TUI
 
 Terminal dashboard for `features.yaml` visualization and editing:
@@ -84,6 +86,7 @@ Modes:
 ## Design Patterns
 
 - **Single-file tools**: `bin/pv` is self-contained Python (requires PyYAML)
-- **Skill-first workflows**: `skills/*/SKILL.md` defines behavior; scripts handle deterministic mutations
+- **Skill-first workflows**: `skills/*/SKILL.md` defines the main behavior; scripts handle deterministic mutations
+- **Experimental prompts stay isolated**: autopilot and file-lock references live under `skills/_lib/` and are only used when explicitly invoked
 - **State in filenames**: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone
 - **yq for YAML ops**: Avoid loading large features.yaml into context

@@ -1,8 +1,19 @@
-## File Reservations (Parallel Mode)
+## Experimental File Reservations (Parallel Mode)
+
+This document is a standalone prompt/reference for the experimental parallel file-lock flow.
+
+It is **not** part of the default workflow and is **not** included in `AGENTS.md`.
+Use it only when explicitly running a prompt that enables file reservations.
 
 If `docs/plans/.file-locks.json` does not exist, skip this section entirely.
 
 Derive feature ID from the active plan file name (e.g., `auth-001.md` → `auth-001`).
+
+Lock file schema:
+
+```json
+{"src/auth/login.py": {"by": "auth-001", "at": "2026-01-30T10:30:00Z"}}
+```
 
 ### Planning Phase
 

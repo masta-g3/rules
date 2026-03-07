@@ -24,28 +24,11 @@ For projects with backlog tracking via `features.yaml`:
 
 Plan file name carries state: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone.
 
-### Autopilot (Claude Code Only)
-
-Autonomous feature cycle via Stop hooks:
-
-`autopilot` starts the same feature cycle and is provider-gated to Claude hook environments.
-
-Chain: `prime` → `plan-md` → `execute` → `commit`
-
-Single mode stops after one feature. Continuous mode (`--epic`) loops back after each commit until no ready features remain in the epic.
-
-Stops on exceptions (baseline fails, tests fail, conflicts) with resume instructions.
-
-**Enable in a project:**
-```bash
-/path/to/rules/setup-autopilot.sh /your/project
-```
-
 ## Skills
 
 | Skill | Purpose |
 |---------|---------|
-| `skills/autopilot` | Autonomous feature cycle (Claude Code) |
+| `skills/autopilot` | Experimental standalone prompt for autonomous feature cycles (Claude Code) |
 | `skills/project-init` | Initialize project with features.yaml |
 | `skills/epic-init` | Initialize new epic with features |
 | `skills/ticket-init` | Add a single ticket to features.yaml |
@@ -55,6 +38,21 @@ Stops on exceptions (baseline fails, tests fail, conflicts) with resume instruct
 | `skills/execute` | Implement with baseline verification |
 | `skills/commit` | Archive plan, commit |
 | `skills/test-coverage` | Analyze test coverage |
+
+## Experimental Standalone Prompts
+
+These prompts are kept usable, but they are **not** part of the main workflow and are **not** included in `AGENTS.md`.
+
+- `skills/autopilot`: Claude Code-only autopilot entrypoint
+- `skills/_lib/WORKFLOW.md`: standalone autopilot transition/reference doc
+- `skills/_lib/FILE_LOCK.md`: standalone parallel file reservation/reference doc
+
+Use them only when explicitly opting into those experimental flows.
+
+**Autopilot setup:**
+```bash
+/path/to/rules/setup-autopilot.sh /your/project
+```
 
 ## CLI Tools
 
