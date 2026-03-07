@@ -13,9 +13,9 @@ For changes involving multiple files or significant logic: invoke the **code-cri
 
 Check modified files for:
 
-- No debugging artifacts (console.logs, print statements, TODO markers for this feature)
+- No debugging artifacts (console.logs, print statements, TODO markers for this feature).
 - No AI slop: excess comments, defensive try/catch in trusted paths, unrequested default values, `any` casts to bypass types, etc.
-- Code matches surrounding file conventions—if it looks out of place, fix it
+- Code matches surrounding file conventions—if it looks out of place, fix it.
 
 ### Archive Planning Document
 
@@ -63,5 +63,9 @@ Refactor API endpoints for better error handling.
 - Add request validation middleware.
 - Implement proper HTTP status codes.
 ```
+
+### Multi-Repo Sessions
+
+If this session touched files across multiple repositories or directories, ask the user whether to commit in those other repos as well. If yes, follow the same principles above for each repo independently (separate `git add`, appropriate commit message per repo, no cross-repo bundling).
 
 Finally verify if any updates are needed to the product documentation, mainly docs/STRUCTURE.md. Only document changes worth tracking that keep the document true to the codebase.

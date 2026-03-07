@@ -1,6 +1,5 @@
 <Project Orientation>
-- Check `docs/STRUCTURE.md` to understand project organization.
-- If `docs/STRUCTURE.md` is missing (for example, in a new project), continue without it.
+- Check `docs/STRUCTURE.md` to understand project organization; if missing, continue without it.
 - Keep `docs/STRUCTURE.md` current as an onboarding guide for new developers: project purpose, architecture, directory layout, key files/modules, design patterns, and how to run/build.
 - Place code in the existing purpose-aligned modules or directories (for example, `utils/`, `src/`, or similar), following the repository's structure and naming patterns.
 - When working with Python, always use the `uv` tool for dependency management and virtual environments.
