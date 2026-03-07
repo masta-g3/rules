@@ -1,59 +1,55 @@
-<Codebase Structure>
-- Check docs/STRUCTURE.md to understand project organization.
-- If docs/STRUCTURE.md is missing (e.g., new project), just continue without it.
-- Place functions in appropriate utils/, src/, etc. scripts by purpose (data_utils.py, format_utils.py, etc.).
-- STRUCTURE.md should serve as an onboarding guide to new developers: project purpose, architecture, directory layout, key files/modules, design patterns, how to run/build. Keep it current.
-- When working with python always use the `uv` tool for dependency management and virtual environments.
-- IMPORTANT: The agent has root-level access and must use it responsibly.
-- IMPORTANT: Never remove/edit/add files outside the current working directory unless the user explicitly instructs it.
-</Codebase Structure>
+<Project Orientation>
+- Check `docs/STRUCTURE.md` to understand project organization.
+- If `docs/STRUCTURE.md` is missing (for example, in a new project), continue without it.
+- Keep `docs/STRUCTURE.md` current as an onboarding guide for new developers: project purpose, architecture, directory layout, key files/modules, design patterns, and how to run/build.
+- Place code in the existing purpose-aligned modules or directories (for example, `utils/`, `src/`, or similar), following the repository's structure and naming patterns.
+- When working with Python, always use the `uv` tool for dependency management and virtual environments.
+</Project Orientation>
 
-<Coding Style>
-- Prioritize minimalism: clean, readable, lightweight, modular code; avoid enterprise bloat at all costs.
-- Never solve problems with hacks or hacky solutions; if an approach is not working, brainstorm alternatives with the user instead.
-- Don't introduce new patterns/technologies unless strictly needed.
-- Study existing functions to maintain consistent patterns and style.
-- Avoid thin wrappers and ad-hoc patches.
-- Make minimal, non-disruptive changes that follow existing structure.
-- Check for existing similar code to avoid duplication.
-- Keep function names direct and simple (no 'enhanced', 'new' prefixes).
-- Avoid unecessary changelog style comments (or useless ones), such as 'new feature' indicators.
-- Avoid try-except except for minor processing failures; we don't want processes to fail silently.
-- Avoid adding fallback mechanism, mock data or default values unless the user explicitly asks.
-- Centralize imports at script top (for languages like python, where this is best practice).
-</Coding Style>
+<Scope and Safety>
+- The agent has root-level access and must use it responsibly.
+- Never remove, edit, or add files outside the current working directory unless the user explicitly instructs it.
+</Scope and Safety>
 
-<Minimalist Coding Philosophy>
+<Implementation Principles>
 We are working at a lean startup, maintained by a small team of 10x engineers, not a large corporation. Code accordingly:
-- Less is more, elegance is clarity
-- Avoid useless boilerplate code, be minimal and efficient
-- Make components modular and reusable
-- Follow existing styles and patterns
-- Leave codebase simpler and more organized
-- Skip redundant validations unless failure has real consequences
-- Let errors surface naturally; avoid blanket try/except (especially "pass") that hides bugs
-- Avoid adding fallback mechanism or default values unless the user explicitly asks
-- No backward compatibility or defaults unless requested
-- Comment only non-obvious logic
-</Minimalist Coding Philosophy>
+- Prioritize minimalism: clean, readable, lightweight, modular code. Less is more; elegance is clarity.
+- Avoid enterprise bloat, useless boilerplate, thin wrappers, ad-hoc patches, and hacky solutions.
+- If an approach is not working, brainstorm alternatives with the user instead of forcing a brittle implementation.
+- Do not introduce new patterns or technologies unless they are strictly needed.
+- Study existing functions and patterns first; follow the established style and leave the codebase simpler and more organized.
+- Make minimal, non-disruptive changes that fit the current structure.
+- Check for existing similar code to avoid duplication.
+- Keep components modular and reusable.
+- Follow existing styles and patterns.
+- Keep function names direct and simple; avoid names like `enhanced` or `new`.
+- Avoid unnecessary changelog-style comments such as "new feature" indicators.
+- Comment only non-obvious logic.
+- Centralize imports at the top of the script in languages where that is best practice, such as Python.
+- Skip redundant validations unless failure has real consequences.
+- Let errors surface naturally. Avoid blanket `try/except`, especially `pass`; only use `try/except` for minor processing failures where handling is intentional.
+- Avoid adding fallback mechanisms, mock data, or default values unless the user explicitly asks for them.
+- Do not add backward compatibility layers or defaults unless the user explicitly requests them.
+</Implementation Principles>
 
 <Generating Documentation>
-- When planning features, create detailed markdown documentation that enables any engineer to implement independently.
-- Adhere to the following style when the user asks you to generate a markdown file (e.g.: FEATURE.md):
-    - Leverage markdown elements and visual diagrams (prefer Mermaid).
-    - Document "why" behind decisions - trade-offs, constraints, strategic context.
-    - Include real code snippits, usage patterns, concrete examples.
-    - Keep examples realistic and working.
-    - Write for maintainers 6 months later.
-    - Place docs close to code, maintain consistent terminology.
-    - Document major features, complex algorithms, integration points, performance-critical paths.
-    - Avoid corporate bloat, overengineering or useless boilerplate.
+- When planning features, create detailed Markdown documentation that enables any engineer to implement independently.
+- When the user asks for a Markdown file such as `FEATURE.md`, follow these rules:
+  - Leverage Markdown elements and visual diagrams, preferably Mermaid.
+  - Document why decisions were made, including trade-offs, constraints, and strategic context.
+  - Include real code snippets, usage patterns, and concrete examples.
+  - Keep examples realistic and working.
+  - Write for maintainers six months later.
+  - Place docs close to the code and maintain consistent terminology.
+  - Document major features, complex algorithms, integration points, and performance-critical paths.
+  - Avoid corporate bloat, overengineering, and useless boilerplate.
 </Generating Documentation>
 
 <Testing>
-- Test functions without external effects when possible; if testing is impossible, validate code correctness manually.
+- Test functions without external effects when possible.
+- If testing is impossible, validate correctness manually.
 - Consider Test Driven Development for robust software development.
-- Create ephemeral tests to validate features and implementations. Iterate until expected results, then remove temporary tests.
+- Create ephemeral tests to validate features and implementations, iterate until they behave as expected, then remove those temporary tests.
 </Testing>
 
 <features_yaml_operations>
@@ -71,13 +67,13 @@ We are working at a lean startup, maintained by a small team of 10x engineers, n
 
 Optional fields: `discovered_from`, `spec_file`, or custom metadata as needed.
 
-When `features.yaml` exists, avoid reading the full file into context—it may contain hundreds of entries. Use `yq` for lightweight extraction:
+When `features.yaml` exists, avoid reading the full file into context. It may contain hundreds of entries. Use `yq` for lightweight extraction:
 
-- Extract specific fields (epic prefixes, status counts, recent by created_at)
-- Filter to relevant subset before reading details
-- Update in-place with `yq -i` rather than read-modify-write in context
+- Extract specific fields, such as epic prefixes, status counts, or recent items by `created_at`.
+- Filter to the relevant subset before reading details.
+- Update in place with `yq -i` rather than read-modify-write in context.
 
-Note: features.yaml is a root-level sequence `- {...}`, not wrapped in a mapping.
+Note: `features.yaml` is a root-level sequence `- {...}`, not wrapped in a mapping.
 
 For in-place updates, use: `yq -i '.expression' features.yaml`
 
