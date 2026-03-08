@@ -29,13 +29,17 @@ SafeYAMLLoader.yaml_implicit_resolvers = {
 # Field order for consistent YAML output
 FIELD_ORDER = [
     'id', 'epic', 'status', 'title', 'description', 'steps',
-    'priority', 'depends_on', 'discovered_from', 'spec_file',
+    'priority', 'depends_on', 'discovered_from', 'plan_file',
     'notes', 'created_at',
 ]
 
 
 def ordered_feature(feat: dict) -> dict:
     """Return feature dict with fields in canonical order."""
+    feat = dict(feat)
+    if 'plan_file' not in feat and 'spec_file' in feat:
+        feat['plan_file'] = feat.pop('spec_file')
+
     result = {}
     for key in FIELD_ORDER:
         if key in feat:

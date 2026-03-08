@@ -9,6 +9,8 @@ Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex
 
 Given the ticket request(s): **$1**, add one or more feature entries to `features.yaml`.
 
+This is the canonical workflow for ticket creation. Other skills should invoke `ticket-init` when they need to register tracked work, instead of restating ticket-creation steps inline.
+
 ### 0. Normalize Input
 
 - If `$1` contains ` || `, split into multiple ticket requests.
@@ -47,14 +49,15 @@ $SKILLS_ROOT/_lib/feature_id.sh features.yaml "$EPIC"
   priority: 2
   depends_on: []
   discovered_from: null
-  spec_file: null
+  plan_file: null
+  references: []
   created_at: YYYY-MM-DD
 ```
 
 Priority: `1`=foundation, `2`=core (default), `3`=polish — adjust if obvious from context.
 
 ```bash
-yq -i '. += [{"id": "...", "epic": "...", "status": "pending", "title": "...", "description": "...", "priority": 2, "depends_on": [], "discovered_from": null, "spec_file": null, "created_at": "YYYY-MM-DD"}]' features.yaml
+yq -i '. += [{"id": "...", "epic": "...", "status": "pending", "title": "...", "description": "...", "priority": 2, "depends_on": [], "discovered_from": null, "plan_file": null, "references": [], "created_at": "YYYY-MM-DD"}]' features.yaml
 ```
 
 ### 4. Report

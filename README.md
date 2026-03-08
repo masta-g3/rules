@@ -22,7 +22,7 @@ For projects with backlog tracking via `features.yaml`:
 
 `project-init` → `next-feature` → `plan-md` → `execute` → `commit`
 
-Plan file name carries state: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone.
+Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone. Creating a plan keeps tracked work `pending`; `execute` moves it to `in_progress`.
 
 ## Skills
 
@@ -118,21 +118,28 @@ fv                    # Project view (./features.yaml in current dir)
     - Add validation
     - Connect API
   created_at: 2024-01-15
-  spec_file: docs/plans/auth-001.md
+  plan_file: docs/plans/auth-001.md
+  references:
+    - docs/plans/auth-000.md
   discovered_from: null
   notes: null
 ```
 
-**Required:** `id`, `status`
+**Minimal required:** `id`, `status`
+
+**Common tracked-ticket fields:** `epic`, `description`, `priority`, `depends_on`, `created_at`
+
+**Optional fields:** `title`, `steps`, `discovered_from`, `plan_file`, `references`, `completed_at`, plus custom metadata when needed
 
 **Status values:** `pending` → `in_progress` → `done` (or `abandoned`, `superseded`)
 
 **Key fields:**
 - **epic**: Groups related features (e.g., "auth", "payments")
-- **depends_on**: Feature is "ready" when all deps are done or in progress
+- **depends_on**: Feature is "ready" when all deps are done
 - **steps**: Implementation checklist
 - **discovered_from**: Links emergent work to parent feature
-- **spec_file**: Path to implementation plan
+- **plan_file**: Path to the ticket's own plan or archived plan summary
+- **references**: Optional shared context docs such as epic, design, or vision docs
 
 ## Setup
 

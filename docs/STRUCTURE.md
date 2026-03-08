@@ -44,10 +44,10 @@ rules/
 
 Projects track work in `features.yaml`:
 ```
-[feature] → plan-md → [plan.md] → execute → commit → [done]
+[pending feature] → plan-md → [plan.md] → execute → [in_progress] → commit → [done]
 ```
 
-Features have: id, status, epic, dependencies, priority, steps.
+Features have: id, status, epic, depends_on, priority, and optional planning references such as `plan_file` and `references`.
 
 ### Skill Chain
 

@@ -13,12 +13,10 @@ Given the request: **$1**, create and maintain a detailed Markdown implementatio
 Store plans in `docs/plans/`:
 
 - **If input is a feature ID** (e.g., `auth-001: description`): use that ID → `auth-001.md`
-- **If `features.yaml` exists** and input isn't an ID: register the feature inline —
-  1. Extract existing epic prefixes: `yq '.[].id | sub("-[0-9]+$", "")' features.yaml | sort -u`
-  2. Match the request to an existing epic, or create a new prefix if none fits. If ambiguous, ask the user.
-  3. Generate the next ID: `$SKILLS_ROOT/_lib/feature_id.sh features.yaml "$EPIC"`
-  4. Append to features.yaml via `yq -i` with all required fields (id, epic, status: "in_progress", title, description, priority: 2, depends_on: [], spec_file: "docs/plans/{id}.md", created_at: today)
-  → `{new-id}.md`
+- **If `features.yaml` exists** and input is not already a tracked feature ID: create the ticket first via `ticket-init`, then plan against the returned ID.
+  - Only do this when a new tracked ticket is actually needed.
+  - Do not restate epic matching, ID generation, or append mechanics here; `ticket-init` owns that workflow.
+  - After ticket creation, set the feature's `plan_file` to `docs/plans/{id}.md` if needed, then write the plan there.
 - **Otherwise**: standalone mode → `FEATURE_NAME.md`
 
 ### Clarify Before Planning
@@ -60,9 +58,11 @@ Keep it lean—only what's needed to start confidently.
 
 Don't execute on this plan yet; the user will provide feedback and finally approve. Keep scope limited to the feature request (especially when working with `features.yaml`).
 
-### Mark Feature Active
+### Preserve Pending Status
 
-**If plan file is named `{epic}-{nnn}.md` (tracked feature):** set its `status` to `"in_progress"` via yq. A finished plan is a commitment artifact—the feature is no longer pending.
+**If plan file is named `{epic}-{nnn}.md` (tracked feature):** keep its `status` as `"pending"`. Planning prepares implementation but does not activate the work; `execute` owns the `pending` → `in_progress` transition.
+
+If the work already has a tracked ticket, plan against it directly and do not load `ticket-init`.
 
 ### Plan Review (Non-Trivial Plans Only)
 

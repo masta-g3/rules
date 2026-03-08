@@ -64,7 +64,9 @@ We are working at a lean startup, maintained by a small team of 10x engineers, n
   completed_at: null  # set on terminal status
 ```
 
-Optional fields: `discovered_from`, `spec_file`, or custom metadata as needed.
+Optional fields: `discovered_from`, `plan_file`, `references`, or custom metadata as needed.
+
+Common tracked-ticket fields beyond the minimal schema are `epic`, `description`, `priority`, `depends_on`, and `created_at`.
 
 When `features.yaml` exists, avoid reading the full file into context. It may contain hundreds of entries. Use `yq` for lightweight extraction:
 

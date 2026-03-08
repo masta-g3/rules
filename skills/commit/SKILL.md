@@ -21,17 +21,15 @@ Check modified files for:
 
 If a markdown planning file exists for this work, archive it:
 
-1. Run `$SKILLS_ROOT/commit/scripts/archive_plan.sh <plan-file>` — this copies the plan to `docs/history/{yyyymmdd}_{basename}.md`
-2. Rename the archive to include a descriptive suffix: `docs/history/yyyymmdd_{feature-id}_{short_desc}.md` (e.g., `20241201_auth-001_user_signup.md`). Keep `{short_desc}` to 2-4 words, snake_case. The feature ID enables visual epic grouping when scanning the directory.
-3. Delete the original planning file from `docs/plans/`
-
-Transform into permanent spec: remove implementation details, keep completed checklist as summary.
+1. Run `$SKILLS_ROOT/commit/scripts/archive_plan.sh <plan-file> <short-desc>` — this moves the plan into `docs/history/` using the final dated descriptive filename, removes the original from `docs/plans/`, and returns the final archive path.
+2. Use a short snake_case description with 2-4 words, for example `user_signup`, so the final path looks like `docs/history/yyyymmdd_{feature-id}_{short_desc}.md`.
+3. Compact the archived markdown into its durable summary/spec form: remove implementation-heavy detail, keep the completed outcome and checklist summary.
 
 ### Update features.yaml
 
 Update features.yaml (if tracked feature):
 
-Run `$SKILLS_ROOT/commit/scripts/mark_done.sh <feature-id> <archive-path>` — this sets `status` to `"done"`, `completed_at` to today's date, and `spec_file` to the archive path.
+Run `$SKILLS_ROOT/commit/scripts/mark_done.sh <feature-id> <archive-path>` — this sets `status` to `"done"`, `completed_at` to today's date, and `plan_file` to the archive path.
 
 Verify any discovered items are properly logged in features.yaml.
 

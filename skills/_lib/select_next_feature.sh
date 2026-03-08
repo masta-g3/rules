@@ -33,7 +33,7 @@ RESULT=$(echo "$JSON" | jq -r "
 # 2) Fallback: first unblocked pending feature
 if [[ "$RESULT" == "null" ]]; then
   RESULT=$(echo "$JSON" | jq -r "
-    ([.[] | select(.status == \"done\" or .status == \"in_progress\") | .id]) as \$resolved |
+    ([.[] | select(.status == \"done\") | .id]) as \$resolved |
     [.[] | select(
       .status == \"pending\" $epic_test and
       ((.depends_on // []) | all(. as \$dep | \$resolved | any(. == \$dep)))
@@ -48,7 +48,7 @@ if [[ "$RESULT" == "null" ]]; then
   fi
   PENDING=$(echo "$JSON" | jq '[.[] | select(.status == "pending")] | length')
   BLOCKED=$(echo "$JSON" | jq "
-    ([.[] | select(.status == \"done\" or .status == \"in_progress\") | .id]) as \$resolved |
+    ([.[] | select(.status == \"done\") | .id]) as \$resolved |
     [.[] | select(
       .status == \"pending\" and
       ((.depends_on // []) | any(. as \$dep | \$resolved | all(. != \$dep)))

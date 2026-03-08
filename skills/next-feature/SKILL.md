@@ -9,16 +9,17 @@ Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex
 ### 1. Review State
 
 - Run `git log --oneline -10` to understand recent work
-- Run `$SKILLS_ROOT/_lib/select_next_feature.sh features.yaml` to find the next ready feature
+- Run `$SKILLS_ROOT/_lib/select_next_feature.sh features.yaml` to find the next actionable feature
 - Read `docs/STRUCTURE.md` only if feature context is unclear
 
 ### 2. Select Feature
 
-Identify **ready** features—those where:
-- `status` is `"pending"`
-- All IDs in `depends_on` have `status: "done"` or `"in_progress"`
+Selection behavior:
 
-From ready features:
+1. If any feature is already `in_progress`, resume the highest-priority active item first.
+2. Otherwise, identify **ready** `pending` features—those where all IDs in `depends_on` have `status: "done"`.
+
+From ready `pending` features:
 1. Prefer highest priority (1 before 2 before 3)
 2. If tied, prefer earlier `created_at`, then earlier ID
 
@@ -30,7 +31,7 @@ If no features are ready:
 Report selection briefly and to the point, without much extra comment:
 
 ```
-NEXT FEATURE: [id]
+NEXT FEATURE: [id] ([status])
 Description: [description]
 Priority: [priority]
 Dependencies: [list or "none"]

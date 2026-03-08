@@ -257,7 +257,7 @@ class Feature:
     depends_on: list[str] = field(default_factory=list)
     priority: int | None = None
     created_at: str | None = None
-    spec_file: str | None = None
+    plan_file: str | None = None
     steps: list[str] = field(default_factory=list)
     discovered_from: str | None = None
     notes: str | None = None
@@ -279,7 +279,7 @@ class Feature:
             depends_on=d.get('depends_on', []),
             priority=priority,
             created_at=d.get('created_at'),
-            spec_file=d.get('spec_file'),
+            plan_file=d.get('plan_file') or d.get('spec_file'),
             steps=d.get('steps', []),
             discovered_from=d.get('discovered_from'),
             notes=d.get('notes'),
@@ -1194,8 +1194,8 @@ def view_feature(model: Model, feature_id: str, width: int, height: int) -> list
         lines.append(f"  {'Priority':<12}  {feat.priority} ({prio_label})")
     if feat.created_at:
         lines.append(f"  {'Created':<12}  {feat.created_at}")
-    if feat.spec_file:
-        lines.append(f"  {'Spec':<12}  {ansi(feat.spec_file, COLOR_MUTED)}")
+    if feat.plan_file:
+        lines.append(f"  {'Plan':<12}  {ansi(feat.plan_file, COLOR_MUTED)}")
 
     lines.append('')
     lines.append(section_header('DEPENDENCIES', inner))
@@ -2382,7 +2382,7 @@ def save_features(project: 'ProjectSummary') -> bool:
     for feat in model.features.values():
         item = {'id': feat.id, 'status': feat.status}
         for attr in ['title', 'description', 'epic', 'depends_on', 'priority',
-                     'created_at', 'spec_file', 'steps', 'discovered_from', 'notes']:
+                     'created_at', 'plan_file', 'steps', 'discovered_from', 'notes']:
             val = getattr(feat, attr, None)
             if val is not None:
                 item[attr] = val

@@ -26,22 +26,28 @@ Think through: foundation → core functionality → integration → polish. Fol
 
 ### 2. Create Epic Doc
 
-Write `docs/plans/{prefix}-000.md` — the durable context for the epic. Keep it under ~20 lines: one-line goal, scope boundaries, key constraints/decisions, and a list of planned feature IDs with one-line descriptions. Features reference this as their `spec_file`.
+Write `docs/plans/{prefix}-000.md` — the durable context for the epic. Keep it under ~20 lines: one-line goal, scope boundaries, key constraints/decisions, and a list of planned feature IDs with one-line descriptions. Features reference this in `references`; it is shared context, not the ticket's own `plan_file`.
 
 ### 3. Generate Features
 
 Choose a short, descriptive epic prefix (e.g., `auth`, `cart`, `notif`, `dash`). If `features.yaml` exists, extract existing prefixes via yq—extend an existing epic if this work belongs there, otherwise create a new prefix.
 
-Generate sequential IDs within the epic using:
-```bash
-$SKILLS_ROOT/_lib/feature_id.sh features.yaml "$EPIC"
-```
+For each planned child feature, register the ticket through `ticket-init` rather than recreating the ticket-creation workflow here.
 
-Create or append to `features.yaml` with entries following this schema:
+- Use the chosen epic prefix in the ticket request so `ticket-init` creates IDs in the intended epic.
+- You may batch creation if that keeps the decomposition clear.
+- After ticket creation, update the created records with the decomposition-specific fields that `epic-init` owns:
+  - `steps`
+  - `priority`
+  - `depends_on`
+  - `references`
+
+Target feature shape after registration and enrichment:
 
 ```yaml
 - id: "{epic}-{nnn}"
   epic: "{epic}"
+  title: "{concise feature title}"
   description: "User can [action] with [context]"
   steps:
     - "Step to verify feature works"
@@ -51,12 +57,15 @@ Create or append to `features.yaml` with entries following this schema:
   depends_on:
     - epic-001
   discovered_from: null
-  spec_file: "docs/plans/{epic}-000.md"
+  plan_file: null
+  references:
+    - "docs/plans/{epic}-000.md"
   created_at: YYYY-MM-DD
 ```
 
 Requirements:
 - IDs sequential within epic (`sync-001`, `sync-002`, ...)
+- Titles are concise and scan well in backlog views
 - Descriptions are action-oriented and testable
 - Steps are concrete verification instructions
 - Priority: 1=foundation, 2=core, 3=polish
@@ -64,11 +73,7 @@ Requirements:
 - `depends_on` explicitly lists blocking feature IDs
 - `created_at` set to today's date
 
-**If appending to existing `features.yaml`:**
-Use yq to append without reading full file into context:
-```bash
-yq -i '. += [<new_features>]' features.yaml
-```
+Do not restate the ticket-creation mechanics here. `ticket-init` owns epic matching, ID generation, and initial append behavior.
 
 ### 4. Report to User
 
