@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Parse --id flag (bare ID output for machine consumers)
 ID_ONLY=false
+MAX_READY_OPTIONS=3
 if [[ "${1:-}" == "--id" ]]; then
   ID_ONLY=true
   shift
@@ -20,58 +21,87 @@ if [[ ! -f "$FEATURES_FILE" ]]; then
 fi
 
 JSON=$(yq -o=json "$FEATURES_FILE")
-
-epic_test=""
-[[ -n "$EPIC_FILTER" ]] && epic_test="and (.id | test(\"^${EPIC_FILTER}-\"))"
-
-# 1) First try: in_progress feature (resume active work)
-RESULT=$(echo "$JSON" | jq -r "
-  [.[] | select(.status == \"in_progress\" $epic_test)] |
-  sort_by(.priority, .created_at, .id) | .[0] // null
-")
-
-# 2) Fallback: first unblocked pending feature
-if [[ "$RESULT" == "null" ]]; then
-  RESULT=$(echo "$JSON" | jq -r "
-    ([.[] | select(.status == \"done\") | .id]) as \$resolved |
-    [.[] | select(
-      .status == \"pending\" $epic_test and
-      ((.depends_on // []) | all(. as \$dep | \$resolved | any(. == \$dep)))
-    )] |
-    sort_by(.priority, .created_at, .id) | .[0] // null
-  ")
+EPIC_CONTEXT="all features"
+if [[ -n "$EPIC_FILTER" ]]; then
+  EPIC_CONTEXT="epic ${EPIC_FILTER}"
 fi
 
-if [[ "$RESULT" == "null" ]]; then
+IN_PROGRESS_JSON=$(printf '%s\n' "$JSON" | jq -c --arg epic "$EPIC_FILTER" '
+  [.[] | select(
+    .status == "in_progress" and
+    ($epic == "" or (.id | test("^" + $epic + "-")))
+  )] |
+  sort_by(.priority, .created_at, .id)
+')
+
+READY_PENDING_JSON=$(printf '%s\n' "$JSON" | jq -c --arg epic "$EPIC_FILTER" '
+  ([.[] | select(.status == "done") | .id]) as $resolved |
+  [.[] | select(
+    .status == "pending" and
+    ($epic == "" or (.id | test("^" + $epic + "-"))) and
+    ((.depends_on // []) | all(. as $dep | $resolved | any(. == $dep)))
+  )] |
+  sort_by(.priority, .created_at, .id)
+')
+
+RECOMMENDED_JSON=$(jq -cn \
+  --argjson in_progress "$IN_PROGRESS_JSON" \
+  --argjson ready "$READY_PENDING_JSON" \
+  '$in_progress[0] // $ready[0] // null')
+
+if [[ "$RECOMMENDED_JSON" == "null" ]]; then
   if $ID_ONLY; then
     exit 1
   fi
-  PENDING=$(echo "$JSON" | jq '[.[] | select(.status == "pending")] | length')
-  BLOCKED=$(echo "$JSON" | jq "
-    ([.[] | select(.status == \"done\") | .id]) as \$resolved |
+  PENDING=$(printf '%s\n' "$JSON" | jq --arg epic "$EPIC_FILTER" '
     [.[] | select(
-      .status == \"pending\" and
-      ((.depends_on // []) | any(. as \$dep | \$resolved | all(. != \$dep)))
+      .status == "pending" and
+      ($epic == "" or (.id | test("^" + $epic + "-")))
     )] | length
-  ")
-  echo "No ready features. ${PENDING} pending, ${BLOCKED} blocked by unresolved dependencies."
+  ')
+  BLOCKED=$(printf '%s\n' "$JSON" | jq --arg epic "$EPIC_FILTER" '
+    ([.[] | select(.status == "done") | .id]) as $resolved |
+    [.[] | select(
+      .status == "pending" and
+      ($epic == "" or (.id | test("^" + $epic + "-"))) and
+      ((.depends_on // []) | any(. as $dep | $resolved | all(. != $dep)))
+    )] | length
+  ')
+  echo "No ready features in ${EPIC_CONTEXT}. ${PENDING} pending, ${BLOCKED} blocked by unresolved dependencies."
   exit 0
 fi
 
-ID=$(echo "$RESULT" | jq -r '.id')
+ID=$(printf '%s\n' "$RECOMMENDED_JSON" | jq -r '.id')
 
 if $ID_ONLY; then
   echo "$ID"
   exit 0
 fi
 
-DESC=$(echo "$RESULT" | jq -r '.description')
-PRIO=$(echo "$RESULT" | jq -r '.priority')
-STATUS=$(echo "$RESULT" | jq -r '.status')
-DEPS=$(echo "$RESULT" | jq -r '(.depends_on // []) | if length == 0 then "none" else join(", ") end')
+echo "IN PROGRESS"
+if [[ "$(printf '%s\n' "$IN_PROGRESS_JSON" | jq 'length')" -eq 0 ]]; then
+  echo "none"
+else
+  printf '%s\n' "$IN_PROGRESS_JSON" | jq -r '
+    .[] |
+    "- \(.id) (priority \((.priority // "-"))): \(.description // .title // "(no description)")"
+  '
+fi
 
-echo "NEXT FEATURE: ${ID} (${STATUS})"
-echo "Description: ${DESC}"
-echo "Priority: ${PRIO}"
-echo "Dependencies: ${DEPS}"
-echo "Suggested plan file: ${ID}.md"
+echo
+echo "READY OPTIONS"
+if [[ "$(printf '%s\n' "$READY_PENDING_JSON" | jq 'length')" -eq 0 ]]; then
+  echo "none"
+else
+  printf '%s\n' "$READY_PENDING_JSON" | jq -r --argjson max "$MAX_READY_OPTIONS" '
+    to_entries |
+    .[:$max] |
+    .[] |
+    "\(.key + 1). \(.value.id) (priority \((.value.priority // "-")), deps: \(((.value.depends_on // []) | if length == 0 then "none" else join(", ") end)))\n   \(.value.description // .value.title // "(no description)")"
+  '
+fi
+
+echo
+echo "RECOMMENDED NEXT"
+echo "$ID"
+echo "Suggested plan file: docs/plans/${ID}.md"

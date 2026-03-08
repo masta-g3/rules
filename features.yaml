@@ -180,11 +180,12 @@
   completed_at: "2026-03-07"
 - id: skill-003
   epic: skill
-  status: pending
+  status: done
   title: Improve next-feature output
   description: Show current in-progress features and a small set of next ready pending options in next-feature instead of a single rigid selection.
   priority: 2
   depends_on: []
   discovered_from: null
   created_at: "2026-03-07"
-  plan_file: null
+  plan_file: docs/history/20260308_skill-003_next_feature_output.md
+  completed_at: "2026-03-08"

@@ -28,14 +28,28 @@ If no features are ready:
 - Check for blocked prerequisites
 - Report situation to user; do not guess
 
-Report selection briefly and to the point, without much extra comment:
+Report the current active work plus a small set of next ready options. Keep it brief and to the point.
+
+Default helper output now has three sections:
 
 ```
-NEXT FEATURE: [id] ([status])
-Description: [description]
-Priority: [priority]
-Dependencies: [list or "none"]
-Suggested plan file: [id].md
+IN PROGRESS
+- [id] (priority [n]): [description]
+
+READY OPTIONS
+1. [id] (priority [n], deps: [list or "none"])
+   [description]
+
+RECOMMENDED NEXT
+[id]
+Suggested plan file: docs/plans/[id].md
 ```
+
+Rules:
+
+- `IN PROGRESS` lists all active tracked features in the same order used for recommendation.
+- `READY OPTIONS` lists up to the top few ready `pending` features by the same priority and tie-break rules as selection.
+- `RECOMMENDED NEXT` remains the single canonical next item.
+- If nothing is actionable, report the no-ready situation instead of inventing a recommendation.
 
 **Do not modify features.yaml.** Status changes happen in execute/commit.
