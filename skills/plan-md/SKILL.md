@@ -21,7 +21,7 @@ Store plans in `docs/plans/`:
 
 ### Clarify Before Planning
 
-If unclear on scope, requirements, or constraints—ask the user before creating the plan (you can use the AskUserQuestion tool for this if available). Resolve what you can via codebase context and reasonable assumptions, but ask when genuinely needed.
+If unclear on scope, requirements, or constraints, ask the user before creating the plan. Resolve what you can via codebase context and reasonable assumptions, but ask when genuinely needed.
 
 ### Context Files
 
@@ -66,4 +66,4 @@ If the work already has a tracked ticket, plan against it directly and do not lo
 
 ### Plan Review (Non-Trivial Plans Only)
 
-For plans involving architectural decisions, multi-file changes, or complex logic: invoke the **plan-critic** subagent via Task tool to review. Skip for trivial edits. Address valid concerns; ignore suggestions that add bloat.
+For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** reviewer subagent. Skip for trivial edits. Address valid concerns; ignore suggestions that add bloat.

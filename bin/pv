@@ -45,6 +45,7 @@ from typing import Any
 BACKLOG_FILE = 'features.yaml'
 
 ANSI_ESCAPE = re.compile(r'\033\[[0-9;]*m')
+ENABLE_ANSI = sys.stdout.isatty()
 
 
 # Custom loader: prevents PyYAML from parsing dates as datetime.date.
@@ -129,7 +130,7 @@ CREATION_FIELDS_EPIC = ['name']
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def ansi(text: str, color: int | None = None, bold: bool = False, dim: bool = False) -> str:
-    if not (color or bold or dim):
+    if not ENABLE_ANSI or not (color or bold or dim):
         return text
     codes = []
     if bold:

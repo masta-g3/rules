@@ -9,7 +9,7 @@ Given the project request: **$1**, set up the foundation for multi-session devel
 
 ### Clarify Before Scaffolding
 
-Ensure you understand the user's vision before making architectural decisions—what problem it solves, who it's for, any tech preferences or constraints. Ask clarifying questions if needed (you can use the AskUserQuestion tool for this if available). Early architectural decisions are costly to change.
+Ensure you understand the user's vision before making architectural decisions—what problem it solves, who it's for, and any tech preferences or constraints. Ask clarifying questions if needed. Early architectural decisions are costly to change.
 
 ### 1. Create Project Structure
 

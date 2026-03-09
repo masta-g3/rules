@@ -31,7 +31,7 @@ Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked f
 | `skills/autopilot` | Experimental standalone prompt for autonomous feature cycles (Claude Code) |
 | `skills/project-init` | Initialize project with features.yaml |
 | `skills/epic-init` | Initialize new epic with features |
-| `skills/ticket-init` | Add a single ticket to features.yaml |
+| `skills/ticket-init` | Add one or more tickets to features.yaml |
 | `skills/next-feature` | Select next ready feature |
 | `skills/prime` | Context prime: structure docs, git history |
 | `skills/plan-md` | Create implementation plan |
@@ -144,8 +144,12 @@ fv                    # Project view (./features.yaml in current dir)
 ## Setup
 
 ```bash
-./sync-prompts.sh   # copies skills to ~/.claude, ~/.codex, ~/.cursor
+./sync-prompts.sh            # copies skills to ~/.claude, ~/.codex, ~/.cursor
+./sync-prompts.sh --clean    # also removes stale synced files
+./sync-prompts.sh --silent   # suppresses the sync summary
 ```
+
+If `~/.claude/settings.json` exists, sync also refreshes the Claude statusline command.
 
 See `AGENTS.md` for coding style and behavioral guidelines.
 See `docs/STRUCTURE.md` for project architecture.

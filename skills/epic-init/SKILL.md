@@ -11,7 +11,7 @@ Given the epic request: **$1**, break it down into trackable sub-features for mu
 
 ### Clarify Before Decomposing
 
-If the epic scope, boundaries, or constraints are unclear, ambiguous or too broad—ask the user before proceeding (you can use the AskUserQuestion tool for this if available). Decomposition errors are costly to fix later.
+If the epic scope, boundaries, or constraints are unclear, ambiguous, or too broad, ask the user before proceeding. Decomposition errors are costly to fix later.
 
 ### 1. Decompose Epic
 

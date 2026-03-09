@@ -7,7 +7,7 @@ Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex
 
 ### Code Review (Non-Trivial Changes Only)
 
-For changes involving multiple files or significant logic: invoke the **code-critic** subagent via Task tool to review modified files. Skip for trivial edits (typos, single-line fixes). Address valid concerns before continuing.
+For changes involving multiple files or significant logic, invoke the **code-critic** reviewer subagent to review modified files. Skip for trivial edits (typos, single-line fixes). Address valid concerns before continuing.
 
 ### Verify Clean State
 

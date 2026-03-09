@@ -15,5 +15,10 @@ mkdir -p docs/history
 
 TARGET="docs/history/${TODAY}_${BASENAME}_${SHORT_DESC}.md"
 
+if [[ -e "$TARGET" ]]; then
+  echo "archive target already exists: $TARGET" >&2
+  exit 1
+fi
+
 mv "$PLAN_FILE" "$TARGET"
 echo "$TARGET"

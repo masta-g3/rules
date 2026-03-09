@@ -10,6 +10,11 @@ if [[ -z "$FEATURE_ID" || -z "$PLAN_FILE" ]]; then
   exit 1
 fi
 
+if [[ ! -f "$PLAN_FILE" ]]; then
+  echo "archive file not found: $PLAN_FILE" >&2
+  exit 1
+fi
+
 if [[ ! -f "$FEATURES_FILE" ]]; then
   echo "features file not found: $FEATURES_FILE" >&2
   exit 1

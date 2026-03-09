@@ -51,7 +51,7 @@ If the work touches UI or UX, follow the design principles and best practices of
 
 ### Functional Testing (Complex User-Facing Features Only)
 
-For substantial features where users interact directly—new UI flows, API endpoints, database schemas with user-visible impact, interactive elements (games, editors, etc.): invoke a testing subagent via Task tool to verify end-to-end behavior.
+For substantial features where users interact directly—new UI flows, API endpoints, database schemas with user-visible impact, interactive elements (games, editors, etc.)—invoke a testing subagent to verify end-to-end behavior.
 
 Test as a user would:
 - UI: browser automation to walk through flows

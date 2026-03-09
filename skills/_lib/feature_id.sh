@@ -9,7 +9,13 @@ if [[ -z "$EPIC" ]]; then
   exit 1
 fi
 
-MAX_ID=$(yq '.[].id' "$FEATURES_FILE" | rg "^${EPIC}-[0-9]+$" | sed "s/^${EPIC}-//" | sort -n | tail -1 || true)
+if [[ ! -f "$FEATURES_FILE" ]]; then
+  echo "features file not found: $FEATURES_FILE" >&2
+  exit 1
+fi
+
+IDS=$(yq '.[].id' "$FEATURES_FILE")
+MAX_ID=$(printf '%s\n' "$IDS" | rg "^${EPIC}-[0-9]+$" | sed "s/^${EPIC}-//" | sort -n | tail -1 || true)
 if [[ -z "$MAX_ID" ]]; then
   MAX_ID=0
 fi

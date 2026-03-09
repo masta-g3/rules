@@ -24,8 +24,8 @@ From ready `pending` features:
 2. If tied, prefer earlier `created_at`, then earlier ID
 
 If no features are ready:
-- Check for circular dependencies (report to user, don't auto-resolve)
 - Check for blocked prerequisites
+- If a dependency cycle is suspected, inspect it manually and report it to the user; do not auto-resolve
 - Report situation to user; do not guess
 
 Report the current active work plus a small set of next ready options. Keep it brief and to the point.
@@ -50,6 +50,6 @@ Rules:
 - `IN PROGRESS` lists all active tracked features in the same order used for recommendation.
 - `READY OPTIONS` lists up to the top few ready `pending` features by the same priority and tie-break rules as selection.
 - `RECOMMENDED NEXT` remains the single canonical next item.
-- If nothing is actionable, report the no-ready situation instead of inventing a recommendation.
+- If nothing is actionable, report the no-ready situation and include the first few blocked items with unmet dependencies instead of inventing a recommendation.
 
 **Do not modify features.yaml.** Status changes happen in execute/commit.

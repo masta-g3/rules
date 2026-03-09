@@ -44,6 +44,20 @@ READY_PENDING_JSON=$(printf '%s\n' "$JSON" | jq -c --arg epic "$EPIC_FILTER" '
   sort_by(.priority, .created_at, .id)
 ')
 
+BLOCKED_PENDING_JSON=$(printf '%s\n' "$JSON" | jq -c --arg epic "$EPIC_FILTER" '
+  ([.[] | select(.status == "done") | .id]) as $resolved |
+  [.[] | select(
+    .status == "pending" and
+    ($epic == "" or (.id | test("^" + $epic + "-")))
+  ) |
+    . + {
+      missing_deps: ((.depends_on // []) | map(select(. as $dep | $resolved | all(. != $dep))))
+    }
+  ] |
+  map(select((.missing_deps | length) > 0)) |
+  sort_by(.priority, .created_at, .id)
+')
+
 RECOMMENDED_JSON=$(jq -cn \
   --argjson in_progress "$IN_PROGRESS_JSON" \
   --argjson ready "$READY_PENDING_JSON" \
@@ -59,15 +73,22 @@ if [[ "$RECOMMENDED_JSON" == "null" ]]; then
       ($epic == "" or (.id | test("^" + $epic + "-")))
     )] | length
   ')
-  BLOCKED=$(printf '%s\n' "$JSON" | jq --arg epic "$EPIC_FILTER" '
-    ([.[] | select(.status == "done") | .id]) as $resolved |
-    [.[] | select(
-      .status == "pending" and
-      ($epic == "" or (.id | test("^" + $epic + "-"))) and
-      ((.depends_on // []) | any(. as $dep | $resolved | all(. != $dep)))
-    )] | length
-  ')
+  BLOCKED=$(printf '%s\n' "$BLOCKED_PENDING_JSON" | jq 'length')
   echo "No ready features in ${EPIC_CONTEXT}. ${PENDING} pending, ${BLOCKED} blocked by unresolved dependencies."
+  if [[ "$BLOCKED" -gt 0 ]]; then
+    echo
+    echo "BLOCKED"
+    printf '%s\n' "$BLOCKED_PENDING_JSON" | jq -r --argjson max "$MAX_READY_OPTIONS" '
+      to_entries |
+      .[:$max] |
+      .[] |
+      "- \(.value.id) -> waiting on \(.value.missing_deps | join(", "))"
+    '
+    REMAINING_BLOCKED=$((BLOCKED - MAX_READY_OPTIONS))
+    if [[ "$REMAINING_BLOCKED" -gt 0 ]]; then
+      echo "... ${REMAINING_BLOCKED} more blocked"
+    fi
+  fi
   exit 0
 fi
 
