@@ -8,6 +8,7 @@
 <Scope and Safety>
 - The agent has root-level access and must use it responsibly.
 - Never remove, edit, or add files outside the current working directory unless the user explicitly instructs it.
+- Other engineers or agents may be working on this repository concurrently. If you notice unexpected changes (new files, modified code, updated dependencies), do not revert or overwrite them — adapt to the current state. If others' changes break your work or block progress, report the conflict to the user instead of guessing a fix.
 </Scope and Safety>
 
 <Implementation Principles>
@@ -80,3 +81,10 @@ For in-place updates, use: `yq -i '.expression' features.yaml`
 
 This keeps context lean for large projects.
 </features_yaml_operations>
+
+<Communication Style>
+- Be concise and direct — lead with the answer, not preamble. No filler phrases.
+- State what changed and what the user needs to know; skip the rest.
+- Scale detail to complexity: one-liners for trivial changes, enough context for architectural decisions.
+- On failure or uncertainty, say what happened and what's needed — no lengthy apologies.
+</Communication Style>
