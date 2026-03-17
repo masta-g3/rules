@@ -69,17 +69,15 @@ Optional fields: `discovered_from`, `plan_file`, `references`, or custom metadat
 
 Common tracked-ticket fields beyond the minimal schema are `epic`, `description`, `priority`, `depends_on`, and `created_at`.
 
-When `features.yaml` exists, avoid reading the full file into context. It may contain hundreds of entries. Use `yq` for lightweight extraction:
+When `features.yaml` exists, avoid reading the full file into context. It may contain hundreds of entries. Prefer the repo-local helper:
 
-- Extract specific fields, such as epic prefixes, status counts, or recent items by `created_at`.
-- Filter to the relevant subset before reading details.
-- Update in place with `yq -i` rather than read-modify-write in context.
+- Use `$SKILLS_ROOT/_lib/features_yaml.sh` for common operations such as listing epics, generating IDs, selecting the next feature, appending entries, or updating status/plan fields.
+- Keep YAML mutations inside the helper instead of ad hoc shell pipelines when possible; this avoids local `yq`/`jq` version drift.
+- If a needed operation is not yet covered by the helper, extract only the minimal subset required before considering direct YAML manipulation.
 
 Note: `features.yaml` is a root-level sequence `- {...}`, not wrapped in a mapping.
 
-For in-place updates, use: `yq -i '.expression' features.yaml`
-
-This keeps context lean for large projects.
+This keeps context lean for large projects while keeping the workflow self-packaged.
 </features_yaml_operations>
 
 <Communication Style>
