@@ -17,7 +17,7 @@ Iterate through each phase incrementally—implement, test, and verify tests pas
 
 Before implementing new functionality, verify that existing features affected by your changes still work. If you discover broken state, report it to the user before proceeding.
 
-**If working on a tracked feature (`{epic}-{nnn}.md`)**: before implementation starts, update that feature's `status` to `"in_progress"` in `features.yaml`. `execute` owns the `pending` → `in_progress` transition.
+**If working on a tracked feature (`{epic}-{nnn}.md`)**: before implementation starts, update that feature's `status` to `"in_progress"` in `features.yaml` with `$SKILLS_ROOT/_lib/features_yaml.sh update "{feature-id}" --json '{"status":"in_progress"}'`. `execute` owns the `pending` → `in_progress` transition.
 
 ### Discovered Work
 
@@ -25,12 +25,12 @@ During implementation, you may encounter sub-tasks not in the original plan.
 
 **If working on a tracked feature (plan file matches `{epic}-{nnn}.md`):**
 1. Check if this work already exists in features.yaml—if so, note the dependency but don't duplicate
-2. If genuinely new, add to features.yaml via yq using the normal `{epic}-{nnn}` ID format:
+2. If genuinely new, add to features.yaml with the repo-local helper using the normal `{epic}-{nnn}` ID format:
    - derive `FEATURE_ID` from the tracked plan filename
    - derive `EPIC` from that ID with `EPIC="${FEATURE_ID%-*}"`
-   - generate the next ID with `$SKILLS_ROOT/_lib/feature_id.sh features.yaml "$EPIC"`
+   - generate the next ID with `$SKILLS_ROOT/_lib/features_yaml.sh next-id "$EPIC"`
    - set `discovered_from` to the parent feature ID
-   - keep `status` as `"pending"`
+   - keep `status` as `"pending"` and append the record with `$SKILLS_ROOT/_lib/features_yaml.sh create --json`
 3. Assess impact:
    - If it blocks current work → pause, work on discovered item first
    - If parallelizable → add to backlog, continue current work

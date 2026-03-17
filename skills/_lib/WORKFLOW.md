@@ -57,7 +57,7 @@ if [[ "$MODE" == "continuous" ]]; then
   EPIC=$(jq -r '.epic' .claude/workflow.json)
 
   # Find next ready feature in epic
-  NEXT_FEATURE=$($SKILLS_ROOT/_lib/select_next_feature.sh --id features.yaml "$EPIC")
+  NEXT_FEATURE=$($SKILLS_ROOT/_lib/features_yaml.sh --file features.yaml --output id next --epic "$EPIC")
 
   if [[ -n "$NEXT_FEATURE" ]]; then
     # Loop back

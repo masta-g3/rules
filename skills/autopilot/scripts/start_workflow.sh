@@ -8,12 +8,12 @@ FEATURES_FILE=${4:-features.yaml}
 WORKFLOW_FILE=${5:-.claude/workflow.json}
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-SELECT_NEXT="${SCRIPT_DIR}/../../_lib/select_next_feature.sh"
+FEATURES_YAML="${SCRIPT_DIR}/../../_lib/features_yaml.sh"
 
 if [[ "$MODE" == "single" ]]; then
   FEATURE="$FEATURE_ARG"
   if [[ -z "$FEATURE" ]]; then
-    FEATURE=$("$SELECT_NEXT" --id "$FEATURES_FILE") || {
+    FEATURE=$("$FEATURES_YAML" --file "$FEATURES_FILE" --output id next) || {
       echo "AUTOPILOT EXCEPTION: no_ready_features" >&2; exit 2
     }
   fi
@@ -25,13 +25,13 @@ fi
 
 EPIC="$EPIC_ARG"
 if [[ -z "$EPIC" ]]; then
-  FIRST=$("$SELECT_NEXT" --id "$FEATURES_FILE") || {
+  FIRST=$("$FEATURES_YAML" --file "$FEATURES_FILE" --output id next) || {
     echo "AUTOPILOT EXCEPTION: no_ready_features" >&2; exit 2
   }
   EPIC=$(echo "$FIRST" | sed 's/-[0-9]*$//')
 fi
 
-FEATURE=$("$SELECT_NEXT" --id "$FEATURES_FILE" "$EPIC") || {
+FEATURE=$("$FEATURES_YAML" --file "$FEATURES_FILE" --output id next --epic "$EPIC") || {
   echo "AUTOPILOT EXCEPTION: no_ready_features in epic ${EPIC}" >&2; exit 2
 }
 

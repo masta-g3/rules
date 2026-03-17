@@ -1,5 +1,7 @@
 # Non-Experimental Tooling Assessment
 
+Note: this audit predates the consolidated `skills/_lib/features_yaml.sh` CLI introduced later. References to `feature_id.sh`, `select_next_feature.sh`, and `mark_done.sh` are historical and now map to `next-id`, `next`, and `complete`.
+
 Audit scope: active workflow skills, deterministic helper scripts, deployment/install scripts, and the `pv` CLI.
 
 Excluded on purpose: `skills/autopilot`, `skills/_lib/WORKFLOW.md`, `skills/_lib/FILE_LOCK.md`, `skills/_lib/workflow_state.sh`, and `skills/_lib/file_lock.sh`.

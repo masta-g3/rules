@@ -30,7 +30,7 @@ Write `docs/plans/{prefix}-000.md` — the durable context for the epic. Keep it
 
 ### 3. Generate Features
 
-Choose a short, descriptive epic prefix (e.g., `auth`, `cart`, `notif`, `dash`). If `features.yaml` exists, extract existing prefixes via yq—extend an existing epic if this work belongs there, otherwise create a new prefix.
+Choose a short, descriptive epic prefix (e.g., `auth`, `cart`, `notif`, `dash`). If `features.yaml` exists, extract existing prefixes via `$SKILLS_ROOT/_lib/features_yaml.sh epics`—extend an existing epic if this work belongs there, otherwise create a new prefix.
 
 For each planned child feature, register the ticket through `ticket-init` rather than recreating the ticket-creation workflow here.
 

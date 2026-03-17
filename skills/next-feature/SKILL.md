@@ -9,7 +9,7 @@ Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex
 ### 1. Review State
 
 - Run `git log --oneline -10` to understand recent work
-- Run `$SKILLS_ROOT/_lib/select_next_feature.sh features.yaml` to find the next actionable feature
+- Run `$SKILLS_ROOT/_lib/features_yaml.sh next` to find the next actionable feature
 - Read `docs/STRUCTURE.md` only if feature context is unclear
 
 ### 2. Select Feature

@@ -26,14 +26,14 @@ Example multi-ticket input:
 Use the epic if mentioned in the description (e.g., "Auth: fix login bug"). Otherwise, extract existing prefixes and match semantically. If ambiguous or no match, ask the user.
 
 ```bash
-yq '.[].id | sub("-[0-9]+$", "")' features.yaml | sort -u
+$SKILLS_ROOT/_lib/features_yaml.sh epics
 ```
 
 ### 2. Generate ID
 
 For each ticket request, generate the next sequential number within the epic:
 ```bash
-$SKILLS_ROOT/_lib/feature_id.sh features.yaml "$EPIC"
+$SKILLS_ROOT/_lib/features_yaml.sh next-id "$EPIC"
 ```
 
 ### 3. Build & Append
@@ -56,8 +56,9 @@ $SKILLS_ROOT/_lib/feature_id.sh features.yaml "$EPIC"
 
 Priority: `1`=foundation, `2`=core (default), `3`=polish — adjust if obvious from context.
 
+Append with the repo-local helper instead of inline YAML mutation:
 ```bash
-yq -i '. += [{"id": "...", "epic": "...", "status": "pending", "title": "...", "description": "...", "priority": 2, "depends_on": [], "discovered_from": null, "plan_file": null, "references": [], "created_at": "YYYY-MM-DD"}]' features.yaml
+$SKILLS_ROOT/_lib/features_yaml.sh create --json '{"id":"...","epic":"...","status":"pending","title":"...","description":"...","priority":2,"depends_on":[],"discovered_from":null,"plan_file":null,"references":[],"created_at":"YYYY-MM-DD"}'
 ```
 
 ### 4. Report

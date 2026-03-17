@@ -49,6 +49,15 @@ These prompts are kept usable, but they are **not** part of the main workflow an
 
 Use them only when explicitly opting into those experimental flows.
 
+## Shared Helper Tooling
+
+Shared backlog operations live in `skills/_lib/features_yaml.py` and are invoked through the canonical entrypoint `skills/_lib/features_yaml.sh`.
+
+- Purpose: keep `features.yaml` selection and mutation logic packaged with the repo
+- Runtime: `uv` manages the script-local PyYAML dependency
+- Replaces: ad hoc `yq`/`jq` shell snippets for the supported skill workflows
+- Contract: `epics`, `next-id`, `next`, `create`, `update`, `complete`, and `describe`
+
 **Autopilot setup:**
 ```bash
 /path/to/rules/setup-autopilot.sh /your/project

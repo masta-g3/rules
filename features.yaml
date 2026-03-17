@@ -2,57 +2,66 @@
   epic: pv
   status: done
   title: Unified Portfolio & Feature Viewer
-  description: "Merge pv and fv into single TUI with 4-level navigation: Portfolio → Project → Epic → Feature"
+  description: "Merge pv and fv into single TUI with 4-level navigation: Portfolio\
+    \ \u2192 Project \u2192 Epic \u2192 Feature"
   created_at: '2026-01-24'
   plan_file: docs/history/20260124_pv-001_unified_viewer.md
 - id: pv-002
   epic: pv
   status: done
   title: Edit Mode - Add/Delete/Modify Features
-  description: Enable editing features.json from within the TUI. Add/remove/modify tickets, change status, edit fields. Track dirty state and save changes back to file.
+  description: Enable editing features.json from within the TUI. Add/remove/modify
+    tickets, change status, edit fields. Track dirty state and save changes back to
+    file.
   steps:
-    - 'Add mode state: ''navigate'' | ''edit'''
-    - Add 'e' key to enter edit mode on feature view
-    - Implement inline field editing (title, status, description)
-    - Add 'n' key to create new feature in current epic
-    - Add 'd' key to delete feature (with confirmation)
-    - Track dirty flag for unsaved changes
-    - Implement save with 'w' key (write to features.json)
-    - Warn on quit if unsaved changes
+  - 'Add mode state: ''navigate'' | ''edit'''
+  - Add 'e' key to enter edit mode on feature view
+  - Implement inline field editing (title, status, description)
+  - Add 'n' key to create new feature in current epic
+  - Add 'd' key to delete feature (with confirmation)
+  - Track dirty flag for unsaved changes
+  - Implement save with 'w' key (write to features.json)
+  - Warn on quit if unsaved changes
   depends_on:
-    - pv-001
+  - pv-001
   created_at: '2026-01-24'
   plan_file: docs/history/20260124_pv-002_edit_mode.md
 - id: pv-003
   epic: pv
   status: done
   title: Archive Projects via UI
-  description: Add ability to archive completed projects from portfolio view. Archived projects are hidden from default view but preserved. Uses a .archived marker file in project directory to avoid schema changes to features.json.
+  description: Add ability to archive completed projects from portfolio view. Archived
+    projects are hidden from default view but preserved. Uses a .archived marker file
+    in project directory to avoid schema changes to features.json.
   steps:
-    - Detect .archived marker file in scan_projects()
-    - Filter archived projects from default portfolio view
-    - Add toggle to show/hide archived (extend filter modes or separate key)
-    - Add archive action in portfolio view (e.g. A key on selected project)
-    - Create/remove .archived file to toggle state
-    - Add visual indicator for archived projects when shown
+  - Detect .archived marker file in scan_projects()
+  - Filter archived projects from default portfolio view
+  - Add toggle to show/hide archived (extend filter modes or separate key)
+  - Add archive action in portfolio view (e.g. A key on selected project)
+  - Create/remove .archived file to toggle state
+  - Add visual indicator for archived projects when shown
   depends_on:
-    - pv-002
+  - pv-002
   created_at: '2026-01-24'
   plan_file: docs/history/20260125_pv-003_archive_projects.md
 - id: pv-004
   epic: pv
   status: done
   title: Tree View Mode
-  description: "Add collapsible tree view for portfolio-wide visualization with project→epic→feature hierarchy, inline dependency annotations, and search/filter capabilities."
+  description: "Add collapsible tree view for portfolio-wide visualization with project\u2192\
+    epic\u2192feature hierarchy, inline dependency annotations, and search/filter\
+    \ capabilities."
   depends_on:
-    - pv-001
+  - pv-001
   created_at: '2026-01-24'
   plan_file: docs/history/20260124_pv-004_tree_view.md
 - id: pv-005
   epic: pv
   status: done
   title: Unified filter cycling
-  description: "Replace a/z toggle filters with single f key that cycles through filter modes: open → all → active → stalled. Reduces hotkey sprawl and follows existing sort cycle pattern."
+  description: "Replace a/z toggle filters with single f key that cycles through filter\
+    \ modes: open \u2192 all \u2192 active \u2192 stalled. Reduces hotkey sprawl and\
+    \ follows existing sort cycle pattern."
   depends_on: []
   created_at: '2026-01-25'
   plan_file: docs/history/20260125_pv-005_unified_filter.md
@@ -60,14 +69,18 @@
   epic: pv
   status: done
   title: Entity Creation Interface (Features & Epics)
-  description: Add creation functionality for features and epics from both table and tree views. Includes preview-before-commit, AI-agent-friendly operations module, and flash feedback.
+  description: Add creation functionality for features and epics from both table and
+    tree views. Includes preview-before-commit, AI-agent-friendly operations module,
+    and flash feedback.
   created_at: '2026-01-27'
   plan_file: docs/history/20260127_pv-006_entity_creation.md
 - id: pv-007
   epic: pv
   status: done
   title: Homogenize hotkey mappings across pv/fv views
-  description: 'Fix inconsistent hotkey behavior: unify f filter cycling, remove dead a key, separate search nav (^n/^p) from new (n), normalize n for new entities, change M to O for collapse-all'
+  description: 'Fix inconsistent hotkey behavior: unify f filter cycling, remove dead
+    a key, separate search nav (^n/^p) from new (n), normalize n for new entities,
+    change M to O for collapse-all'
   priority: 2
   created_at: '2026-01-27'
   plan_file: docs/history/20260127_pv-007_hotkey_homogenization.md
@@ -75,7 +88,8 @@
   epic: cmd
   status: done
   title: ticket-init command for adding individual features
-  description: Create ticket-init.md slash command that adds single tickets to features.json with optional epic assignment
+  description: Create ticket-init.md slash command that adds single tickets to features.json
+    with optional epic assignment
   priority: 1
   depends_on: []
   created_at: '2026-01-28'
@@ -84,23 +98,26 @@
   epic: cmd
   status: done
   title: File reservation system for parallel agents
-  description: Cooperative file-lock mechanism so multiple agents working on different features can avoid modifying the same file simultaneously. Presence-based toggle via docs/plans/.file-locks.json.
+  description: Cooperative file-lock mechanism so multiple agents working on different
+    features can avoid modifying the same file simultaneously. Presence-based toggle
+    via docs/plans/.file-locks.json.
   steps:
-    - Add reservation protocol to AGENTS.md
-    - Add --parallel flag and conflict check to plan-md.md
-    - Add reserve/release cycle to execute.md
-    - Add cleanup to commit.md
+  - Add reservation protocol to AGENTS.md
+  - Add --parallel flag and conflict check to plan-md.md
+  - Add reserve/release cycle to execute.md
+  - Add cleanup to commit.md
   priority: 2
   depends_on: []
   discovered_from: null
   created_at: '2026-01-30'
-  completed_at: "2026-02-01"
+  completed_at: '2026-02-01'
   plan_file: docs/history/20260130_cmd-002_file_reservations.md
 - id: cmd-003
   epic: cmd
   status: done
   title: Migrate features.json to features.yaml with yq
-  description: Migrate project backlogs from features.json (jq) to features.yaml (yq). Update all commands, AGENTS.md, pv app, docs, and provide migration script.
+  description: Migrate project backlogs from features.json (jq) to features.yaml (yq).
+    Update all commands, AGENTS.md, pv app, docs, and provide migration script.
   priority: 1
   depends_on: []
   discovered_from: null
@@ -110,32 +127,37 @@
   epic: pv
   status: done
   title: Activity Dashboard View
-  description: "Add portfolio-wide activity view showing completion velocity: GitHub-style heatmap calendar, bar chart, and comprehensive stats. Access via 'a' key from portfolio view."
+  description: 'Add portfolio-wide activity view showing completion velocity: GitHub-style
+    heatmap calendar, bar chart, and comprehensive stats. Access via ''a'' key from
+    portfolio view.'
   depends_on: []
   created_at: '2026-02-03'
-  completed_at: "2026-02-03"
+  completed_at: '2026-02-03'
   plan_file: docs/history/20260203_pv-008_activity_dashboard.md
 - id: pv-009
   status: done
   title: Stacked bar chart by epic in activity view
-  description: Toggle bar chart into stacked bar chart showing epic breakdown with smart grouping to avoid clutter
+  description: Toggle bar chart into stacked bar chart showing epic breakdown with
+    smart grouping to avoid clutter
   epic: pv
   priority: 2
   depends_on:
-    - pv-008
-  created_at: "2026-02-07"
-  completed_at: "2026-02-07"
+  - pv-008
+  created_at: '2026-02-07'
+  completed_at: '2026-02-07'
   plan_file: docs/history/20260207_pv-009_stacked_bar_epic.md
 - id: cmd-004
   epic: cmd
   status: done
   title: Migrate custom commands to skills with cross-provider frontmatter
-  description: Design and execute migration from command-first prompts to skill-first workflows, with a frontmatter spec compatible across Claude/Codex/Cursor while preserving Claude-first behavior.
+  description: Design and execute migration from command-first prompts to skill-first
+    workflows, with a frontmatter spec compatible across Claude/Codex/Cursor while
+    preserving Claude-first behavior.
   priority: 1
   depends_on: []
   discovered_from: null
-  created_at: "2026-02-13"
-  completed_at: "2026-02-13"
+  created_at: '2026-02-13'
+  completed_at: '2026-02-13'
   plan_file: docs/history/20260218_cmd-004_skills_frontmatter_contract.md
 - id: cmd-005
   epic: cmd
@@ -145,60 +167,97 @@
   priority: 2
   depends_on: []
   discovered_from: null
-  created_at: "2026-02-14"
-  completed_at: "2026-02-18"
+  created_at: '2026-02-14'
+  completed_at: '2026-02-18'
   plan_file: docs/history/20260218_cmd-005_restore_skill_guidance.md
 - id: cmd-006
   epic: cmd
   status: done
   title: Move subagents to repo root for multi-harness sync
-  description: Relocate .claude/agents/ to top-level agents/ and sync to all three harnesses (codex, claude, cursor)
+  description: Relocate .claude/agents/ to top-level agents/ and sync to all three
+    harnesses (codex, claude, cursor)
   priority: 2
   depends_on: []
-  created_at: "2026-02-17"
-  completed_at: "2026-02-18"
+  created_at: '2026-02-17'
+  completed_at: '2026-02-18'
   plan_file: docs/history/20260218_cmd-006_subagents_root_sync.md
 - id: skill-001
   epic: skill
   status: done
   title: Extract workflow & file-lock instructions into standalone mini-skills
-  description: Strip autopilot state transition and file reservation instructions out of individual SKILL.md files into standalone _lib docs, replacing inline sections with references.
+  description: Strip autopilot state transition and file reservation instructions
+    out of individual SKILL.md files into standalone _lib docs, replacing inline sections
+    with references.
   priority: 2
   depends_on: []
-  created_at: "2026-03-02"
-  completed_at: "2026-03-02"
+  created_at: '2026-03-02'
+  completed_at: '2026-03-02'
   plan_file: docs/history/20260302_skill-001_extract_workflow_filelock.md
 - id: skill-002
   epic: skill
   status: done
   title: Clarify skills workflow docs
-  description: Rewrite skill workflow documentation so proposed changes are prioritized by impact and tied to exact files and semantics.
+  description: Rewrite skill workflow documentation so proposed changes are prioritized
+    by impact and tied to exact files and semantics.
   priority: 2
   depends_on: []
-  created_at: "2026-03-07"
+  created_at: '2026-03-07'
   plan_file: docs/history/20260307_skill-002_workflow_cleanup.md
-  completed_at: "2026-03-07"
+  completed_at: '2026-03-07'
 - id: skill-003
   epic: skill
   status: done
   title: Improve next-feature output
-  description: Show current in-progress features and a small set of next ready pending options in next-feature instead of a single rigid selection.
+  description: Show current in-progress features and a small set of next ready pending
+    options in next-feature instead of a single rigid selection.
   priority: 2
   depends_on: []
   discovered_from: null
-  created_at: "2026-03-07"
+  created_at: '2026-03-07'
   plan_file: docs/history/20260308_skill-003_next_feature_output.md
-  completed_at: "2026-03-08"
+  completed_at: '2026-03-08'
 - id: skill-004
   epic: skill
   status: done
   title: Harden non-experimental tooling contracts
-  description: Users can rely on the non-experimental tooling surface without hidden retries, silent data loss, or misleading command output.
+  description: Users can rely on the non-experimental tooling surface without hidden
+    retries, silent data loss, or misleading command output.
   priority: 2
   depends_on: []
   discovered_from: null
   plan_file: docs/history/20260308_skill-004_tooling_contracts.md
   references:
-    - docs/NON_EXPERIMENTAL_TOOLING_ASSESSMENT.md
-  created_at: "2026-03-08"
-  completed_at: "2026-03-08"
+  - docs/NON_EXPERIMENTAL_TOOLING_ASSESSMENT.md
+  created_at: '2026-03-08'
+  completed_at: '2026-03-08'
+- id: skill-005
+  epic: skill
+  status: pending
+  title: Package workflow skills behind a workflow-mgmt orchestrator
+  description: Maintainers can invoke one workflow-mgmt skill that routes into the
+    existing atomic skills without duplicating their instructions or mutating workflow
+    contracts.
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: docs/plans/skill-005.md
+  references:
+  - docs/history/20260218_cmd-004_skills_frontmatter_contract.md
+  - docs/history/20260302_skill-001_extract_workflow_filelock.md
+  - docs/history/20260307_skill-002_workflow_cleanup.md
+  created_at: '2026-03-16'
+- id: skill-006
+  epic: skill
+  status: done
+  title: Simplify the shared features CLI for agent use
+  description: User can rely on a simpler, agent-first features helper CLI that covers
+    the current skill workflows without argument ambiguity or external tool drift.
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: docs/history/20260316_skill-006_features_cli.md
+  references:
+  - https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/
+  - docs/plans/skill-005.md
+  created_at: '2026-03-16'
+  completed_at: '2026-03-16'

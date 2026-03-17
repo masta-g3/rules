@@ -29,7 +29,7 @@ If a markdown planning file exists for this work, archive it:
 
 Update features.yaml (if tracked feature):
 
-Run `$SKILLS_ROOT/commit/scripts/mark_done.sh <feature-id> <archive-path>` — this sets `status` to `"done"`, `completed_at` to today's date, and `plan_file` to the archive path.
+Run `$SKILLS_ROOT/_lib/features_yaml.sh complete <feature-id> --plan-file <archive-path>` — this sets `status` to `"done"`, `completed_at` to today's date, and `plan_file` to the archive path.
 
 Verify any discovered items are properly logged in features.yaml.
 

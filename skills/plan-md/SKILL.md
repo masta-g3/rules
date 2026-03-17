@@ -16,7 +16,7 @@ Store plans in `docs/plans/`:
 - **If `features.yaml` exists** and input is not already a tracked feature ID: create the ticket first via `ticket-init`, then plan against the returned ID.
   - Only do this when a new tracked ticket is actually needed.
   - Do not restate epic matching, ID generation, or append mechanics here; `ticket-init` owns that workflow.
-  - After ticket creation, set the feature's `plan_file` to `docs/plans/{id}.md` if needed, then write the plan there.
+  - After ticket creation, set the feature's `plan_file` to `docs/plans/{id}.md` with `$SKILLS_ROOT/_lib/features_yaml.sh update "{id}" --json '{"plan_file":"docs/plans/{id}.md"}'` if needed, then write the plan there.
 - **Otherwise**: standalone mode → `FEATURE_NAME.md`
 
 ### Clarify Before Planning
