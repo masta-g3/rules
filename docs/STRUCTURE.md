@@ -34,7 +34,7 @@ rules/
 ├── features.yaml       # This project's feature backlog
 ├── AGENTS.md           # Coding style & behavioral guidelines
 ├── README.md           # Usage documentation
-├── sync-prompts.sh     # Deploy skills to ~/.claude, ~/.codex, ~/.cursor
+├── sync-prompts.sh     # Deploy AGENTS.md, skills, and subagents to ~/.claude, ~/.codex, ~/.cursor, ~/.pi/agent
 └── setup-autopilot.sh  # Enable autopilot hooks in a project
 ```
 

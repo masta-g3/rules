@@ -153,10 +153,12 @@ fv                    # Project view (./features.yaml in current dir)
 ## Setup
 
 ```bash
-./sync-prompts.sh            # copies skills to ~/.claude, ~/.codex, ~/.cursor
+./sync-prompts.sh            # copies AGENTS.md, skills, and subagents to ~/.claude, ~/.codex, ~/.cursor, ~/.pi/agent
 ./sync-prompts.sh --clean    # also removes stale synced files
 ./sync-prompts.sh --silent   # suppresses the sync summary
 ```
+
+Sync also ensures `npm:pi-subagents` is listed in `~/.pi/agent/settings.json`.
 
 If `~/.claude/settings.json` exists, sync also refreshes the Claude statusline command.
 

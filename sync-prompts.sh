@@ -16,8 +16,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 codex_root="${HOME}/.codex"
 claude_root="${HOME}/.claude"
 cursor_root="${HOME}/.cursor"
+pi_root="${HOME}/.pi/agent"
 
-mkdir -p "${codex_root}" "${claude_root}" "${cursor_root}"
+mkdir -p "${codex_root}" "${claude_root}" "${cursor_root}" "${pi_root}"
 
 DIM='\033[2m'
 BOLD='\033[1m'
@@ -97,17 +98,39 @@ sync_dir() {
   done <<< "$rsync_out"
 }
 
+ensure_pi_package() {
+  local package="$1"
+  local settings="${pi_root}/settings.json"
+  add_unique all_files["pi_packages"] "$package"
+
+  if [[ ! -f "$settings" ]] || ! jq -e --arg package "$package" '.packages // [] | index($package)' "$settings" >/dev/null; then
+    add_unique added_files["pi_packages"] "$package"
+  fi
+
+  if [[ -f "$settings" ]]; then
+    jq --arg package "$package" '. + {packages: (((.packages // []) + [$package]) | unique)}' \
+      "$settings" > tmp.$$ && mv tmp.$$ "$settings"
+  else
+    jq -n --arg package "$package" '{packages: [$package]}' > "$settings"
+  fi
+}
+
 sync_file "${repo_root}/AGENTS.md" "${codex_root}/AGENTS.md" "agents_md"
 sync_file "${repo_root}/AGENTS.md" "${claude_root}/CLAUDE.md" "agents_md"
 sync_file "${repo_root}/AGENTS.md" "${cursor_root}/AGENTS.md" "agents_md"
+sync_file "${repo_root}/AGENTS.md" "${pi_root}/AGENTS.md" "agents_md"
 
 sync_dir "${repo_root}/skills/" "${codex_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${claude_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${cursor_root}/skills/" "skills"
+sync_dir "${repo_root}/skills/" "${pi_root}/skills/" "skills"
 
 sync_dir "${repo_root}/agents/" "${codex_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${claude_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${cursor_root}/agents/" "subagents"
+sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
+
+ensure_pi_package "npm:pi-subagents"
 
 sync_dir "${repo_root}/statusline/" "${claude_root}/statusline/" "statusline"
 
@@ -163,9 +186,10 @@ if [[ "$SILENT" == false ]]; then
   echo -e "${BOLD}sync-prompts${RESET}$(if [[ -n "$DELETE_FLAG" ]]; then echo -e " ${DIM}--clean${RESET}"; fi)"
   echo ""
 
-  print_row "AGENTS.md" "agents_md" "codex, claude, cursor"
-  print_row "skills" "skills" "codex, claude, cursor"
-  print_row "subagents" "subagents" "codex, claude, cursor"
+  print_row "AGENTS.md" "agents_md" "codex, claude, cursor, pi"
+  print_row "skills" "skills" "codex, claude, cursor, pi"
+  print_row "subagents" "subagents" "codex, claude, cursor, pi"
+  print_row "pi packages" "pi_packages" "pi"
   print_row "statusline" "statusline" "claude"
 
   echo ""
