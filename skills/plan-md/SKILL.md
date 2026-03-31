@@ -6,17 +6,17 @@ argument-hint: "[request]"
 
 Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor), `~/.pi/agent/skills` (Pi).
 
-Given the request: **$1**, create and maintain a detailed Markdown implementation plan as follows. Be sure to keep the scope limited to the specific request (i.e.: avoid scope creep).
+Given the provided request, create and maintain a detailed Markdown implementation plan as follows. Be sure to keep the scope limited to the specific request (i.e.: avoid scope creep).
 
 ### Plan File Location & Naming
 
 Store plans in `docs/plans/`:
 
-- **If input is a feature ID** (e.g., `auth-001: description`): use that ID → `auth-001.md`
+- **If the provided request already identifies a feature ID** (e.g., `auth-001` or `auth-001: description`): use that ID → `auth-001.md`
 - **If `features.yaml` exists** and input is not already a tracked feature ID: create the ticket first via `ticket-init`, then plan against the returned ID.
   - Only do this when a new tracked ticket is actually needed.
   - Do not restate epic matching, ID generation, or append mechanics here; `ticket-init` owns that workflow.
-  - After ticket creation, set the feature's `plan_file` to `docs/plans/{id}.md` with `$SKILLS_ROOT/_lib/features_yaml.sh update "{id}" --json '{"plan_file":"docs/plans/{id}.md"}'` if needed, then write the plan there.
+  - After ticket creation, set the feature's `plan_file` to `docs/plans/<feature-id>.md` with `$SKILLS_ROOT/_lib/features_yaml.sh update "<feature-id>" --json '{"plan_file":"docs/plans/<feature-id>.md"}'` if needed, then write the plan there.
 - **Otherwise**: standalone mode → `FEATURE_NAME.md`
 
 ### Clarify Before Planning

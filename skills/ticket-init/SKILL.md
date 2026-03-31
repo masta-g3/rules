@@ -7,19 +7,19 @@ disable-model-invocation: true
 
 Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor), `~/.pi/agent/skills` (Pi).
 
-Given the ticket request(s): **$1**, add one or more feature entries to `features.yaml`.
+Given the provided ticket request(s), add one or more feature entries to `features.yaml`.
 
 This is the canonical workflow for ticket creation. Other skills should invoke `ticket-init` when they need to register tracked work, instead of restating ticket-creation steps inline.
 
 ### 0. Normalize Input
 
-- If `$1` contains ` || `, split into multiple ticket requests.
+- If the provided ticket input contains ` || `, split it into multiple ticket requests.
 - Otherwise, treat it as a single ticket request.
 - Process each request independently, in order, using steps 1-4.
 - Backward compatibility: single-ticket behavior stays unchanged.
 
 Example multi-ticket input:
-`$ticket-init "Add GICS industry toggle || Add issuer-first cap-weighted aggregation"`
+`/ticket-init "Add GICS industry toggle || Add issuer-first cap-weighted aggregation"`
 
 ### 1. Determine Epic
 
@@ -58,7 +58,7 @@ Priority: `1`=foundation, `2`=core (default), `3`=polish — adjust if obvious f
 
 Append with the repo-local helper instead of inline YAML mutation:
 ```bash
-$SKILLS_ROOT/_lib/features_yaml.sh create --json '{"id":"...","epic":"...","status":"pending","title":"...","description":"...","priority":2,"depends_on":[],"discovered_from":null,"plan_file":null,"references":[],"created_at":"YYYY-MM-DD"}'
+$SKILLS_ROOT/_lib/features_yaml.sh create --json '{"id":"...","epic":"...","status":"pending","title":"...","description":"...","steps":[],"priority":2,"depends_on":[],"discovered_from":null,"plan_file":null,"references":[],"created_at":"YYYY-MM-DD"}'
 ```
 
 ### 4. Report

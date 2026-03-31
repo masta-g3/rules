@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor), `~/.pi/agent/skills` (Pi).
 
-Given the epic request: **$1**, break it down into trackable sub-features for multi-session development.
+Given the provided epic description, break it down into trackable sub-features for multi-session development.
 
 ### Clarify Before Decomposing
 
@@ -18,7 +18,7 @@ If the epic scope, boundaries, or constraints are unclear, ambiguous, or too bro
 Break down into **atomic features**—each with one testable outcome, completable in one session.
 
 **Sizing guardrails:**
-- Target **4-10 features** per epic. Fewer = under-decomposed; 12+ = over-decomposed or split into multiple epics.
+- Target **4-10 features** per epic. Fewer = under-decomposed; 11+ = over-decomposed or should be split into multiple epics.
 - Each feature should have a single "it works when..." statement. Multiple "and also..." = too big.
 - Group related work (e.g., CRUD operations, fetch+display). Don't create features for boilerplate, glue code, or per-file tasks.
 
@@ -26,7 +26,7 @@ Think through: foundation → core functionality → integration → polish. Fol
 
 ### 2. Create Epic Doc
 
-Write `docs/plans/{prefix}-000.md` — the durable context for the epic. Keep it under ~20 lines: one-line goal, scope boundaries, key constraints/decisions, and a list of planned feature IDs with one-line descriptions. Features reference this in `references`; it is shared context, not the ticket's own `plan_file`.
+Write `docs/plans/{epic}-000.md` — the durable context for the epic. Keep it under ~20 lines: one-line goal, scope boundaries, key constraints/decisions, and a list of planned feature IDs with one-line descriptions. Features reference this in `references`; it is shared context, not the ticket's own `plan_file`.
 
 ### 3. Generate Features
 

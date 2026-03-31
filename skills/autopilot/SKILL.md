@@ -1,7 +1,7 @@
 ---
 name: autopilot
 description: Run complete feature cycle autonomously (Claude Code only).
-argument-hint: "[feature-id | --epic prefix]"
+argument-hint: "[feature-id | --epic [epic-prefix]]"
 model: claude-sonnet-4-5
 disable-model-invocation: true
 ---
@@ -19,22 +19,24 @@ Then stop.
 
 ## Parse Arguments
 
-**If `$1` is `--epic`:**
+**If the provided input starts with `--epic`:**
 - Mode = `continuous`
-- Epic prefix = `$2` (if provided, otherwise auto-detect from next ready feature)
+- Epic prefix = the provided epic prefix, if any; otherwise auto-detect from the next ready feature
 
 **Otherwise:**
 - Mode = `single`
-- Feature ID = `$1` (if provided, otherwise pick next ready feature)
+- Feature ID = the provided feature ID, if any; otherwise pick the next ready feature
 
 ---
 
 ## Single Mode
 
-Start workflow via:
+If a feature ID was provided, start workflow via:
 ```bash
-~/.claude/skills/autopilot/scripts/start_workflow.sh single "$1"
+~/.claude/skills/autopilot/scripts/start_workflow.sh single <feature-id>
 ```
+
+Otherwise, omit the final argument and let the script pick the next ready feature.
 
 If no feature found:
 ```
@@ -54,16 +56,18 @@ AUTOPILOT STARTED: <feature-id>
 
 ## Continuous Mode
 
-Start workflow via:
+If an epic prefix was provided, start workflow via:
 ```bash
-~/.claude/skills/autopilot/scripts/start_workflow.sh continuous "" "$2"
+~/.claude/skills/autopilot/scripts/start_workflow.sh continuous "" <epic-prefix>
 ```
+
+Otherwise, omit the final argument and let the script auto-detect the next ready epic.
 
 If no feature found:
 ```
 AUTOPILOT EXCEPTION: no_ready_features
 
-No features with status "pending" in epic "<prefix>".
+No features with status "pending" in epic "<epic-prefix>".
 ```
 
 Output:

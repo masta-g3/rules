@@ -5,7 +5,7 @@ argument-hint: "[project description]"
 disable-model-invocation: true
 ---
 
-Given the project request: **$1**, set up the foundation for multi-session development.
+Given the provided project description, set up the foundation for multi-session development.
 
 ### Clarify Before Scaffolding
 

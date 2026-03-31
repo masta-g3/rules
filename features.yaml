@@ -261,3 +261,16 @@
   - docs/plans/skill-005.md
   created_at: '2026-03-16'
   completed_at: '2026-03-16'
+- id: skill-007
+  epic: skill
+  status: done
+  title: Replace positional prompt placeholders
+  description: Agents use natural-language references to user input instead of positional
+    placeholders across workflow prompts and related docs.
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: docs/history/20260330_skill-007_prompt_placeholders.md
+  references: []
+  created_at: '2026-03-27'
+  completed_at: '2026-03-30'
