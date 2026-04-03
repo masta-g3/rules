@@ -22,10 +22,11 @@ Each skill advances the workflow to the next command after completing successful
 |-------|-------------|-----------|---------------|
 | prime | `/plan-md` | workflow.json exists | — |
 | plan-md | `/execute` | workflow.json exists | ambiguous requirements |
-| execute | `/commit` | workflow.json exists AND plan complete | baseline/tests/build fail |
+| execute | `/review` | workflow.json exists AND plan complete | baseline/tests/build fail |
+| review | `/commit` | workflow.json exists AND review ready | `REVIEW ISSUES` |
 | commit | *(see below)* | workflow.json exists | git conflicts |
 
-For **prime**, **plan-md**, and **execute**, advance with:
+For **prime**, **plan-md**, **execute**, and **review**, advance with:
 ```bash
 $SKILLS_ROOT/_lib/workflow_state.sh <next-command>
 ```

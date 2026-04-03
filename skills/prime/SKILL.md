@@ -6,8 +6,16 @@ argument-hint: "[task]"
 
 Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor), `~/.pi/agent/skills` (Pi).
 
-Read and thoroughly understand this codebase by examining `docs/STRUCTURE.md` (and relevant `docs/` files), understanding its purpose, architecture, components, and coding/design philosophy.
+Orient on the task with the minimum context needed to work confidently.
 
-Check recent git history (`git log --oneline -10`) for context on recent work.
+1. Read `docs/STRUCTURE.md` first, plus other relevant `docs/` files when they help clarify the task, architecture, or local conventions.
+2. Check recent git history (`git log --oneline -10`) for context that may affect the task.
+3. Read the task-relevant source files and a small number of nearby reference files that show the patterns to follow.
 
-Focus on the provided task. Read relevant scripts and files to gather sufficient context about existing patterns, components, design, and implementation approaches, then summarize the relevant context and any open ambiguities.
+For broad or cross-cutting tasks, you may launch 1-3 parallel read-only subagents to scout distinct areas. Skip this for simple local tasks.
+
+Then produce a brief synthesis for the next step:
+- files/modules to inspect or modify
+- existing patterns to follow
+- relevant risks or recent changes
+- open ambiguities to resolve before planning or implementation

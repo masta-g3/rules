@@ -43,6 +43,8 @@ Never silently absorb scope—make all work visible.
 
 While coding, adhere strictly to the minimalist philosophy originally outlined: avoid hacks, fallback mechanisms, or any form of bloat. Keep implementations clean, modular, and pattern-aligned.
 
+Prefer the smallest change that fully solves the task. Reuse existing patterns and nearby abstractions when they fit; avoid widening the impact surface or introducing new structure unless the task clearly requires it.
+
 At the end of each phase, ensure the code is in a clean, reviewable state—no half-implemented features, no commented-out debugging code, no broken imports.
 
 When writing tests: no mock data, dummy assertions, or placeholder tests. Every test must validate actual functionality—if it doesn't test something meaningful, don't add it.
@@ -66,5 +68,5 @@ Fix issues found before proceeding. Report test summary to user (what was tested
 
 Report status clearly:
 
-- **PLAN COMPLETE** — all phases done, ready for `/commit`
+- **PLAN COMPLETE** — all phases done, ready for `/review`
 - **PENDING STEPS** — list remaining phases/tasks, indicate next action

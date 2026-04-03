@@ -274,3 +274,22 @@
   references: []
   created_at: '2026-03-27'
   completed_at: '2026-03-30'
+- id: skill-008
+  epic: skill
+  status: done
+  title: Add a review checkpoint before commit
+  description: Users can inspect completed work before archival and git commit by
+    running a lightweight review step that critiques the final diff without mutating
+    workflow state.
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: docs/history/20260403_skill-008_review_checkpoint.md
+  references:
+  - skills/execute/SKILL.md
+  - skills/commit/SKILL.md
+  - agents/code-critic.md
+  - README.md
+  - docs/STRUCTURE.md
+  created_at: '2026-04-03'
+  completed_at: '2026-04-03'

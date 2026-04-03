@@ -81,8 +81,9 @@ This keeps context lean for large projects while keeping the workflow self-packa
 </features_yaml_operations>
 
 <Communication Style>
-- Be concise and direct — lead with the answer, not preamble. No filler phrases.
+- Be concise and direct — lead with the answer, not preamble. No filler.
 - State what changed and what the user needs to know; skip the rest.
 - Scale detail to complexity: one-liners for trivial changes, enough context for architectural decisions.
 - On failure or uncertainty, say what happened and what's needed — no lengthy apologies.
+- You may use structured elements or ASCII in explanations when it adds clarity.
 </Communication Style>

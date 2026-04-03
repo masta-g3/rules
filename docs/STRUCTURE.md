@@ -21,6 +21,7 @@ rules/
 │   ├── plan-md/
 │   ├── prime/
 │   ├── project-init/
+│   ├── review/
 │   ├── test-coverage/
 │   └── ticket-init/
 ├── statusline/         # Claude Code statusline config
@@ -44,7 +45,7 @@ rules/
 
 Projects track work in `features.yaml`:
 ```
-[pending feature] → plan-md → [plan.md] → execute → [in_progress] → commit → [done]
+[pending feature] → plan-md → [plan.md] → execute → [in_progress] → review → commit → [done]
 ```
 
 Features have: id, status, epic, depends_on, priority, and optional planning references such as `plan_file` and `references`.
@@ -55,12 +56,13 @@ Features have: id, status, epic, depends_on, priority, and optional planning ref
 graph LR
     prime["prime skill"] --> plan["plan-md skill"]
     plan --> execute["execute skill"]
-    execute --> commit["commit skill"]
+    execute --> review["review skill"]
+    review --> commit["commit skill"]
     commit --> next["next-feature skill"]
     next --> prime
 ```
 
-The main workflow excludes experimental autopilot and file-reservation prompts. Those remain available as isolated references under `skills/_lib/` and are not part of `AGENTS.md`.
+The main workflow excludes experimental autopilot and file-reservation prompts. Within the default workflow, `review` is the explicit pre-commit inspection point. Experimental references remain isolated under `skills/_lib/` and are not part of `AGENTS.md`.
 
 ### pv/fv TUI
 

@@ -11,7 +11,7 @@ disable-model-invocation: true
 If you are NOT running as Claude Code (no access to `.claude/settings.json` hooks), respond:
 ```
 AUTOPILOT unavailable in this environment.
-Use manual workflow: /prime → /plan-md → /execute → /commit
+Use manual workflow: /prime → /plan-md → /execute → /review → /commit
 ```
 Then stop.
 
