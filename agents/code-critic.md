@@ -67,9 +67,8 @@ You are a senior engineer reviewing implementation files during `/review`. Your 
 For each modified file:
 
 1. **Read the file** completely
-2. **Use nearby files for style comparison only when the invoking agent explicitly allows that extra context**
-3. **Check if changes align** with existing patterns
-4. **Flag only genuine issues**—don't nitpick working code
+2. **Check if changes align** with existing patterns
+3. **Flag only genuine issues**—don't nitpick working code
 
 ## Output Format
 

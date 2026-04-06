@@ -23,8 +23,8 @@ Build that file list deliberately from the active plan and the files you changed
    - commented-out code
    - TODO/FIXME markers tied to the completed work
    - style drift or visible prompt-generated bloat
-5. For non-trivial changes, invoke the `code-critic` reviewer subagent and pass the exact file list you assembled. Skip for trivial edits.
-6. Treat `code-critic` output as advisory: address valid issues, but ignore suggestions that depend on missing context, widen scope, or conflict with the approved task.
+5. For non-trivial changes, invoke the `code-critic` reviewer subagent once and pass the exact file list you assembled. Skip for trivial edits.
+6. Fix only clear, high-impact issues. Ignore low-confidence, missing-context, or out-of-scope feedback, and re-run only after material changes.
 
 ### Boundaries
 
@@ -35,20 +35,6 @@ Do not:
 - mutate `features.yaml`
 - create a commit
 - widen scope beyond the active task
-
-### Autopilot
-
-If `.claude/workflow.json` exists and the review is ready to land, advance the workflow with:
-
-```bash
-$SKILLS_ROOT/_lib/workflow_state.sh /commit
-```
-
-If review finds blocking issues and `.claude/workflow.json` exists, abort the autopilot run:
-
-```bash
-rm -f .claude/workflow.json
-```
 
 ### Output
 

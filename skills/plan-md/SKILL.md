@@ -66,4 +66,4 @@ If the work already has a tracked ticket, plan against it directly and do not lo
 
 ### Plan Review (Non-Trivial Plans Only)
 
-For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** reviewer subagent. Skip for trivial edits. Address valid concerns; ignore suggestions that add bloat.
+For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** reviewer subagent once. Skip for trivial edits. Fix only clear correctness, completeness, or simplicity issues; ignore nits and re-run only after material plan changes.

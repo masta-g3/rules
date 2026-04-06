@@ -1,26 +1,29 @@
-<Project Orientation>
+## Project Orientation
+
 - Check `docs/STRUCTURE.md` to understand project organization; if missing, continue without it.
 - Keep `docs/STRUCTURE.md` current as an onboarding guide for new developers: project purpose, architecture, directory layout, key files/modules, design patterns, and how to run/build.
 - Place code in the existing purpose-aligned modules or directories (for example, `utils/`, `src/`, or similar), following the repository's structure and naming patterns.
 - When working with Python, always use the `uv` tool for dependency management and virtual environments.
-</Project Orientation>
 
-<Scope and Safety>
+## Scope and Safety
+
 - The agent has root-level access and must use it responsibly.
 - Never remove, edit, or add files outside the current working directory unless the user explicitly instructs it.
 - Other engineers or agents may be working on this repository concurrently. If you notice unexpected changes (new files, modified code, updated dependencies), do not revert or overwrite them — adapt to the current state. If others' changes break your work or block progress, report the conflict to the user instead of guessing a fix.
-</Scope and Safety>
 
-<Implementation Principles>
+## Implementation Principles
+
 We are working at a lean startup, maintained by a small team of 10x engineers, not a large corporation. Code accordingly:
 - Prioritize minimalism: clean, readable, lightweight, modular code. Less is more; elegance is clarity.
+- Follow the *via negativa*: removing is better than adding, simple better than complex.
 - Avoid enterprise bloat, useless boilerplate, thin wrappers, ad-hoc patches, and hacky solutions.
 - If an approach is not working, brainstorm alternatives with the user instead of forcing a brittle implementation.
 - Do not introduce new patterns or technologies unless they are strictly needed.
 - Study existing functions and patterns first; follow the established style and leave the codebase simpler and more organized.
 - Make minimal, non-disruptive changes that fit the current structure.
+- Prefer simplifying or trimming existing code over adding new structure.
 - Check for existing similar code to avoid duplication.
-- Keep components modular and reusable.
+- Keep components modular and reusable, but do not over-abstract.
 - Follow existing styles and patterns.
 - Keep function names direct and simple; avoid names like `enhanced` or `new`.
 - Avoid unnecessary changelog-style comments such as "new feature" indicators.
@@ -30,9 +33,9 @@ We are working at a lean startup, maintained by a small team of 10x engineers, n
 - Let errors surface naturally. Avoid blanket `try/except`, especially `pass`; only use `try/except` for minor processing failures where handling is intentional.
 - Avoid adding fallback mechanisms, mock data, or default values unless the user explicitly asks for them.
 - Do not add backward compatibility layers or defaults unless the user explicitly requests them.
-</Implementation Principles>
 
-<Generating Documentation>
+## Generating Documentation
+
 - When planning features, create detailed Markdown documentation that enables any engineer to implement independently.
 - When the user asks for a Markdown file such as `FEATURE.md`, follow these rules:
   - Leverage Markdown elements and visual diagrams, preferably Mermaid.
@@ -43,16 +46,17 @@ We are working at a lean startup, maintained by a small team of 10x engineers, n
   - Place docs close to the code and maintain consistent terminology.
   - Document major features, complex algorithms, integration points, and performance-critical paths.
   - Avoid corporate bloat, overengineering, and useless boilerplate.
-</Generating Documentation>
 
-<Testing>
+## Testing
+
+- Always include testing as final phase in your plans / implementations.
 - Test functions without external effects when possible.
 - If testing is impossible, validate correctness manually.
 - Consider Test Driven Development for robust software development.
 - Create ephemeral tests to validate features and implementations, iterate until they behave as expected, then remove those temporary tests.
-</Testing>
 
-<features_yaml_operations>
+## Features YAML Operations
+
 `features.yaml` is a project backlog file tracking features through the development cycle. Minimal schema:
 
 ```yaml
@@ -78,12 +82,16 @@ When `features.yaml` exists, avoid reading the full file into context. It may co
 Note: `features.yaml` is a root-level sequence `- {...}`, not wrapped in a mapping.
 
 This keeps context lean for large projects while keeping the workflow self-packaged.
-</features_yaml_operations>
 
-<Communication Style>
+Skills for projects with backlog tracking via `features.yaml`:
+`next-feature` → `prime` → `plan-md` → `execute` → `review` → `commit`
+
+
+## Communication Style
+
 - Be concise and direct — lead with the answer, not preamble. No filler.
 - State what changed and what the user needs to know; skip the rest.
 - Scale detail to complexity: one-liners for trivial changes, enough context for architectural decisions.
 - On failure or uncertainty, say what happened and what's needed — no lengthy apologies.
-- You may use structured elements or ASCII in explanations when it adds clarity.
-</Communication Style>
+- Use structured elements or ASCII in explanations when it adds clarity. Prefer this over long text explanations.
+- Be joyful and enjoyable to work with, a reliable college.
