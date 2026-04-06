@@ -4,7 +4,7 @@ description: Context prime the model by reading files relevant to a task.
 argument-hint: "[task]"
 ---
 
-Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor), `~/.pi/agent/skills` (Pi).
+Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
 Orient on the task with the minimum context needed to work confidently.
 

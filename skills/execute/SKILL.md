@@ -3,7 +3,7 @@ name: execute
 description: Implement the approved plan.
 ---
 
-Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor), `~/.pi/agent/skills` (Pi).
+Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
 Work directly from the active plan or task we have been discussing.
 

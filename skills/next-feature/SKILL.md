@@ -4,7 +4,7 @@ description: Select the next feature to implement from features.yaml and prepare
 disable-model-invocation: true
 ---
 
-Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor), `~/.pi/agent/skills` (Pi).
+Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
 ### 1. Review State
 

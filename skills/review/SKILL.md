@@ -3,7 +3,7 @@ name: review
 description: Review finished work before archival and commit.
 ---
 
-Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor), `~/.pi/agent/skills` (Pi).
+Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
 Review the active task after implementation and before `/commit`.
 

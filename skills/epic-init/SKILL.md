@@ -5,7 +5,7 @@ argument-hint: "[epic description]"
 disable-model-invocation: true
 ---
 
-Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor), `~/.pi/agent/skills` (Pi).
+Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
 Given the provided epic description, break it down into trackable sub-features for multi-session development.
 

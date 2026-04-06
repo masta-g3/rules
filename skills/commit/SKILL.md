@@ -3,7 +3,7 @@ name: commit
 description: Archive planning document, finalize tracked work, and commit files from session.
 ---
 
-Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor), `~/.pi/agent/skills` (Pi).
+Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
 Assume the work has already been reviewed.
 

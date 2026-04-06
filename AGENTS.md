@@ -55,6 +55,15 @@ We are working at a lean startup, maintained by a small team of 10x engineers, n
 - Consider Test Driven Development for robust software development.
 - Create ephemeral tests to validate features and implementations, iterate until they behave as expected, then remove those temporary tests.
 
+## Skills Root
+
+Before running skill helper commands, set `SKILLS_ROOT` from the active harness install path created by `./sync-prompts.sh`:
+
+- Codex: `export SKILLS_ROOT="$HOME/.codex/skills"`
+- Claude: `export SKILLS_ROOT="$HOME/.claude/skills"`
+- Cursor: `export SKILLS_ROOT="$HOME/.cursor/skills"`
+- Pi: `export SKILLS_ROOT="$HOME/.pi/agent/skills"`
+
 ## Features YAML Operations
 
 `features.yaml` is a project backlog file tracking features through the development cycle. Minimal schema:

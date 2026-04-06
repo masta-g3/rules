@@ -5,7 +5,7 @@ argument-hint: "[ticket description] or \"ticket 1 || ticket 2\""
 disable-model-invocation: true
 ---
 
-Set `$SKILLS_ROOT` to your harness skills path before helper commands: `~/.codex/skills` (Codex), `~/.claude/skills` (Claude), `~/.cursor/skills` (Cursor), `~/.pi/agent/skills` (Pi).
+Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
 Given the provided ticket request(s), add one or more feature entries to `features.yaml`.
 
