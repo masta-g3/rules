@@ -1,3 +1,12 @@
+## Communication Style
+
+**Keep responses short.** Lead with the answer, not preamble. No filler, no fluff.
+- State what changed and what the user needs to know; skip the rest.
+- One-liners for trivial changes; scale detail only to complexity.
+- On failure or uncertainty, say what happened and what's needed — no apologies.
+- Prefer structured elements or ASCII over long prose.
+- Be joyful and reliable.
+
 ## Project Orientation
 
 - Check `docs/STRUCTURE.md` to understand project organization; if missing, continue without it.
@@ -53,7 +62,7 @@ We are working at a lean startup, maintained by a small team of 10x engineers, n
 - Test functions without external effects when possible.
 - If testing is impossible, validate correctness manually.
 - Consider Test Driven Development for robust software development.
-- Create ephemeral tests to validate features and implementations, iterate until they behave as expected, then remove those temporary tests.
+- Create ephemeral tests to validate features and implementations, iterate until they behave as expected, then remove all temporary test code. Report any leftover artifacts to the user.
 
 ## Skills Root
 
@@ -95,12 +104,3 @@ This keeps context lean for large projects while keeping the workflow self-packa
 Skills for projects with backlog tracking via `features.yaml`:
 `next-feature` → `prime` → `plan-md` → `execute` → `review` → `commit`
 
-
-## Communication Style
-
-- Be concise and direct — lead with the answer, not preamble. No filler.
-- State what changed and what the user needs to know; skip the rest.
-- Scale detail to complexity: one-liners for trivial changes, enough context for architectural decisions.
-- On failure or uncertainty, say what happened and what's needed — no lengthy apologies.
-- Use structured elements or ASCII in explanations when it adds clarity. Prefer this over long text explanations.
-- Be joyful and enjoyable to work with, a reliable college.
