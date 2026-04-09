@@ -11,9 +11,11 @@ rules/
 │   ├── fv -> pv        # Symlink: project-level alias
 │   └── install.sh      # Install pv/fv to ~/.local/bin
 │
+├── experimental/
+│   └── autopilot/      # Experimental Claude-only autopilot flow
+│
 ├── skills/             # Canonical workflow skills
 │   ├── _lib/           # Shared deterministic shell helpers
-│   ├── autopilot/
 │   ├── commit/
 │   ├── epic-init/
 │   ├── execute/
@@ -35,8 +37,7 @@ rules/
 ├── features.yaml       # This project's feature backlog
 ├── AGENTS.md           # Coding style & behavioral guidelines
 ├── README.md           # Usage documentation
-├── sync-prompts.sh     # Deploy AGENTS.md, skills, and subagents to ~/.claude, ~/.codex, ~/.cursor, ~/.pi/agent
-└── setup-autopilot.sh  # Enable autopilot hooks in a project
+└── sync-prompts.sh     # Deploy AGENTS.md, skills, and subagents to ~/.claude, ~/.codex, ~/.cursor, ~/.pi/agent
 ```
 
 ## Core Concepts
@@ -62,7 +63,7 @@ graph LR
     next --> prime
 ```
 
-The main workflow excludes experimental autopilot and file-reservation prompts. Within the default workflow, `review` is the explicit pre-commit inspection point. Experimental references remain isolated under `skills/_lib/` and are not part of `AGENTS.md`.
+The main workflow excludes experimental autopilot and file-reservation prompts. Within the default workflow, `review` is the explicit pre-commit inspection point. Autopilot lives under `experimental/autopilot/` and is not part of `AGENTS.md`.
 
 ### pv/fv TUI
 
@@ -89,6 +90,6 @@ Modes:
 
 - **Single-file tools**: `bin/pv` is self-contained Python (requires PyYAML)
 - **Skill-first workflows**: `skills/*/SKILL.md` defines the main behavior; scripts handle deterministic mutations
-- **Experimental prompts stay isolated**: autopilot and file-lock references live under `skills/_lib/` and are only used when explicitly invoked
+- **Experimental prompts stay isolated**: autopilot lives under `experimental/autopilot/` and remains opt-in
 - **State in filenames**: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone
 - **Repo-local YAML helper**: `skills/_lib/features_yaml.sh` is the supported entrypoint for shared `features.yaml` reads/writes, backed by `skills/_lib/features_yaml.py` via `uv`

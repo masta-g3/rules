@@ -28,7 +28,6 @@ Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked f
 
 | Skill | Purpose |
 |---------|---------|
-| `skills/autopilot` | Experimental standalone prompt for autonomous feature cycles (Claude Code) |
 | `skills/project-init` | Initialize project with features.yaml |
 | `skills/epic-init` | Initialize new epic with features |
 | `skills/ticket-init` | Add one or more tickets to features.yaml |
@@ -42,13 +41,11 @@ Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked f
 
 ## Experimental Standalone Prompts
 
-These prompts are kept usable, but they are **not** part of the main workflow and are **not** included in `AGENTS.md`.
+Experimental autopilot lives under `experimental/autopilot/` and is **not** part of the main workflow or included in `AGENTS.md`.
 
-- `skills/autopilot`: Claude Code-only autopilot entrypoint
-- `skills/_lib/WORKFLOW.md`: standalone autopilot transition/reference doc
-- `skills/_lib/FILE_LOCK.md`: standalone parallel file reservation/reference doc
+- `experimental/autopilot/`: Claude Code-only autopilot flow, setup, and reference docs
 
-Use them only when explicitly opting into those experimental flows.
+See that directory for the experimental details.
 
 ## Shared Helper Tooling
 
@@ -61,7 +58,7 @@ Shared backlog operations live in `skills/_lib/features_yaml.py` and are invoked
 
 **Autopilot setup:**
 ```bash
-/path/to/rules/setup-autopilot.sh /your/project
+/path/to/rules/experimental/autopilot/setup.sh /your/project
 ```
 
 ## CLI Tools

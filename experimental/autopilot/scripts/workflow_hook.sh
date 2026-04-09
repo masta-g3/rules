@@ -8,7 +8,6 @@ FEATURE=$(jq -r '.feature // empty' "$STATE")
 
 [[ -z "$NEXT" ]] && exit 0
 
-# Validate known commands
 case "$NEXT" in
   /prime|/plan-md)
     [[ -z "$FEATURE" ]] && { echo '{"decision":"block","reason":"AUTOPILOT ERROR: '"$NEXT"' requires feature ID"}'; exit 0; }

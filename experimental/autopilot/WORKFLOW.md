@@ -28,7 +28,7 @@ Each skill advances the workflow to the next command after completing successful
 
 For **prime**, **plan-md**, **execute**, and **review**, advance with:
 ```bash
-$SKILLS_ROOT/_lib/workflow_state.sh <next-command>
+~/.claude/skills/autopilot/lib/workflow_state.sh <next-command>
 ```
 
 ### Commit — Mode-Dependent Transition
