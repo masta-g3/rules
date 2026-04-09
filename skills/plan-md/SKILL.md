@@ -21,7 +21,7 @@ Store plans in `docs/plans/`:
 
 ### Clarify Before Planning
 
-If unclear on scope, requirements, or constraints, ask the user before creating the plan. Resolve what you can via codebase context and reasonable assumptions, but ask when genuinely needed.
+If unclear on scope, requirements, or constraints, ask the user before creating the plan. Resolve what you can via codebase context and reasonable assumptions, but ask when genuinely needed. You can use the ask tool for this.
 
 ### Context Files
 
@@ -49,6 +49,7 @@ Keep it lean—only what's needed to start confidently.
    - Avoid "AI slop": no generic purple gradients, no cookie-cutter layouts, no predictable patterns
 
 5. Add an implementation section that divides work into incremental phases—foundation first, then progressive refinement (e.g., architecture setup → core components → specific features → polish). Use [ ] checkboxes to track progress. End each phase with a verification step to confirm it works and didn't break existing functionality.
+   - **Bulk-change checklist:** when a plan touches a large number of files (ie.: 20+) for a cross-cutting change (schema migration, per-route auth guards, config key rename, etc.), enumerate every affected file in a dedicated `[ ]` checklist so none is forgotten. Group by directory or module when it helps readability.
 
 6. Include a **verification strategy** for each phase:
    - Focus on outcomes, not syntax: "Does it achieve the goal?" not "Does it import?"

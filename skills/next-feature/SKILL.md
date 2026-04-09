@@ -28,9 +28,9 @@ If no features are ready:
 - If a dependency cycle is suspected, inspect it manually and report it to the user; do not auto-resolve
 - Report situation to user; do not guess
 
-Report the current active work plus a small set of next ready options. Keep it brief and to the point.
+Report the current active work plus a small set of next ready options. Keep it brief and to the point. If the session spans multiple repos, repeat this check in each repo and report per-repo results separately.
 
-Default helper output now has three sections:
+Default helper output has three sections:
 
 ```
 IN PROGRESS
