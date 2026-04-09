@@ -104,3 +104,5 @@ This keeps context lean for large projects while keeping the workflow self-packa
 Skills for projects with backlog tracking via `features.yaml`:
 `next-feature` → `prime` → `plan-md` → `execute` → `review` → `commit`
 
+This workflow is user-driven: the user chooses when to invoke each step. Do not advance automatically, and keep work strictly within the current step and instructions.
+
