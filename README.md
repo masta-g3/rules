@@ -1,4 +1,4 @@
-# AI IDE Agent Skill Set
+# Agent Rules
 
 Minimal skills for AI agents in developer IDEs.
 
