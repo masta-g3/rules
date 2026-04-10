@@ -1,7 +1,6 @@
 ---
 name: next-feature
-description: Select the next feature to implement from features.yaml and prepare for the atomic cycle.
-disable-model-invocation: true
+description: Select the next feature to implement from features.yaml.
 ---
 
 Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.

@@ -1,7 +1,6 @@
 ---
 name: test-coverage
-description: Assess test coverage, propose critical tests, implement on confirmation.
-disable-model-invocation: true
+description: Assess project test coverage, propose critical tests, implement on confirmation.
 ---
 
 Analyze the project's test coverage and propose tests that would catch real bugs.

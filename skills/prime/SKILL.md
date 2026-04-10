@@ -1,6 +1,6 @@
 ---
 name: prime
-description: Context prime the model by reading files relevant to a task.
+description: Context priming by reading files relevant to a task.
 argument-hint: "[task]"
 ---
 

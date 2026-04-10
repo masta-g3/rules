@@ -1,6 +1,6 @@
 ---
 name: execute
-description: Implement the approved plan.
+description: Execute on a plan.
 ---
 
 Work directly from the active plan or task we have been discussing.

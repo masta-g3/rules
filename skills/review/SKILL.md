@@ -3,8 +3,6 @@ name: review
 description: Review finished work before archival and commit.
 ---
 
-Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
-
 Review the active task after implementation and before `/commit`.
 
 ### Review Process

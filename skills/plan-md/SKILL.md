@@ -1,6 +1,6 @@
 ---
 name: plan-md
-description: Create and maintain a Markdown implementation plan from a single request string.
+description: Create and maintain a Markdown implementation plan for a feature or task.
 argument-hint: "[request]"
 ---
 

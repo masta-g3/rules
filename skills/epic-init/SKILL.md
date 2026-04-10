@@ -2,10 +2,7 @@
 name: epic-init
 description: Decompose a complex feature into trackable sub-features for an existing codebase.
 argument-hint: "[epic description]"
-disable-model-invocation: true
 ---
-
-Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
 Given the provided epic description, break it down into trackable sub-features for multi-session development.
 
