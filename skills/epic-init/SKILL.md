@@ -1,4 +1,4 @@
-`---
+---
 name: epic-init
 description: Decompose a complex feature into trackable sub-features for an existing codebase.
 argument-hint: "[epic description]"
