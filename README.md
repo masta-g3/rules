@@ -20,7 +20,7 @@ For quick tasks without multi-session tracking:
 
 For projects with backlog tracking via `features.yaml`:
 
-`project-init` → `next-feature` → `plan-md` → `execute` → `review` → `commit`
+`project-init` → `next-feature` → `prime` → `plan-md` → `execute` → `review` → `commit`
 
 Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone. Creating a plan keeps tracked work `pending`; `execute` moves it to `in_progress`; `commit` moves it to `done`.
 
@@ -30,7 +30,7 @@ Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked f
 |---------|---------|
 | `skills/project-init` | Initialize project with features.yaml |
 | `skills/epic-init` | Initialize new epic with features |
-| `skills/ticket-init` | Add one or more tickets to features.yaml |
+| `skills/ticket-init` | Canonical ticket creation for features.yaml |
 | `skills/next-feature` | Select next ready feature |
 | `skills/prime` | Context prime: structure docs, git history |
 | `skills/plan-md` | Create implementation plan |
@@ -39,13 +39,9 @@ Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked f
 | `skills/commit` | Archive plan, finalize tracked work, commit |
 | `skills/test-coverage` | Analyze test coverage |
 
-## Experimental Standalone Prompts
+## Experimental
 
-Experimental autopilot lives under `experimental/autopilot/` and is **not** part of the main workflow or included in `AGENTS.md`.
-
-- `experimental/autopilot/`: Claude Code-only autopilot flow, setup, and reference docs
-
-See that directory for the experimental details.
+`experimental/autopilot/` — Claude Code-only autopilot flow. Not part of the main workflow or `AGENTS.md`. See that directory for details.
 
 ## Shared Helper Tooling
 
@@ -53,13 +49,7 @@ Shared backlog operations live in `skills/_lib/features_yaml.py` and are invoked
 
 - Purpose: keep `features.yaml` selection and mutation logic packaged with the repo
 - Runtime: `uv` manages the script-local PyYAML dependency
-- Replaces: ad hoc `yq`/`jq` shell snippets for the supported skill workflows
 - Contract: `epics`, `next-id`, `next`, `create`, `update`, `complete`, and `describe`
-
-**Autopilot setup:**
-```bash
-/path/to/rules/experimental/autopilot/setup.sh /your/project
-```
 
 ## CLI Tools
 
@@ -139,14 +129,6 @@ fv                    # Project view (./features.yaml in current dir)
 **Optional fields:** `title`, `steps`, `discovered_from`, `plan_file`, `references`, `completed_at`, plus custom metadata when needed
 
 **Status values:** `pending` → `in_progress` → `done` (or `abandoned`, `superseded`)
-
-**Key fields:**
-- **epic**: Groups related features (e.g., "auth", "payments")
-- **depends_on**: Feature is "ready" when all deps are done
-- **steps**: Implementation checklist
-- **discovered_from**: Links emergent work to parent feature
-- **plan_file**: Path to the ticket's own plan or archived plan summary
-- **references**: Optional shared context docs such as epic, design, or vision docs
 
 ## Setup
 
