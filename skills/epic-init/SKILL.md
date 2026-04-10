@@ -1,4 +1,4 @@
----
+`---
 name: epic-init
 description: Decompose a complex feature into trackable sub-features for an existing codebase.
 argument-hint: "[epic description]"
@@ -9,76 +9,37 @@ Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
 Given the provided epic description, break it down into trackable sub-features for multi-session development.
 
-### Clarify Before Decomposing
-
-If the epic scope, boundaries, or constraints are unclear, ambiguous, or too broad, ask the user before proceeding. Decomposition errors are costly to fix later.
+If scope or boundaries are unclear, ask the user wit hthe user ask tool before proceeding.
 
 ### 1. Decompose Epic
 
-Break down into **atomic features**—each with one testable outcome, completable in one session.
+Break down into **atomic features** — each with one testable outcome, completable in one session.
 
-**Sizing guardrails:**
-- Target **4-10 features** per epic. Fewer = under-decomposed; 11+ = over-decomposed or should be split into multiple epics.
-- Each feature should have a single "it works when..." statement. Multiple "and also..." = too big.
-- Group related work (e.g., CRUD operations, fetch+display). Don't create features for boilerplate, glue code, or per-file tasks.
+- Target **4-10 features**. Fewer = under-decomposed; 11+ = split into multiple epics.
+- Each feature has a single "it works when..." statement. Group related work (e.g., CRUD, fetch+display).
 
-Think through: foundation → core functionality → integration → polish. Fold trivial setup into the first feature that needs it.
+Think through: foundation → core → integration → polish. Fold trivial setup into the first feature that needs it.
 
 ### 2. Create Epic Doc
 
-Write `docs/plans/{epic}-000.md` — the durable context for the epic. Keep it under ~20 lines: one-line goal, scope boundaries, key constraints/decisions, and a list of planned feature IDs with one-line descriptions. Features reference this in `references`; it is shared context, not the ticket's own `plan_file`.
+Write `docs/plans/{epic}-000.md` — under ~20 lines: one-line goal, scope boundaries, key constraints, and planned feature IDs with one-line descriptions. Features reference this in `references`.
 
 ### 3. Generate Features
 
-Choose a short, descriptive epic prefix (e.g., `auth`, `cart`, `notif`, `dash`). If `features.yaml` exists, extract existing prefixes via `$SKILLS_ROOT/_lib/features_yaml.sh epics`—extend an existing epic if this work belongs there, otherwise create a new prefix.
+Choose a short epic prefix (e.g., `auth`, `cart`, `notif`). Check existing prefixes via `$SKILLS_ROOT/_lib/features_yaml.sh epics` — extend an existing epic if the work belongs there.
 
-For each planned child feature, register the ticket through `ticket-init` rather than recreating the ticket-creation workflow here.
-
-- Use the chosen epic prefix in the ticket request so `ticket-init` creates IDs in the intended epic.
-- You may batch creation if that keeps the decomposition clear.
-- After ticket creation, update the created records with the decomposition-specific fields that `epic-init` owns:
-  - `steps`
-  - `priority`
-  - `depends_on`
-  - `references`
-
-Target feature shape after registration and enrichment:
+Register each feature through `ticket-init`. After creation, enrich with decomposition-specific fields:
 
 ```yaml
-- id: "{epic}-{nnn}"
-  epic: "{epic}"
-  title: "{concise feature title}"
-  description: "User can [action] with [context]"
-  steps:
-    - "Step to verify feature works"
-    - "Another verification step"
-  status: pending
-  priority: 1
-  depends_on:
-    - epic-001
-  discovered_from: null
-  plan_file: null
-  references:
-    - "docs/plans/{epic}-000.md"
-  created_at: YYYY-MM-DD
+steps:
+  - "Step to verify feature works"
+priority: 1  # 1=foundation, 2=core, 3=polish
+depends_on:
+  - epic-001
+references:
+  - "docs/plans/{epic}-000.md"
 ```
 
-Requirements:
-- IDs sequential within epic (`sync-001`, `sync-002`, ...)
-- Titles are concise and scan well in backlog views
-- Descriptions are action-oriented and testable
-- Steps are concrete verification instructions
-- Priority: 1=foundation, 2=core, 3=polish
-- `status`: always `"pending"` here (lifecycle: `pending` → `in_progress` → `done`)
-- `depends_on` explicitly lists blocking feature IDs
-- `created_at` set to today's date
+### 4. Report
 
-Do not restate the ticket-creation mechanics here. `ticket-init` owns epic matching, ID generation, and initial append behavior.
-
-### 4. Report to User
-
-Summarize the decomposition: epic prefix, feature count by priority, key dependencies, and recommended starting feature. List any assumptions made or clarifications needed before starting.
-
----
-
-**Do not begin implementation.** This command only decomposes and registers work. Use `/next-feature` to select and `/plan-md` to plan implementation.
+Summarize: epic prefix, feature count by priority, key dependencies, and recommended starting feature. Do not begin implementation — use `/next-feature` to select and `/plan-md` to plan.

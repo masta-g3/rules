@@ -29,10 +29,7 @@ Skip trivial code—getters, boilerplate, simple wrappers, layout.
 
 ### 3. Identify Gaps
 
-For each critical path, assess coverage:
-- **Covered**: tests exist
-- **Partial**: happy path only
-- **Gap**: no tests, risk if it breaks
+For each critical path, assess coverage: **covered**, **partial** (happy path only), or **gap** (no tests, risk if it breaks).
 
 ### 4. Report to User
 
@@ -65,15 +62,8 @@ Keep the list focused—3-7 high-value tests, not exhaustive coverage.
 Once user confirms:
 - Write tests following existing conventions
 - One test per behavior, no duplication
-- Test outcomes, not implementation
+- Test outcomes, not implementation; prefer integration tests when behavior spans components
 - Use real data over elaborate mocks
 - Run tests to verify they pass
 
 If existing tests fail before adding new ones, report to user first.
-
----
-
-**Test quality principles:**
-- A test should fail when the feature breaks, pass when it works
-- Prefer integration tests when behavior spans components
-- Tests should survive refactoring of internals
