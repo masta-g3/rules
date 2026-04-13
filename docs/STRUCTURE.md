@@ -37,7 +37,7 @@ rules/
 ├── features.yaml       # This project's feature backlog
 ├── AGENTS.md           # Coding style & behavioral guidelines
 ├── README.md           # Usage documentation
-└── sync-prompts.sh     # Deploy AGENTS.md, skills, and subagents to ~/.claude, ~/.codex, ~/.cursor, ~/.pi/agent
+└── sync-prompts.sh     # Deploy skills to ~/.claude, ~/.codex, ~/.cursor; deploy AGENTS.md/subagents to those plus ~/.pi/agent; point Pi at ~/.claude/skills
 ```
 
 ## Core Concepts
@@ -84,7 +84,7 @@ Modes:
 |------|---------|
 | `features.yaml` | Feature backlog (sequence of feature objects) |
 | `AGENTS.md` | Agent behavior rules, copied to project roots |
-| `sync-prompts.sh` | Deploys skills to IDE agent directories |
+| `sync-prompts.sh` | Deploys skills to Claude/Codex/Cursor, deploys AGENTS.md/subagents to those plus Pi, and configures Pi to load Claude skills |
 
 ## Design Patterns
 

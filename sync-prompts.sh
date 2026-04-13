@@ -98,21 +98,29 @@ sync_dir() {
   done <<< "$rsync_out"
 }
 
-ensure_pi_package() {
-  local package="$1"
+ensure_pi_setting_array_value() {
+  local key="$1" value="$2" category="$3"
   local settings="${pi_root}/settings.json"
-  add_unique all_files["pi_packages"] "$package"
+  add_unique all_files["$category"] "$value"
 
-  if [[ ! -f "$settings" ]] || ! jq -e --arg package "$package" '.packages // [] | index($package)' "$settings" >/dev/null; then
-    add_unique added_files["pi_packages"] "$package"
+  if [[ ! -f "$settings" ]] || ! jq -e --arg key "$key" --arg value "$value" '.[$key] // [] | index($value)' "$settings" >/dev/null; then
+    add_unique added_files["$category"] "$value"
   fi
 
   if [[ -f "$settings" ]]; then
-    jq --arg package "$package" '. + {packages: (((.packages // []) + [$package]) | unique)}' \
+    jq --arg key "$key" --arg value "$value" '. + {($key): (((.[$key] // []) + [$value]) | unique)}' \
       "$settings" > tmp.$$ && mv tmp.$$ "$settings"
   else
-    jq -n --arg package "$package" '{packages: [$package]}' > "$settings"
+    jq -n --arg key "$key" --arg value "$value" '{($key): [$value]}' > "$settings"
   fi
+}
+
+ensure_pi_package() {
+  ensure_pi_setting_array_value "packages" "$1" "pi_packages"
+}
+
+ensure_pi_skill_path() {
+  ensure_pi_setting_array_value "skills" "$1" "pi_skill_paths"
 }
 
 sync_file "${repo_root}/AGENTS.md" "${codex_root}/AGENTS.md" "agents_md"
@@ -123,14 +131,18 @@ sync_file "${repo_root}/AGENTS.md" "${pi_root}/AGENTS.md" "agents_md"
 sync_dir "${repo_root}/skills/" "${codex_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${claude_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${cursor_root}/skills/" "skills"
-sync_dir "${repo_root}/skills/" "${pi_root}/skills/" "skills"
 
 sync_dir "${repo_root}/agents/" "${codex_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${claude_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${cursor_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
 
+if [[ -n "$DELETE_FLAG" ]]; then
+  rm -rf "${pi_root}/skills"
+fi
+
 ensure_pi_package "npm:pi-subagents"
+ensure_pi_skill_path "~/.claude/skills"
 
 sync_dir "${repo_root}/statusline/" "${claude_root}/statusline/" "statusline"
 
@@ -187,9 +199,10 @@ if [[ "$SILENT" == false ]]; then
   echo ""
 
   print_row "AGENTS.md" "agents_md" "codex, claude, cursor, pi"
-  print_row "skills" "skills" "codex, claude, cursor, pi"
+  print_row "skills" "skills" "codex, claude, cursor"
   print_row "subagents" "subagents" "codex, claude, cursor, pi"
   print_row "pi packages" "pi_packages" "pi"
+  print_row "pi loads skills from" "pi_skill_paths" "pi"
   print_row "statusline" "statusline" "claude"
 
   echo ""
