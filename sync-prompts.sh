@@ -136,6 +136,7 @@ sync_dir "${repo_root}/agents/" "${codex_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${claude_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${cursor_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
+sync_dir "${repo_root}/extensions/" "${pi_root}/extensions/" "extensions"
 
 if [[ -n "$DELETE_FLAG" ]]; then
   rm -rf "${pi_root}/skills"
@@ -147,7 +148,7 @@ ensure_pi_skill_path "~/.claude/skills"
 sync_dir "${repo_root}/statusline/" "${claude_root}/statusline/" "statusline"
 
 if [[ -f "${claude_root}/settings.json" ]]; then
-  jq '. + {statusLine: {type: "command", command: "bash ~/.claude/statusline/minimal.sh"}}' \
+  jq '.statusLine = ((.statusLine // {}) + {type: "command", command: "bash ~/.claude/statusline/minimal.sh"})' \
     "${claude_root}/settings.json" > tmp.$$ && mv tmp.$$ "${claude_root}/settings.json"
 fi
 
@@ -201,6 +202,7 @@ if [[ "$SILENT" == false ]]; then
   print_row "AGENTS.md" "agents_md" "codex, claude, cursor, pi"
   print_row "skills" "skills" "codex, claude, cursor"
   print_row "subagents" "subagents" "codex, claude, cursor, pi"
+  print_row "extensions" "extensions" "pi"
   print_row "pi packages" "pi_packages" "pi"
   print_row "pi loads skills from" "pi_skill_paths" "pi"
   print_row "statusline" "statusline" "claude"

@@ -43,6 +43,16 @@ Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked f
 
 `experimental/autopilot/` — Claude Code-only autopilot flow. Not part of the main workflow or `AGENTS.md`. See that directory for details.
 
+## Pi Extensions
+
+Project-local Pi extensions live in `extensions/` and sync into `~/.pi/agent/extensions/` via `./sync-prompts.sh`.
+
+Current Pi-specific extension work includes a minimalist workflow rail that highlights the active tracked-work skill step inside Pi:
+
+`next-feature → prime → plan-md → execute → review → commit`
+
+This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the most recently invoked workflow step, not authoritative feature completion state.
+
 ## Shared Helper Tooling
 
 Shared backlog operations live in `skills/_lib/features_yaml.py` and are invoked through the canonical entrypoint `skills/_lib/features_yaml.sh`.
@@ -133,7 +143,7 @@ fv                    # Project view (./features.yaml in current dir)
 ## Setup
 
 ```bash
-./sync-prompts.sh            # copies skills to ~/.claude, ~/.codex, ~/.cursor; copies AGENTS.md/subagents to those plus ~/.pi/agent; points Pi at ~/.claude/skills
+./sync-prompts.sh            # copies skills to ~/.claude, ~/.codex, ~/.cursor; copies AGENTS.md/subagents to those plus ~/.pi/agent; copies repo Pi extensions to ~/.pi/agent/extensions; points Pi at ~/.claude/skills
 ./sync-prompts.sh --clean    # also removes stale synced files, including legacy ~/.pi/agent/skills
 ./sync-prompts.sh --silent   # suppresses the sync summary
 ```

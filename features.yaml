@@ -293,3 +293,31 @@
   - docs/STRUCTURE.md
   created_at: '2026-04-03'
   completed_at: '2026-04-03'
+- id: skill-009
+  epic: skill
+  status: done
+  title: Show workflow-step indicator in Pi
+  description: User can see a minimalist workflow indicator in Pi that reflects the
+    workflow skill sequence and highlights the active step when invoking next-feature,
+    prime, plan-md, execute, review, or commit.
+  steps: []
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: docs/history/20260413_skill-009_workflow_indicator.md
+  references: []
+  created_at: '2026-04-14'
+  completed_at: '2026-04-13'
+- id: pv-010
+  epic: pv
+  status: pending
+  title: Fix pytest collection collision for pv tests
+  description: Developer can run uv run pytest without collection failure from duplicate
+    test_pv_creation module names
+  steps: []
+  priority: 2
+  depends_on: []
+  discovered_from: skill-009
+  plan_file: null
+  references: []
+  created_at: '2026-04-14'
