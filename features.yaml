@@ -310,7 +310,7 @@
   completed_at: '2026-04-13'
 - id: pv-010
   epic: pv
-  status: pending
+  status: done
   title: Fix pytest collection collision for pv tests
   description: Developer can run uv run pytest without collection failure from duplicate
     test_pv_creation module names
@@ -318,6 +318,7 @@
   priority: 2
   depends_on: []
   discovered_from: skill-009
-  plan_file: null
+  plan_file: docs/history/20260414_pv-010_pytest_collection_fix.md
   references: []
   created_at: '2026-04-14'
+  completed_at: '2026-04-14'

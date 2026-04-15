@@ -109,6 +109,14 @@ fv                    # Project view (./features.yaml in current dir)
 **Epic view:**
 - `n` - Create new feature in epic
 
+## Testing
+
+```bash
+uv run pytest -q
+```
+
+Pytest is scoped to `tests/` via `pytest.ini`.
+
 ## features.yaml Schema
 
 ```yaml

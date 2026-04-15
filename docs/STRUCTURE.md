@@ -36,6 +36,7 @@ rules/
 │   └── PARALLEL_AGENTS.md
 │
 ├── features.yaml       # This project's feature backlog
+├── pytest.ini          # Pytest collection config (scopes default runs to tests/)
 ├── AGENTS.md           # Coding style & behavioral guidelines
 ├── README.md           # Usage documentation
 └── sync-prompts.sh     # Deploy skills to ~/.claude, ~/.codex, ~/.cursor; deploy AGENTS.md/subagents/extensions to Pi; point Pi at ~/.claude/skills
@@ -84,6 +85,7 @@ Modes:
 | File | Purpose |
 |------|---------|
 | `features.yaml` | Feature backlog (sequence of feature objects) |
+| `pytest.ini` | Pytest collection scope for repo tests |
 | `AGENTS.md` | Agent behavior rules, copied to project roots |
 | `sync-prompts.sh` | Deploys skills to Claude/Codex/Cursor, deploys AGENTS.md/subagents/extensions to Pi, and configures Pi to load Claude skills |
 
