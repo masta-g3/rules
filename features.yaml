@@ -322,3 +322,19 @@
   references: []
   created_at: '2026-04-14'
   completed_at: '2026-04-14'
+- id: skill-010
+  epic: skill
+  status: done
+  title: Show active workflow ticket in Pi
+  description: User can see the active workflow ticket beside the Pi workflow rail,
+    set or override it explicitly, and keep the agent anchored to that ticket across
+    later workflow steps until it is cleared.
+  steps: []
+  priority: 2
+  depends_on: []
+  discovered_from: skill-009
+  plan_file: docs/history/20260414_skill-010_workflow_ticket.md
+  references:
+  - docs/history/20260413_skill-009_workflow_indicator.md
+  created_at: '2026-04-15'
+  completed_at: '2026-04-14'

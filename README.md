@@ -51,7 +51,9 @@ Current Pi-specific extension work includes a minimalist workflow rail that high
 
 `next-feature → prime → plan-md → execute → review → commit`
 
-This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the most recently invoked workflow step, not authoritative feature completion state. Use `/wf-clear` to clear it manually.
+This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the most recently invoked workflow step, not authoritative feature completion state.
+
+If you invoke a workflow skill with an explicit ticket immediately after the skill name, such as `/skill:prime engine-003`, the rail remembers that ticket, shows it beside the active step, and injects `Active workflow ticket: engine-003` into later turns until cleared. Use `/wf-ticket <ticket-id>` to set or override the active ticket manually; this also activates the same ticket context even before a workflow step is visible in the rail. Use `/wf-clear` to clear both the rail and the active ticket. Forking a session clears the workflow indicator and ticket context in the fork.
 
 ## Shared Helper Tooling
 
