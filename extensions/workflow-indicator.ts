@@ -61,6 +61,13 @@ function persistState(pi: ExtensionAPI, state: IndicatorState): void {
 	pi.appendEntry(ENTRY_TYPE, state);
 }
 
+function clearState(pi: ExtensionAPI, ctx: ExtensionContext): IndicatorState {
+	const state = { updatedAt: Date.now() };
+	persistState(pi, state);
+	applyWidget(ctx, state);
+	return state;
+}
+
 function renderRail(width: number, state: IndicatorState, theme: ExtensionContext["ui"]["theme"]): string {
 	const activeStep = getStep(state.activeStep);
 	if (!activeStep) return "";
@@ -100,6 +107,14 @@ function applyWidget(ctx: ExtensionContext, state: IndicatorState): void {
 export default function workflowIndicator(pi: ExtensionAPI): void {
 	let state: IndicatorState = {};
 
+	pi.registerCommand("wf-clear", {
+		description: "Clear the workflow indicator",
+		handler: async (_args, ctx) => {
+			state = clearState(pi, ctx);
+			ctx.ui.notify("Workflow indicator cleared.", "info");
+		},
+	});
+
 	pi.on("input", async (event, ctx) => {
 		if (event.source === "extension") {
 			return { action: "continue" };
@@ -129,9 +144,7 @@ export default function workflowIndicator(pi: ExtensionAPI): void {
 		}
 
 		if (event.reason === "fork") {
-			state = { updatedAt: Date.now() };
-			persistState(pi, state);
-			applyWidget(ctx, state);
+			state = clearState(pi, ctx);
 			return;
 		}
 

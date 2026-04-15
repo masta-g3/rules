@@ -51,7 +51,7 @@ Current Pi-specific extension work includes a minimalist workflow rail that high
 
 `next-feature → prime → plan-md → execute → review → commit`
 
-This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the most recently invoked workflow step, not authoritative feature completion state.
+This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the most recently invoked workflow step, not authoritative feature completion state. Use `/wf-clear` to clear it manually.
 
 ## Shared Helper Tooling
 
