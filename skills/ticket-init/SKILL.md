@@ -1,7 +1,7 @@
 ---
 name: ticket-init
 description: Add one or more tickets to features.yaml.
-argument-hint: "[ticket description] or \"ticket 1 || ticket 2\""
+argument-hint: "[ticket description(s) in natural language]"
 disable-model-invocation: true
 ---
 
@@ -9,16 +9,11 @@ Given the provided ticket request(s), add one or more feature entries to `featur
 
 ### 0. Normalize Input
 
-- If the provided ticket input contains ` || `, split it into multiple ticket requests.
-- Otherwise, treat it as a single ticket request.
-- Process each request independently, in order, using steps 1-4.
-
-Example multi-ticket input:
-`/ticket-init "Add GICS industry toggle || Add issuer-first cap-weighted aggregation"`
+Read the input as natural language. Infer whether it describes one ticket or multiple distinct tickets based on meaning — look for conjunctions ("and", "also"), comma-separated tasks, or clearly independent work items. When in doubt, prefer fewer tickets (group related work). Process each ticket independently using steps 1-4.
 
 ### 1. Determine Epic
 
-Use the epic if mentioned in the description (e.g., "Auth: fix login bug"). Otherwise, extract existing prefixes and match semantically. If ambiguous or no match, ask the user.
+Use the epic if mentioned in the description. Otherwise, extract existing prefixes and match semantically. If ambiguous or no match, ask the user.
 
 ```bash
 $SKILLS_ROOT/_lib/features_yaml.sh epics

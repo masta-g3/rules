@@ -1,6 +1,6 @@
 ---
 name: prime
-description: Context priming by reading files relevant to a task.
+description: Context priming to prepare to execute a task.
 argument-hint: "[task]"
 ---
 

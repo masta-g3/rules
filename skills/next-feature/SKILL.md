@@ -13,21 +13,11 @@ Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
 ### 2. Select Feature
 
-Selection behavior:
+Priority order: `in_progress` first (resume active work), then `pending` features whose `depends_on` are all `done`, ranked by priority (1 > 2 > 3), then `created_at`, then ID.
 
-1. If any feature is already `in_progress`, resume the highest-priority active item first.
-2. Otherwise, identify **ready** `pending` features—those where all IDs in `depends_on` have `status: "done"`.
+If nothing is ready, report blocked items and their unmet deps — do not guess or auto-resolve cycles.
 
-From ready `pending` features:
-1. Prefer highest priority (1 before 2 before 3)
-2. If tied, prefer earlier `created_at`, then earlier ID
-
-If no features are ready:
-- Check for blocked prerequisites
-- If a dependency cycle is suspected, inspect it manually and report it to the user; do not auto-resolve
-- Report situation to user; do not guess
-
-Report the current active work plus a small set of next ready options. Keep it brief and to the point. If the session spans multiple repos, repeat this check in each repo and report per-repo results separately.
+Report active work and a few next-ready options. For multi-repo sessions, report per repo.
 
 Default helper output has three sections:
 

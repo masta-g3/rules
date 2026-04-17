@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Archive planning document, finalize tracked work, and commit files from session.
+description: Commit files from session and archive/clean-up associated files.
 ---
 
 Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
