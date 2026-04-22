@@ -22,7 +22,8 @@
 
 We are working at a lean startup, not a large corporation. Code accordingly:
 - Prioritize minimalism and clarity. Removing is better than adding, **simple better than complex**.
-- Avoid enterprise bloat, boilerplate, thin wrappers, unecessary abstractions, ad-hoc patches, and hacky solutions.
+- Unless the repo style dictates it, prefer a minimalistic functional programing approach over complex over-abstracted OOP.
+- Avoid enterprise bloat, boilerplate, thin wrappers, unnecessary abstractions, ad-hoc patches, and hacky solutions.
 - If an approach is not working, report and brainstorm with the user instead of forcing a brittle implementation.
 - Do not introduce new patterns or technologies unless strictly needed.
 - Study existing functions and patterns first; make minimal, non-disruptive changes that simplify the codebase.

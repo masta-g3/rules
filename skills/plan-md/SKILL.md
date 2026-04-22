@@ -51,4 +51,4 @@ Don't execute on this plan yet; the user will provide feedback and approve.
 
 ### Plan Review (Non-Trivial Plans Only)
 
-For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** reviewer subagent once. Skip for trivial edits. Fix only clear correctness, completeness, or simplicity issues; ignore nits, decontextualized suggestions, and proposals that don't fit project constraints. Re-run only after material plan changes.
+For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** subagent once. Skip for trivial edits. Fix only clear correctness, completeness, or simplicity issues; ignore nits, decontextualized suggestions, scope creep and proposals that don't fit project constraints. Re-run only after material plan changes.
