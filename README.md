@@ -43,9 +43,11 @@ Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked f
 
 `experimental/autopilot/` — Claude Code-only autopilot flow. Not part of the main workflow or `AGENTS.md`. See that directory for details.
 
-## Pi Extensions
+## Pi Runtime Assets
 
 Project-local Pi extensions live in `extensions/` and sync into `~/.pi/agent/extensions/` via `./sync-prompts.sh`.
+
+Pi-only subagents live in `pi/agents/` and overlay into `~/.pi/agent/agents/` after the shared `agents/` sync. Use this for agents with Pi-specific providers, tools, or skills.
 
 Current Pi-specific extension work includes a minimalist workflow rail that highlights the active tracked-work skill step inside Pi:
 

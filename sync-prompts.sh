@@ -98,6 +98,32 @@ sync_dir() {
   done <<< "$rsync_out"
 }
 
+sync_overlay_dir() {
+  local src="$1" dst="$2" category="$3"
+  mkdir -p "$dst"
+  collect_files "$src" "$category"
+
+  local rsync_out
+  rsync_out=$(rsync -a --itemize-changes "$src" "$dst") || true
+
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    local change_type="${line:0:1}"
+    local file=$(echo "$line" | awk '{print $2}')
+    local name=$(echo "$file" | cut -d/ -f1)
+    name=$(strip_ext "$name")
+    [[ "$name" == .* || "$name" == _* ]] && continue
+
+    if [[ "$change_type" == ">" ]]; then
+      if [[ "${line:1:1}" == "f" && "${line:3:1}" == "+" ]]; then
+        add_unique added_files[$category] "$name"
+      else
+        add_unique updated_files[$category] "$name"
+      fi
+    fi
+  done <<< "$rsync_out"
+}
+
 ensure_pi_setting_array_value() {
   local key="$1" value="$2" category="$3"
   local settings="${pi_root}/settings.json"
@@ -136,6 +162,7 @@ sync_dir "${repo_root}/agents/" "${codex_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${claude_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${cursor_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
+sync_overlay_dir "${repo_root}/pi/agents/" "${pi_root}/agents/" "pi_subagents"
 sync_dir "${repo_root}/extensions/" "${pi_root}/extensions/" "extensions"
 
 if [[ -n "$DELETE_FLAG" ]]; then
@@ -202,6 +229,7 @@ if [[ "$SILENT" == false ]]; then
   print_row "AGENTS.md" "agents_md" "codex, claude, cursor, pi"
   print_row "skills" "skills" "codex, claude, cursor"
   print_row "subagents" "subagents" "codex, claude, cursor, pi"
+  print_row "pi-only subagents" "pi_subagents" "pi"
   print_row "extensions" "extensions" "pi"
   print_row "pi packages" "pi_packages" "pi"
   print_row "pi loads skills from" "pi_skill_paths" "pi"

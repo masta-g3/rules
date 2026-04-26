@@ -27,6 +27,8 @@ rules/
 │   ├── test-coverage/
 │   └── ticket-init/
 ├── extensions/         # Pi-only runtime extensions synced to ~/.pi/agent/extensions/
+├── pi/                 # Pi-only prompt assets
+│   └── agents/         # Pi-only subagents synced to ~/.pi/agent/agents/
 ├── statusline/         # Claude Code statusline config
 │
 ├── docs/
@@ -39,7 +41,7 @@ rules/
 ├── pytest.ini          # Pytest collection config (scopes default runs to tests/)
 ├── AGENTS.md           # Coding style & behavioral guidelines
 ├── README.md           # Usage documentation
-└── sync-prompts.sh     # Deploy skills to ~/.claude, ~/.codex, ~/.cursor; deploy AGENTS.md/subagents/extensions to Pi; point Pi at ~/.claude/skills
+└── sync-prompts.sh     # Deploy shared assets to all harnesses and overlay Pi-only assets into Pi
 ```
 
 ## Core Concepts
@@ -87,13 +89,13 @@ Modes:
 | `features.yaml` | Feature backlog (sequence of feature objects) |
 | `pytest.ini` | Pytest collection scope for repo tests |
 | `AGENTS.md` | Agent behavior rules, copied to project roots |
-| `sync-prompts.sh` | Deploys skills to Claude/Codex/Cursor, deploys AGENTS.md/subagents/extensions to Pi, and configures Pi to load Claude skills |
+| `sync-prompts.sh` | Deploys shared subagents to all harnesses and overlays Pi-only subagents/extensions into Pi |
 
 ## Design Patterns
 
 - **Single-file tools**: `bin/pv` is self-contained Python (requires PyYAML)
 - **Skill-first workflows**: `skills/*/SKILL.md` defines the main behavior; scripts handle deterministic mutations
-- **Pi runtime stays additive**: Pi-specific behavior belongs in `extensions/` instead of patching Pi core or overloading shared skills
+- **Pi runtime stays additive**: Pi-specific behavior belongs in `extensions/` or `pi/` instead of patching Pi core or overloading shared skills
 - **Experimental prompts stay isolated**: autopilot lives under `experimental/autopilot/` and remains opt-in
 - **State in filenames**: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone
 - **Repo-local YAML helper**: `skills/_lib/features_yaml.sh` is the supported entrypoint for shared `features.yaml` reads/writes, backed by `skills/_lib/features_yaml.py` via `uv`
