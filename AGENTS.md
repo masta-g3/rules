@@ -69,12 +69,12 @@ We are working at a lean startup, not a large corporation. Code accordingly:
 
 ## Skills Root
 
-Before running skill helper commands, set `SKILLS_ROOT` from the active harness install path. `./sync-prompts.sh` populates Claude/Codex/Cursor skill roots directly:
+Before running skill helper commands, set `SKILLS_ROOT` from the active harness install path. `./sync-prompts.sh` populates each harness skill root directly:
 
 - Codex: `export SKILLS_ROOT="$HOME/.codex/skills"`
 - Claude: `export SKILLS_ROOT="$HOME/.claude/skills"`
 - Cursor: `export SKILLS_ROOT="$HOME/.cursor/skills"`
-- Pi: `export SKILLS_ROOT="$HOME/.claude/skills"`  # Pi loads Claude skills via ~/.pi/agent/settings.json
+- Pi: `export SKILLS_ROOT="$HOME/.pi/agent/skills"`
 
 When `features.yaml` exists, avoid reading the full file into context. Prefer the repo-local helper:
 

@@ -155,12 +155,12 @@ Pytest is scoped to `tests/` via `pytest.ini`.
 ## Setup
 
 ```bash
-./sync-prompts.sh            # copies skills to ~/.claude, ~/.codex, ~/.cursor; copies AGENTS.md/subagents to those plus ~/.pi/agent; copies repo Pi extensions to ~/.pi/agent/extensions; points Pi at ~/.claude/skills
-./sync-prompts.sh --clean    # also removes stale synced files, including legacy ~/.pi/agent/skills
+./sync-prompts.sh            # copies skills to ~/.claude/skills, ~/.codex/skills, ~/.cursor/skills, ~/.pi/agent/skills; copies AGENTS.md/subagents to those plus ~/.pi/agent; copies repo Pi extensions to ~/.pi/agent/extensions
+./sync-prompts.sh --clean    # also removes stale synced files from synced target directories
 ./sync-prompts.sh --silent   # suppresses the sync summary
 ```
 
-Sync also ensures `npm:pi-subagents` and `~/.claude/skills` are listed in `~/.pi/agent/settings.json`.
+Sync also ensures `npm:pi-subagents` and `~/.pi/agent/skills` are listed in `~/.pi/agent/settings.json`.
 
 If `~/.claude/settings.json` exists, sync also refreshes the Claude statusline command.
 

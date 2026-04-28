@@ -6,7 +6,7 @@ argument-hint: "[request]"
 
 Create a detailed Markdown implementation plan for the provided request. Avoid scope creep.
 
-If unclear on scope or requirements, ask the user with the user ask tool before planning.
+If scope, approach, or dependencies are unclear, interview the user with the user ask tool before planning — walk through each decision branch one at a time. Don't carry unresolved assumptions forward.
 
 ### Plan File Location & Naming
 

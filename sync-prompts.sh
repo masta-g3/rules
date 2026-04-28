@@ -146,7 +146,22 @@ ensure_pi_package() {
 }
 
 ensure_pi_skill_path() {
-  ensure_pi_setting_array_value "skills" "$1" "pi_skill_paths"
+  local value="$1"
+  local old_value="${2:-}"
+  local settings="${pi_root}/settings.json"
+  add_unique all_files["pi_skill_paths"] "$value"
+
+  if [[ ! -f "$settings" ]] || ! jq -e --arg value "$value" '.skills // [] | index($value)' "$settings" >/dev/null; then
+    add_unique added_files["pi_skill_paths"] "$value"
+  fi
+
+  if [[ -f "$settings" ]]; then
+    jq --arg value "$value" --arg old_value "$old_value" \
+      '. + {skills: (((.skills // []) | map(select(. != $old_value)) + [$value]) | unique)}' \
+      "$settings" > tmp.$$ && mv tmp.$$ "$settings"
+  else
+    jq -n --arg value "$value" '{skills: [$value]}' > "$settings"
+  fi
 }
 
 sync_file "${repo_root}/AGENTS.md" "${codex_root}/AGENTS.md" "agents_md"
@@ -157,6 +172,7 @@ sync_file "${repo_root}/AGENTS.md" "${pi_root}/AGENTS.md" "agents_md"
 sync_dir "${repo_root}/skills/" "${codex_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${claude_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${cursor_root}/skills/" "skills"
+sync_dir "${repo_root}/skills/" "${pi_root}/skills/" "skills"
 
 sync_dir "${repo_root}/agents/" "${codex_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${claude_root}/agents/" "subagents"
@@ -165,12 +181,8 @@ sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
 sync_overlay_dir "${repo_root}/pi/agents/" "${pi_root}/agents/" "pi_subagents"
 sync_dir "${repo_root}/extensions/" "${pi_root}/extensions/" "extensions"
 
-if [[ -n "$DELETE_FLAG" ]]; then
-  rm -rf "${pi_root}/skills"
-fi
-
 ensure_pi_package "npm:pi-subagents"
-ensure_pi_skill_path "~/.claude/skills"
+ensure_pi_skill_path "~/.pi/agent/skills" "~/.claude/skills"
 
 sync_dir "${repo_root}/statusline/" "${claude_root}/statusline/" "statusline"
 
@@ -227,7 +239,7 @@ if [[ "$SILENT" == false ]]; then
   echo ""
 
   print_row "AGENTS.md" "agents_md" "codex, claude, cursor, pi"
-  print_row "skills" "skills" "codex, claude, cursor"
+  print_row "skills" "skills" "codex, claude, cursor, pi"
   print_row "subagents" "subagents" "codex, claude, cursor, pi"
   print_row "pi-only subagents" "pi_subagents" "pi"
   print_row "extensions" "extensions" "pi"
