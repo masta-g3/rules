@@ -1,17 +1,16 @@
 ## Communication Style
 
-**Keep responses short.** Lead with the answer, not preamble. No filler, no fluff.
-- State what changed and what the user needs to know; skip the rest.
-- Use one-liners for simple replies; expand only as needed for complexity.
-- On failure or uncertainty, say what happened and what's needed — no apologies.
-- Use the user ask tool to interview the user when requests are ambiguous or under-specified.
-- When explaining complex ideas prefer structured elements or ASCII diagrams.
+**Lead with the answer.** No preamble, no filler, no apologies.
+- One-liners for simple replies; expand only when complexity demands it.
+- On failure or uncertainty: state what happened and what's needed.
+- For complex ideas, prefer tables, lists, or ASCII diagrams over prose.
+- When a request is ambiguous, use the ask-user tool instead of guessing.
 
 ## Project Orientation
 
 - Check `docs/STRUCTURE.md` to understand project organization; if missing, continue without it.
-- Keep `docs/STRUCTURE.md` current as an onboarding guide for new developers: project purpose, architecture, directory layout, key files/modules, design patterns, and how to run/build.
-- Place code in the existing purpose-aligned modules or directories (for example, `utils/`, `src/`, or similar), following the repository's structure and naming patterns.
+- Keep `docs/STRUCTURE.md` current as an onboarding guide for new developers: project purpose, architecture, directory layout, key files/modules, design patterns, and how to run/build. Describe components and areas, not every file — it is a practical guide, not a full file index.
+- Before adding code, inspect existing structure and place new code in the matching purpose-aligned module, following the repo's conventions.
 - When working with Python, always use the `uv` tool for dependency management and virtual environments.
 
 ## Collaboration and Codebase Workflow
@@ -52,9 +51,20 @@ We are working at a lean startup, not a large corporation. Code accordingly:
 - Follow **Test Driven Development**: write tests first, iterate until passing.
 - Use ephemeral tests to validate features; remove all temporary test code and artifacts when done.
 
-## Features YAML Operations
+## Tracked Work State
 
-`features.yaml` is a project backlog file tracking features through the development cycle. Minimal schema (root-level sequence, not wrapped in a mapping):
+Tracked work persists across sessions in three places:
+
+- `features.yaml` — backlog and source of truth: id, status, priority, dependencies, and `plan_file`.
+- `docs/plans/` — active implementation plans (created by `plan-md`, updated during `execute`).
+- `docs/history/` — archived completed plans (moved here by `commit`; `plan_file` is updated to the archived path).
+
+User-driven skill workflow (do not advance automatically; stay within the current step):
+`next-feature` → `prime` → `plan-md` → `execute` → `review` → `commit`
+
+### features.yaml schema
+
+Root-level sequence (not wrapped in a mapping):
 
 ```yaml
 - id: auth-001
@@ -67,20 +77,15 @@ We are working at a lean startup, not a large corporation. Code accordingly:
   # optional: discovered_from, plan_file, references, epic, or custom metadata
 ```
 
-## Skills Root
+### Mutating features.yaml
 
-Before running skill helper commands, set `SKILLS_ROOT` from the active harness install path. `./sync-prompts.sh` populates each harness skill root directly:
+When `features.yaml` exists, avoid reading the full file into context. Use `$SKILLS_ROOT/_lib/features_yaml.sh` for listing epics, generating IDs, selecting the next feature, appending entries, and updating status/plan fields. Only fall back to direct YAML edits for operations the helper does not yet cover.
+
+## Skill Helper Setup
+
+Before running skill helper commands, set `SKILLS_ROOT` from the active harness install path1:
 
 - Codex: `export SKILLS_ROOT="$HOME/.codex/skills"`
 - Claude: `export SKILLS_ROOT="$HOME/.claude/skills"`
 - Cursor: `export SKILLS_ROOT="$HOME/.cursor/skills"`
 - Pi: `export SKILLS_ROOT="$HOME/.pi/agent/skills"`
-
-When `features.yaml` exists, avoid reading the full file into context. Prefer the repo-local helper:
-
-- Use `$SKILLS_ROOT/_lib/features_yaml.sh` for common operations such as listing epics, generating IDs, selecting the next feature, appending entries, or updating status/plan fields.
-- Keep YAML mutations inside the helper instead of ad hoc shell pipelines when possible; this avoids local `yq`/`jq` version drift.
-- If a needed operation is not yet covered by the helper, extract only the minimal subset required before considering direct YAML manipulation.
-
-User-driven skill workflow (do not advance automatically; stay within the current step):
-`next-feature` → `prime` → `plan-md` → `execute` → `review` → `commit`
