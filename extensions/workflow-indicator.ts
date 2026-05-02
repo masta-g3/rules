@@ -19,6 +19,7 @@ const WORKFLOW = [
 	{ id: "plan-md", short: "PL" },
 	{ id: "execute", short: "EX" },
 	{ id: "review", short: "RV" },
+	{ id: "reflect", short: "RF" },
 	{ id: "commit", short: "CM" },
 ] as const;
 

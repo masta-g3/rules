@@ -352,3 +352,17 @@
   references: []
   created_at: '2026-05-01'
   completed_at: '2026-05-01'
+- id: skill-012
+  epic: skill
+  status: done
+  title: Add reflect workflow step
+  description: Workflow includes a reflect step after review to update durable docs
+    and agent guidance from finalized work
+  steps: []
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: docs/history/20260501_skill-012_reflect_workflow_step.md
+  references: []
+  created_at: '2026-05-01'
+  completed_at: '2026-05-01'

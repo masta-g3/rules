@@ -45,6 +45,10 @@ Include a context-files section:
 
 Don't execute on this plan yet; the user will provide feedback and approve.
 
+### Documentation
+
+Only plan doc updates when they are explicit deliverables; otherwise note likely doc impacts as `Reflection Candidates` for `/reflect`.
+
 ### Preserve Pending Status
 
 **If plan file is named `{epic}-{nnn}.md` (tracked feature):** keep its `status` as `"pending"`. Planning prepares implementation but does not activate the work; `execute` owns the `pending` → `in_progress` transition.

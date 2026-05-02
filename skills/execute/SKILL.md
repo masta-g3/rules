@@ -23,6 +23,10 @@ Iterate through each phase: implement, verify existing features still work, conf
 
 Update the plan document with a "Discovered Work" section. Never silently absorb scope.
 
+### Documentation
+
+Only update docs during execution when they are explicit deliverables or runtime/build/testable artifacts; otherwise note `Reflection Candidates` for `/reflect`.
+
 ### Code Quality
 
 Prefer the smallest change that fully solves the task — keep it clean, modular, and pattern-aligned. Reuse existing patterns; avoid widening the impact surface unless clearly required.

@@ -5,7 +5,7 @@ description: Commit files from session and archive/clean-up associated files.
 
 Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
-Assume the work has already been reviewed. Quick final scan for debug artifacts or prompt residue before proceeding.
+Assume the work has already been reviewed and reflected. Quick final scan for debug artifacts or prompt residue before proceeding.
 
 ### Archive Planning Document
 
@@ -18,9 +18,9 @@ If a planning file exists, archive it:
 
 If tracked feature: `$SKILLS_ROOT/_lib/features_yaml.sh complete <feature-id> --plan-file <archive-path>` — sets status to `"done"`, `completed_at` to today, and `plan_file` to archive path. Verify discovered items are logged. Include `features.yaml` in the commit.
 
-### Repo Docs
+### Documentation
 
-Update `docs/STRUCTURE.md`, `README.md`, and related `docs/` guides to reflect finished work. Keep edits concise and factual.
+Assume `/reflect` handled durable documentation updates. Do not make broad documentation changes here. If obvious documentation drift remains and the user skipped `/reflect`, stop and ask whether to run `/reflect` before committing.
 
 ### Commit
 

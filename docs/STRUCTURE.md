@@ -23,6 +23,7 @@ rules/
 │   ├── plan-md/
 │   ├── prime/
 │   ├── project-init/
+│   ├── reflect/
 │   ├── review/
 │   ├── test-coverage/
 │   └── ticket-init/
@@ -50,7 +51,7 @@ rules/
 
 Projects track work in `features.yaml`:
 ```
-[pending feature] → plan-md → [plan.md] → execute → [in_progress] → review → commit → [done]
+[pending feature] → plan-md → [plan.md] → execute → [in_progress] → review → reflect → commit → [done]
 ```
 
 Features have: id, status, epic, depends_on, priority, and optional planning references such as `plan_file` and `references`.
@@ -62,12 +63,13 @@ graph LR
     prime["prime skill"] --> plan["plan-md skill"]
     plan --> execute["execute skill"]
     execute --> review["review skill"]
-    review --> commit["commit skill"]
+    review --> reflect["reflect skill"]
+    reflect --> commit["commit skill"]
     commit --> next["next-feature skill"]
     next --> prime
 ```
 
-The main workflow excludes experimental autopilot and file-reservation prompts. Within the default workflow, `review` is the explicit pre-commit inspection point. Successful workflow skills emit handoff labels (`READY FOR PLAN`, `READY FOR EXECUTE`, `READY FOR REVIEW`, `READY FOR COMMIT`, then `WORKFLOW COMPLETE`; tracked work also uses `READY FOR PRIME`). These labels indicate the next user-invoked step and do not advance the workflow automatically. Autopilot lives under `experimental/autopilot/` and is not part of `AGENTS.md`.
+The main workflow excludes experimental autopilot and file-reservation prompts. Within the default workflow, `review` is the explicit implementation inspection point and `reflect` updates durable docs or agent guidance before commit. Successful workflow skills emit handoff labels (`READY FOR PLAN`, `READY FOR EXECUTE`, `READY FOR REVIEW`, `READY FOR REFLECT`, `READY FOR COMMIT`, then `WORKFLOW COMPLETE`; tracked work also uses `READY FOR PRIME`). These labels indicate the next user-invoked step and do not advance the workflow automatically. Autopilot lives under `experimental/autopilot/` and is not part of `AGENTS.md`.
 
 ### pv/fv TUI
 

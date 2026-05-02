@@ -60,7 +60,7 @@ Tracked work persists across sessions in three places:
 - `docs/history/` — archived completed plans (moved here by `commit`; `plan_file` is updated to the archived path).
 
 User-driven skill workflow (do not advance automatically; stay within the current step):
-`next-feature` → `prime` → `plan-md` → `execute` → `review` → `commit`
+`next-feature` → `prime` → `plan-md` → `execute` → `review` → `reflect` → `commit`
 
 ### features.yaml schema
 

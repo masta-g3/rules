@@ -14,15 +14,15 @@ Minimal skills for AI agents in developer IDEs.
 
 For quick tasks without multi-session tracking:
 
-`prime` → `plan-md` → `execute` → `review` → `commit`
+`prime` → `plan-md` → `execute` → `review` → `reflect` → `commit`
 
 ### Feature-Driven (Multi-Session Projects)
 
 For projects with backlog tracking via `features.yaml`:
 
-`project-init` → `next-feature` → `prime` → `plan-md` → `execute` → `review` → `commit`
+`project-init` → `next-feature` → `prime` → `plan-md` → `execute` → `review` → `reflect` → `commit`
 
-Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone. Creating a plan keeps tracked work `pending`; `execute` moves it to `in_progress`; `commit` moves it to `done`.
+Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone. Creating a plan keeps tracked work `pending`; `execute` moves it to `in_progress`; `commit` moves it to `done` after `reflect` handles durable documentation updates.
 
 ## Skills
 
@@ -35,7 +35,8 @@ Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked f
 | `skills/prime` | Context prime: structure docs, git history |
 | `skills/plan-md` | Create implementation plan |
 | `skills/execute` | Implement with baseline verification |
-| `skills/review` | Review finished work before archival and commit |
+| `skills/review` | Review finished work before reflection and commit |
+| `skills/reflect` | Update durable docs and agent guidance after review |
 | `skills/commit` | Archive plan, finalize tracked work, commit |
 | `skills/test-coverage` | Analyze test coverage |
 
@@ -51,7 +52,7 @@ Pi-only subagents live in `pi/agents/` and overlay into `~/.pi/agent/agents/` af
 
 Current Pi-specific extension work includes a minimalist workflow rail that highlights the active tracked-work skill step inside Pi:
 
-`next-feature → prime → plan-md → execute → review → commit`
+`next-feature → prime → plan-md → execute → review → reflect → commit`
 
 This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the most recently invoked workflow step, not authoritative feature completion state.
 
