@@ -42,3 +42,7 @@ Rules:
 - If nothing is actionable, report the no-ready situation and include the first few blocked items with unmet dependencies instead of inventing a recommendation.
 
 **Do not modify features.yaml.** Status changes happen in execute/commit.
+
+### Output
+
+When an actionable feature is recommended, end with `READY FOR PRIME`. If nothing is actionable, report the blocked/no-ready state instead.

@@ -67,7 +67,7 @@ graph LR
     next --> prime
 ```
 
-The main workflow excludes experimental autopilot and file-reservation prompts. Within the default workflow, `review` is the explicit pre-commit inspection point. Autopilot lives under `experimental/autopilot/` and is not part of `AGENTS.md`.
+The main workflow excludes experimental autopilot and file-reservation prompts. Within the default workflow, `review` is the explicit pre-commit inspection point. Successful workflow skills emit handoff labels (`READY FOR PLAN`, `READY FOR EXECUTE`, `READY FOR REVIEW`, `READY FOR COMMIT`, then `WORKFLOW COMPLETE`; tracked work also uses `READY FOR PRIME`). These labels indicate the next user-invoked step and do not advance the workflow automatically. Autopilot lives under `experimental/autopilot/` and is not part of `AGENTS.md`.
 
 ### pv/fv TUI
 

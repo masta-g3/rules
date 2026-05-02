@@ -26,5 +26,5 @@ Do not:
 
 Report one of:
 
-- `READY FOR COMMIT` — include any brief caveats worth remembering
+- `READY FOR COMMIT` — implementation has passed review; include any brief caveats worth remembering
 - `REVIEW ISSUES` — list the blocking issues and the concrete fixes needed

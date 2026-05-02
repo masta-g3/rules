@@ -42,5 +42,5 @@ For user-facing features (UI flows, API endpoints, interactive elements), invoke
 
 Report status clearly:
 
-- **PLAN COMPLETE** — all phases done, ready for `/review`
+- **READY FOR REVIEW** — all phases done and ready for `/review`
 - **PENDING STEPS** — list remaining phases/tasks, indicate next action

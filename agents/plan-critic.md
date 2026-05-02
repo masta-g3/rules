@@ -1,6 +1,8 @@
 ---
 name: plan-critic
 description: Reviews implementation plans for correctness, gaps, and simplification opportunities. Invoked after plan creation to catch issues before implementation.
+model: openai-codex/gpt-5.5
+thinking: high
 tools: read, grep, find, bash
 ---
 
