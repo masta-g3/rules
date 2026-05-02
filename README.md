@@ -16,15 +16,11 @@ For quick tasks without multi-session tracking:
 
 `prime` → `plan-md` → `execute` → `review` → `commit`
 
-Successful skills end with handoff labels: `READY FOR PLAN`, `READY FOR EXECUTE`, `READY FOR REVIEW`, `READY FOR COMMIT`, then `WORKFLOW COMPLETE`.
-
 ### Feature-Driven (Multi-Session Projects)
 
 For projects with backlog tracking via `features.yaml`:
 
 `project-init` → `next-feature` → `prime` → `plan-md` → `execute` → `review` → `commit`
-
-`next-feature` adds the tracked-work handoff `READY FOR PRIME`. Handoff labels indicate the next user-invoked step; they do not authorize automatic advancement.
 
 Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone. Creating a plan keeps tracked work `pending`; `execute` moves it to `in_progress`; `commit` moves it to `done`.
 
