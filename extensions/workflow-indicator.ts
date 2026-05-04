@@ -4,6 +4,8 @@ import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 const ENTRY_TYPE = "workflow-indicator";
 const WIDGET_ID = "workflow-indicator";
 const SKILL_PREFIX = /^\/skill:([a-z0-9-]+)(?:\s|$)/;
+const ADVANCE_SHORTCUT = "ctrl+shift+right";
+const ADVANCE_DOUBLE_PRESS_MS = 800;
 
 const TOKENS = {
 	muted: "dim",
@@ -31,7 +33,7 @@ type StepName = (typeof WORKFLOW)[number]["id"];
 type IndicatorState = {
 	activeStep?: StepName;
 	ticketId?: string;
-	source?: "input" | "command";
+	source?: "input" | "command" | "shortcut";
 	updatedAt?: number;
 };
 
@@ -51,6 +53,15 @@ function getStep(stepName?: StepName) {
 
 function getStepIndex(stepName?: StepName): number {
 	return WORKFLOW.findIndex((step) => step.id === stepName);
+}
+
+function getNextStep(stepName?: StepName): StepName | undefined {
+	const index = getStepIndex(stepName);
+	return index >= 0 ? WORKFLOW[index + 1]?.id : undefined;
+}
+
+function buildSkillCommand(stepName: StepName, ticketId?: string): string {
+	return ticketId ? `/skill:${stepName} ${ticketId}` : `/skill:${stepName}`;
 }
 
 function extractStep(text: string): StepName | undefined {
@@ -153,6 +164,7 @@ function applyWidget(ctx: ExtensionContext, state: IndicatorState): void {
 
 export default function workflowIndicator(pi: ExtensionAPI): void {
 	let state: IndicatorState = {};
+	let lastAdvanceShortcutAt = 0;
 
 	pi.registerCommand("wf-ticket", {
 		description: "Set or override the active workflow ticket",
@@ -181,6 +193,49 @@ export default function workflowIndicator(pi: ExtensionAPI): void {
 		handler: async (_args, ctx) => {
 			state = clearState(pi, ctx);
 			ctx.ui.notify("Workflow indicator cleared.", "info");
+		},
+	});
+
+	pi.registerShortcut(ADVANCE_SHORTCUT, {
+		description: "Run the next workflow skill, or clear after commit, on double press",
+		handler: async (ctx) => {
+			if (!state.activeStep) {
+				ctx.ui.notify("No active workflow step to advance.", "warning");
+				lastAdvanceShortcutAt = 0;
+				return;
+			}
+
+			if (!ctx.isIdle()) {
+				ctx.ui.notify("Wait for the current turn to finish before advancing workflow.", "warning");
+				lastAdvanceShortcutAt = 0;
+				return;
+			}
+
+			if (ctx.ui.getEditorText().length > 0) {
+				ctx.ui.notify("Editor has unsent text. Clear it before advancing workflow.", "warning");
+				lastAdvanceShortcutAt = 0;
+				return;
+			}
+
+			const nextStep = getNextStep(state.activeStep);
+			const command = nextStep ? buildSkillCommand(nextStep, state.ticketId) : undefined;
+			const actionDescription = command ?? "clear workflow indicator";
+			const now = Date.now();
+			if (now - lastAdvanceShortcutAt > ADVANCE_DOUBLE_PRESS_MS) {
+				lastAdvanceShortcutAt = now;
+				ctx.ui.notify(`Again to ${command ? `run ${command}` : actionDescription}`, "info");
+				return;
+			}
+
+			lastAdvanceShortcutAt = 0;
+			if (!nextStep) {
+				state = clearState(pi, ctx);
+				ctx.ui.notify("Workflow indicator cleared.", "info");
+				return;
+			}
+
+			state = setState(pi, ctx, { ...state, activeStep: nextStep, source: "shortcut" });
+			pi.sendUserMessage(command);
 		},
 	});
 

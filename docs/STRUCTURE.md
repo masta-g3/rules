@@ -69,7 +69,7 @@ graph LR
     next --> prime
 ```
 
-The main workflow excludes experimental autopilot and file-reservation prompts. Within the default workflow, `review` is the explicit implementation inspection point and `reflect` updates durable docs or agent guidance before commit. Successful workflow skills emit handoff labels (`READY FOR PLAN`, `READY FOR EXECUTE`, `READY FOR REVIEW`, `READY FOR REFLECT`, `READY FOR COMMIT`, then `WORKFLOW COMPLETE`; tracked work also uses `READY FOR PRIME`). These labels indicate the next user-invoked step and do not advance the workflow automatically. Autopilot lives under `experimental/autopilot/` and is not part of `AGENTS.md`.
+The main workflow excludes experimental autopilot and file-reservation prompts. Within the default workflow, `review` is the explicit implementation inspection point and `reflect` updates durable docs or agent guidance before commit. Successful workflow skills emit handoff labels (`READY FOR PLAN`, `READY FOR EXECUTE`, `READY FOR REVIEW`, `READY FOR REFLECT`, `READY FOR COMMIT`, then `WORKFLOW COMPLETE`; tracked work also uses `READY FOR PRIME`). These labels indicate the next user-invoked step and do not advance the workflow without explicit user action; Pi's workflow indicator also offers a double `ctrl+shift+right` shortcut that runs the next workflow skill, or clears the indicator from `commit`, when the editor is empty and Pi is idle. Autopilot lives under `experimental/autopilot/` and is not part of `AGENTS.md`.
 
 ### pv/fv TUI
 
