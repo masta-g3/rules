@@ -19,7 +19,7 @@ Focus on **implementation craft and drift from the approved plan**.
 
 2. **Read the approved plan** at the path supplied by the invoking agent; if none is supplied, skip plan-drift checks.
 
-3. **Use the exact file list provided by the invoking agent.** Review only those task files. Do not infer a broader file set from git unless no file list was supplied.
+3. **Review the files listed by the invoking agent.** If no file list is supplied, fall back to the smallest relevant git diff. Others may be working in parallel; do not assume unlisted changes are part of this review.
 
 4. **If no file list was supplied**, fall back to the smallest relevant git diff you can determine for the current task.
 
