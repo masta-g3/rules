@@ -15,6 +15,8 @@ Read the input as natural language. Infer whether it describes one ticket or mul
 
 Use the epic if mentioned in the description. Otherwise, extract existing prefixes and match semantically. If ambiguous or no match, ask the user.
 
+Epic prefixes should be concise, self-explanatory slugs of 1-3 short words, usually lowercase kebab-case. Prefer creating a new focused epic over adding unrelated tickets to a broad or muddy existing epic. Reuse an existing epic only when the ticket clearly belongs to the same coherent work area.
+
 ```bash
 $SKILLS_ROOT/_lib/features_yaml.sh epics
 ```
