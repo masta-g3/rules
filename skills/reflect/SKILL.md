@@ -27,6 +27,6 @@ Only update durable docs/guidance. Do not change code, tracked state, archives, 
 
 Report one of:
 
-- `READY FOR COMMIT` — list docs updated
-- `NO REFLECTION UPDATES — READY FOR COMMIT`
+- `READY FOR COMMIT` — include a `Summary:` line with 1-2 sentences on docs/guidance updated before the handoff label, then list docs updated
+- `NO REFLECTION UPDATES — READY FOR COMMIT` — include a `Summary:` line with 1-2 sentences explaining why no durable updates were needed before the handoff label
 - `REFLECTION BLOCKED` — explain the decision needed

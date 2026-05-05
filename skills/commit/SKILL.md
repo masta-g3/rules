@@ -39,4 +39,4 @@ If this session touched multiple repositories, ask the user whether to commit in
 
 ### Output
 
-After a successful commit, end with `WORKFLOW COMPLETE` and include the commit hash.
+After a successful commit, include a `Summary:` line with 1-2 sentences on what was committed, then end with `WORKFLOW COMPLETE` and include the commit hash.

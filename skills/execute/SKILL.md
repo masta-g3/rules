@@ -44,7 +44,7 @@ For user-facing features (UI flows, API endpoints, interactive elements), invoke
 
 ### Session End
 
-Report status clearly:
+Report status clearly. For successful execution, include a `Summary:` line with 1-2 sentences on what was implemented and verified before the handoff label.
 
 - **READY FOR REVIEW** — all phases done and ready for `/review`
 - **PENDING STEPS** — list remaining phases/tasks, indicate next action

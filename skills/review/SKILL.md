@@ -27,5 +27,5 @@ Do not:
 
 Report one of:
 
-- `READY FOR REFLECT` — implementation has passed review; include any documentation/reflection candidates
+- `READY FOR REFLECT` — implementation has passed review; include a `Summary:` line with 1-2 sentences on the review result before the handoff label, plus any documentation/reflection candidates
 - `REVIEW ISSUES` — list the blocking issues and the concrete fixes needed

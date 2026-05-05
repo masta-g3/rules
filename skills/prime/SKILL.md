@@ -13,4 +13,4 @@ Gather the context needed to work confidently on the task:
 
 ### Output
 
-End successful priming with `READY FOR PLAN`. If context gathering is blocked, report `BLOCKED — <reason>`.
+For successful priming, include a `Summary:` line with 1-2 sentences on the key context learned, then end with `READY FOR PLAN`. If context gathering is blocked, report `BLOCKED — <reason>`.
