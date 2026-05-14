@@ -26,7 +26,8 @@ rules/
 │   ├── reflect/
 │   ├── review/
 │   ├── test-coverage/
-│   └── ticket-init/
+│   ├── ticket-init/
+│   └── workflow-migrate/
 ├── extensions/         # Pi-only runtime extensions synced to ~/.pi/agent/extensions/
 ├── pi/                 # Pi-only prompt assets
 │   └── agents/         # Pi-only subagents synced to ~/.pi/agent/agents/
@@ -36,7 +37,8 @@ rules/
 │   ├── features.yaml   # This project's feature backlog
 │   ├── plans/          # Active implementation plans
 │   ├── history/        # Archived implementation plans and workflow notes
-│   └── tickets/        # Ticket-local scripts, logs, and validation artifacts
+│   ├── tickets/        # On-demand ticket-local temporary scripts, logs, and validation artifacts
+│   └── <name>/         # Optional repo-specific non-durable planning/scratchpad areas
 │
 ├── docs/
 │   └── STRUCTURE.md    # Durable architecture/onboarding guide
@@ -56,7 +58,7 @@ Projects track work in `agent-work/features.yaml`:
 [pending feature] → plan-md → [agent-work/plans/id.md] → execute → [in_progress] → review → reflect → commit → [done]
 ```
 
-Agent-produced workflow artifacts live under `agent-work/`. Durable architecture, onboarding, and reference documentation stays under `docs/`.
+Agent-produced workflow artifacts live under `agent-work/`, including repo-specific planning/scratchpad areas when needed. Durable architecture, onboarding, and reference documentation stays under `docs/`.
 
 Features have: id, status, epic, depends_on, priority, and optional planning references such as `plan_file` and `references`.
 
@@ -105,3 +107,4 @@ Modes:
 - **Experimental prompts stay isolated**: autopilot lives under `experimental/autopilot/` and remains opt-in
 - **State in filenames**: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone
 - **Repo-local YAML helper**: `skills/_lib/features_yaml.sh` is the supported entrypoint for shared `agent-work/features.yaml` reads/writes, backed by `skills/_lib/features_yaml.py` via `uv`
+- **Explicit migrations**: `skills/workflow-migrate` prepares legacy root/`docs/` workflow artifacts for planned migration into `agent-work/` without adding old-path fallback behavior

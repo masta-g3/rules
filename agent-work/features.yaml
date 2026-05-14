@@ -380,3 +380,18 @@
   references: []
   created_at: '2026-05-13'
   completed_at: '2026-05-13'
+- id: skill-014
+  epic: skill
+  status: done
+  title: Add legacy workflow migration skill
+  description: Maintainers can guide old-format repositories from root features.yaml
+    and docs workflow artifacts into the canonical agent-work layout using a concise
+    skill that pairs with plan-md.
+  steps: []
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: agent-work/history/20260513_skill-014_legacy_migration_skill.md
+  references: []
+  created_at: '2026-05-13'
+  completed_at: '2026-05-13'
