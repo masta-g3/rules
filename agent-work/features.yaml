@@ -5,7 +5,7 @@
   description: "Merge pv and fv into single TUI with 4-level navigation: Portfolio\
     \ \u2192 Project \u2192 Epic \u2192 Feature"
   created_at: '2026-01-24'
-  plan_file: docs/history/20260124_pv-001_unified_viewer.md
+  plan_file: agent-work/history/20260124_pv-001_unified_viewer.md
 - id: pv-002
   epic: pv
   status: done
@@ -25,7 +25,7 @@
   depends_on:
   - pv-001
   created_at: '2026-01-24'
-  plan_file: docs/history/20260124_pv-002_edit_mode.md
+  plan_file: agent-work/history/20260124_pv-002_edit_mode.md
 - id: pv-003
   epic: pv
   status: done
@@ -43,7 +43,7 @@
   depends_on:
   - pv-002
   created_at: '2026-01-24'
-  plan_file: docs/history/20260125_pv-003_archive_projects.md
+  plan_file: agent-work/history/20260125_pv-003_archive_projects.md
 - id: pv-004
   epic: pv
   status: done
@@ -54,7 +54,7 @@
   depends_on:
   - pv-001
   created_at: '2026-01-24'
-  plan_file: docs/history/20260124_pv-004_tree_view.md
+  plan_file: agent-work/history/20260124_pv-004_tree_view.md
 - id: pv-005
   epic: pv
   status: done
@@ -64,7 +64,7 @@
     \ follows existing sort cycle pattern."
   depends_on: []
   created_at: '2026-01-25'
-  plan_file: docs/history/20260125_pv-005_unified_filter.md
+  plan_file: agent-work/history/20260125_pv-005_unified_filter.md
 - id: pv-006
   epic: pv
   status: done
@@ -73,7 +73,7 @@
     tree views. Includes preview-before-commit, AI-agent-friendly operations module,
     and flash feedback.
   created_at: '2026-01-27'
-  plan_file: docs/history/20260127_pv-006_entity_creation.md
+  plan_file: agent-work/history/20260127_pv-006_entity_creation.md
 - id: pv-007
   epic: pv
   status: done
@@ -83,7 +83,7 @@
     change M to O for collapse-all'
   priority: 2
   created_at: '2026-01-27'
-  plan_file: docs/history/20260127_pv-007_hotkey_homogenization.md
+  plan_file: agent-work/history/20260127_pv-007_hotkey_homogenization.md
 - id: cmd-001
   epic: cmd
   status: done
@@ -93,14 +93,14 @@
   priority: 1
   depends_on: []
   created_at: '2026-01-28'
-  plan_file: docs/history/20260128_cmd-001_ticket_init.md
+  plan_file: agent-work/history/20260128_cmd-001_ticket_init.md
 - id: cmd-002
   epic: cmd
   status: done
   title: File reservation system for parallel agents
   description: Cooperative file-lock mechanism so multiple agents working on different
     features can avoid modifying the same file simultaneously. Presence-based toggle
-    via docs/plans/.file-locks.json.
+    via agent-work/plans/.file-locks.json.
   steps:
   - Add reservation protocol to AGENTS.md
   - Add --parallel flag and conflict check to plan-md.md
@@ -111,7 +111,7 @@
   discovered_from: null
   created_at: '2026-01-30'
   completed_at: '2026-02-01'
-  plan_file: docs/history/20260130_cmd-002_file_reservations.md
+  plan_file: agent-work/history/20260130_cmd-002_file_reservations.md
 - id: cmd-003
   epic: cmd
   status: done
@@ -122,7 +122,7 @@
   depends_on: []
   discovered_from: null
   created_at: '2026-01-31'
-  plan_file: docs/history/20260131_cmd-003_features_yaml.md
+  plan_file: agent-work/history/20260131_cmd-003_features_yaml.md
 - id: pv-008
   epic: pv
   status: done
@@ -133,7 +133,7 @@
   depends_on: []
   created_at: '2026-02-03'
   completed_at: '2026-02-03'
-  plan_file: docs/history/20260203_pv-008_activity_dashboard.md
+  plan_file: agent-work/history/20260203_pv-008_activity_dashboard.md
 - id: pv-009
   status: done
   title: Stacked bar chart by epic in activity view
@@ -145,7 +145,7 @@
   - pv-008
   created_at: '2026-02-07'
   completed_at: '2026-02-07'
-  plan_file: docs/history/20260207_pv-009_stacked_bar_epic.md
+  plan_file: agent-work/history/20260207_pv-009_stacked_bar_epic.md
 - id: cmd-004
   epic: cmd
   status: done
@@ -158,7 +158,7 @@
   discovered_from: null
   created_at: '2026-02-13'
   completed_at: '2026-02-13'
-  plan_file: docs/history/20260218_cmd-004_skills_frontmatter_contract.md
+  plan_file: agent-work/history/20260218_cmd-004_skills_frontmatter_contract.md
 - id: cmd-005
   epic: cmd
   status: done
@@ -169,7 +169,7 @@
   discovered_from: null
   created_at: '2026-02-14'
   completed_at: '2026-02-18'
-  plan_file: docs/history/20260218_cmd-005_restore_skill_guidance.md
+  plan_file: agent-work/history/20260218_cmd-005_restore_skill_guidance.md
 - id: cmd-006
   epic: cmd
   status: done
@@ -180,7 +180,7 @@
   depends_on: []
   created_at: '2026-02-17'
   completed_at: '2026-02-18'
-  plan_file: docs/history/20260218_cmd-006_subagents_root_sync.md
+  plan_file: agent-work/history/20260218_cmd-006_subagents_root_sync.md
 - id: skill-001
   epic: skill
   status: done
@@ -192,7 +192,7 @@
   depends_on: []
   created_at: '2026-03-02'
   completed_at: '2026-03-02'
-  plan_file: docs/history/20260302_skill-001_extract_workflow_filelock.md
+  plan_file: agent-work/history/20260302_skill-001_extract_workflow_filelock.md
 - id: skill-002
   epic: skill
   status: done
@@ -202,7 +202,7 @@
   priority: 2
   depends_on: []
   created_at: '2026-03-07'
-  plan_file: docs/history/20260307_skill-002_workflow_cleanup.md
+  plan_file: agent-work/history/20260307_skill-002_workflow_cleanup.md
   completed_at: '2026-03-07'
 - id: skill-003
   epic: skill
@@ -214,7 +214,7 @@
   depends_on: []
   discovered_from: null
   created_at: '2026-03-07'
-  plan_file: docs/history/20260308_skill-003_next_feature_output.md
+  plan_file: agent-work/history/20260308_skill-003_next_feature_output.md
   completed_at: '2026-03-08'
 - id: skill-004
   epic: skill
@@ -225,7 +225,7 @@
   priority: 2
   depends_on: []
   discovered_from: null
-  plan_file: docs/history/20260308_skill-004_tooling_contracts.md
+  plan_file: agent-work/history/20260308_skill-004_tooling_contracts.md
   references:
   - docs/NON_EXPERIMENTAL_TOOLING_ASSESSMENT.md
   created_at: '2026-03-08'
@@ -240,11 +240,11 @@
   priority: 2
   depends_on: []
   discovered_from: null
-  plan_file: docs/plans/skill-005.md
+  plan_file: agent-work/plans/skill-005.md
   references:
-  - docs/history/20260218_cmd-004_skills_frontmatter_contract.md
-  - docs/history/20260302_skill-001_extract_workflow_filelock.md
-  - docs/history/20260307_skill-002_workflow_cleanup.md
+  - agent-work/history/20260218_cmd-004_skills_frontmatter_contract.md
+  - agent-work/history/20260302_skill-001_extract_workflow_filelock.md
+  - agent-work/history/20260307_skill-002_workflow_cleanup.md
   created_at: '2026-03-16'
 - id: skill-006
   epic: skill
@@ -255,10 +255,10 @@
   priority: 2
   depends_on: []
   discovered_from: null
-  plan_file: docs/history/20260316_skill-006_features_cli.md
+  plan_file: agent-work/history/20260316_skill-006_features_cli.md
   references:
   - https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/
-  - docs/plans/skill-005.md
+  - agent-work/plans/skill-005.md
   created_at: '2026-03-16'
   completed_at: '2026-03-16'
 - id: skill-007
@@ -270,7 +270,7 @@
   priority: 2
   depends_on: []
   discovered_from: null
-  plan_file: docs/history/20260330_skill-007_prompt_placeholders.md
+  plan_file: agent-work/history/20260330_skill-007_prompt_placeholders.md
   references: []
   created_at: '2026-03-27'
   completed_at: '2026-03-30'
@@ -284,7 +284,7 @@
   priority: 2
   depends_on: []
   discovered_from: null
-  plan_file: docs/history/20260403_skill-008_review_checkpoint.md
+  plan_file: agent-work/history/20260403_skill-008_review_checkpoint.md
   references:
   - skills/execute/SKILL.md
   - skills/commit/SKILL.md
@@ -304,7 +304,7 @@
   priority: 2
   depends_on: []
   discovered_from: null
-  plan_file: docs/history/20260413_skill-009_workflow_indicator.md
+  plan_file: agent-work/history/20260413_skill-009_workflow_indicator.md
   references: []
   created_at: '2026-04-14'
   completed_at: '2026-04-13'
@@ -318,7 +318,7 @@
   priority: 2
   depends_on: []
   discovered_from: skill-009
-  plan_file: docs/history/20260414_pv-010_pytest_collection_fix.md
+  plan_file: agent-work/history/20260414_pv-010_pytest_collection_fix.md
   references: []
   created_at: '2026-04-14'
   completed_at: '2026-04-14'
@@ -333,9 +333,9 @@
   priority: 2
   depends_on: []
   discovered_from: skill-009
-  plan_file: docs/history/20260414_skill-010_workflow_ticket.md
+  plan_file: agent-work/history/20260414_skill-010_workflow_ticket.md
   references:
-  - docs/history/20260413_skill-009_workflow_indicator.md
+  - agent-work/history/20260413_skill-009_workflow_indicator.md
   created_at: '2026-04-15'
   completed_at: '2026-04-14'
 - id: skill-011
@@ -348,7 +348,7 @@
   priority: 2
   depends_on: []
   discovered_from: null
-  plan_file: docs/history/20260501_skill-011_handoff_labels.md
+  plan_file: agent-work/history/20260501_skill-011_handoff_labels.md
   references: []
   created_at: '2026-05-01'
   completed_at: '2026-05-01'
@@ -362,7 +362,21 @@
   priority: 2
   depends_on: []
   discovered_from: null
-  plan_file: docs/history/20260501_skill-012_reflect_workflow_step.md
+  plan_file: agent-work/history/20260501_skill-012_reflect_workflow_step.md
   references: []
   created_at: '2026-05-01'
   completed_at: '2026-05-01'
+- id: skill-013
+  epic: skill
+  status: done
+  title: Move workflow artifacts to agent-work
+  description: Maintainers can use agent-work as the canonical home for workflow backlog,
+    plans, history, and ticket artifacts while docs stays reserved for durable documentation.
+  steps: []
+  priority: 1
+  depends_on: []
+  discovered_from: null
+  plan_file: agent-work/history/20260513_skill-013_agent_work_paths.md
+  references: []
+  created_at: '2026-05-13'
+  completed_at: '2026-05-13'

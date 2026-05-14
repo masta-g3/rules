@@ -5,7 +5,7 @@ This document is a standalone prompt/reference for the experimental parallel fil
 It is **not** part of the default workflow and is **not** included in `AGENTS.md`.
 Use it only when explicitly running a prompt that enables file reservations.
 
-If `docs/plans/.file-locks.json` does not exist, skip this section unless the invoked command includes `--parallel`; in that case, create the file during the planning phase.
+If `agent-work/plans/.file-locks.json` does not exist, skip this section unless the invoked command includes `--parallel`; in that case, create the file during the planning phase.
 
 Derive `FEATURE_ID` from the active plan file name (e.g., `auth-001.md` → `auth-001`).
 
@@ -18,7 +18,7 @@ Lock file schema:
 ### Planning Phase
 
 When the invoked command includes `--parallel`:
-1. If `docs/plans/.file-locks.json` doesn't exist, create it with `{}`
+1. If `agent-work/plans/.file-locks.json` doesn't exist, create it with `{}`
 2. After creating the plan, check the lock file against files in the Context Files section
 3. Report any conflicts: "⚠ {file} is reserved by {feature-id}"
 4. Informational only — no reservations placed during planning

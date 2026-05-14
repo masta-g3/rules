@@ -17,7 +17,8 @@ Initialize the project with appropriate tooling:
 - Set up version control
 - Create dependency manifest with pinned versions
 - Create minimal `README.md` (project name, brief description, how to run)
-- Create empty `features.yaml` (`[]`) in project root
+- Create empty `agent-work/features.yaml` (`[]`)
+- Create `agent-work/plans/`, `agent-work/history/`, and `agent-work/tickets/` for workflow artifacts
 
 ### 2. Create `docs/STRUCTURE.md`
 
@@ -42,7 +43,7 @@ Commit the scaffolding with a message like:
 Initialize project structure
 
 - docs/STRUCTURE.md: architecture and vision
-- Empty features.yaml for backlog tracking
+- Empty agent-work/features.yaml for backlog tracking
 - [Stack/framework] scaffold
 ```
 
@@ -53,7 +54,7 @@ Summarize what was created and recommend next step:
 ```
 Project initialized: [name]
 Stack: [technologies]
-Structure: README.md, docs/STRUCTURE.md, features.yaml
+Structure: README.md, docs/STRUCTURE.md, agent-work/features.yaml
 
 Next: Run /epic-init "[first epic description]" to decompose your first batch of work.
 ```
@@ -62,4 +63,4 @@ List any assumptions made or clarifications needed.
 
 ---
 
-**Do not decompose features here.** This command only scaffolds the project. Use `/epic-init` to define epics and populate features.yaml.
+**Do not decompose features here.** This command only scaffolds the project. Use `/epic-init` to define epics and populate agent-work/features.yaml.

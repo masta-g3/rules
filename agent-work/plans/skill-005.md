@@ -87,13 +87,13 @@ These requests should still end up delegating to existing skills or their docume
 
 - `docs/STRUCTURE.md`
 - `README.md`
-- `docs/history/20260218_cmd-004_skills_frontmatter_contract.md`
-- `docs/history/20260302_skill-001_extract_workflow_filelock.md`
-- `docs/history/20260307_skill-002_workflow_cleanup.md`
+- `agent-work/history/20260218_cmd-004_skills_frontmatter_contract.md`
+- `agent-work/history/20260302_skill-001_extract_workflow_filelock.md`
+- `agent-work/history/20260307_skill-002_workflow_cleanup.md`
 
 ### Config
 
-- `features.yaml`
+- `agent-work/features.yaml`
 - local synced skill trees under `~/.codex/skills`, `~/.claude/skills`, `~/.cursor/skills`
 
 ## Existing Constraints
@@ -249,7 +249,7 @@ It should not trigger instead of `execute` for direct implementation requests un
 
 Before routing by phase, the orchestrator should first decide whether the repo context is tracked-work or standalone-work:
 
-- If `features.yaml` exists and the request is about backlog-managed work, treat it as tracked workflow.
+- If `agent-work/features.yaml` exists and the request is about backlog-managed work, treat it as tracked workflow.
 - Otherwise treat it as standalone workflow and never send "what next?" requests to `next-feature`.
 - Do not infer experimental autopilot or file-lock mode from this skill; those remain opt-in only.
 
@@ -314,7 +314,7 @@ The orchestrator should follow these rules:
 
 - `README.md`
 - `docs/STRUCTURE.md`
-- possibly `features.yaml` only for tracking this feature, not because the skill needs schema changes
+- possibly `agent-work/features.yaml` only for tracking this feature, not because the skill needs schema changes
 
 ### Files explicitly not changed in the first pass
 
@@ -334,7 +334,7 @@ description: Route workflow-management requests to the right feature lifecycle s
 
 Use this skill when the user asks how to manage tracked work, what workflow step comes next, or wants one entrypoint for the feature lifecycle.
 
-First determine whether the request is about tracked work (`features.yaml`, backlog, feature IDs, next tracked task) or standalone work.
+First determine whether the request is about tracked work (`agent-work/features.yaml`, backlog, feature IDs, next tracked task) or standalone work.
 
 Classify the request:
 - New project -> use `project-init`

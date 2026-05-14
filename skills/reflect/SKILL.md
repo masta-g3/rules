@@ -21,7 +21,7 @@ Update durable documentation and agent guidance after implementation has passed 
 
 ### Boundaries
 
-Only update durable docs/guidance. Do not change code, tracked state, archives, or commits. Do not add docs just to summarize the implementation.
+Only update durable docs/guidance. Do not change code, tracked state, archives, or commits. Do not add docs just to summarize the implementation. Workflow artifacts belong in `agent-work/`; `docs/` is for durable documentation.
 
 ### Output
 

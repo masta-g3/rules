@@ -16,12 +16,13 @@ class FeaturesYamlCliTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
         self.workdir = Path(self.tempdir.name)
-        self.features_file = self.workdir / "features.yaml"
+        self.features_file = self.workdir / "agent-work" / "features.yaml"
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
     def write_features(self, payload: list[dict]) -> None:
+        self.features_file.parent.mkdir(parents=True, exist_ok=True)
         self.features_file.write_text(json.dumps(payload, indent=2))
 
     def run_helper(self, *args: str, expect_ok: bool = True) -> subprocess.CompletedProcess[str]:
@@ -94,6 +95,20 @@ class FeaturesYamlCliTest(unittest.TestCase):
         )
         self.assertEqual(result.stdout.strip(), "skill-006")
 
+    def test_default_next_uses_agent_work_features_file(self) -> None:
+        self.write_features([
+            {
+                "id": "skill-001",
+                "status": "pending",
+                "priority": 1,
+                "depends_on": [],
+                "description": "Canonical backlog work",
+            }
+        ])
+
+        result = self.run_helper("--output", "id", "next")
+        self.assertEqual(result.stdout.strip(), "skill-001")
+
     def test_next_reports_blocked_items(self) -> None:
         self.write_features(
             [
@@ -138,14 +153,22 @@ class FeaturesYamlCliTest(unittest.TestCase):
 
     def test_next_text_mode_handles_missing_features_file(self) -> None:
         result = self.run_helper("next")
-        self.assertIn("No features.yaml found", result.stdout)
+        self.assertIn("No agent-work/features.yaml found", result.stdout)
 
         missing_id = self.run_helper("--output", "id", "next", expect_ok=False)
         self.assertEqual(missing_id.returncode, 1)
 
+    def test_default_commands_do_not_fall_back_to_root_features_file(self) -> None:
+        (self.workdir / "features.yaml").write_text(json.dumps([
+            {"id": "skill-001", "status": "pending", "description": "Legacy root backlog"}
+        ]))
+
+        result = self.run_helper("next")
+        self.assertIn("No agent-work/features.yaml found", result.stdout)
+
     def test_create_then_update_plan_file_keeps_string_value(self) -> None:
         self.write_features([])
-        plan_path = "docs/plans/skill-006.md"
+        plan_path = "agent-work/plans/skill-006.md"
 
         create = self.run_helper(
             "--file",
@@ -181,7 +204,7 @@ class FeaturesYamlCliTest(unittest.TestCase):
         )
         payload = json.loads(update.stdout)
         self.assertEqual(payload["feature"]["plan_file"], plan_path)
-        self.assertIn("plan_file: docs/plans/skill-006.md", self.features_file.read_text())
+        self.assertIn("plan_file: agent-work/plans/skill-006.md", self.features_file.read_text())
 
     def test_update_rejects_unsupported_fields_and_done_status(self) -> None:
         self.write_features([{"id": "skill-006", "status": "pending"}])

@@ -18,19 +18,21 @@ For quick tasks without multi-session tracking:
 
 ### Feature-Driven (Multi-Session Projects)
 
-For projects with backlog tracking via `features.yaml`:
+For projects with backlog tracking via `agent-work/features.yaml`:
 
 `project-init` → `next-feature` → `prime` → `plan-md` → `execute` → `review` → `reflect` → `commit`
 
 Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone. Creating a plan keeps tracked work `pending`; `execute` moves it to `in_progress`; `commit` moves it to `done` after `reflect` handles durable documentation updates.
 
+Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, active plans in `plans/`, archives in `history/`, and ticket-local scripts/logs/evidence in `tickets/`. Durable documentation remains in `docs/`.
+
 ## Skills
 
 | Skill | Purpose |
 |---------|---------|
-| `skills/project-init` | Initialize project with features.yaml |
+| `skills/project-init` | Initialize project with agent-work/features.yaml |
 | `skills/epic-init` | Initialize new epic with features |
-| `skills/ticket-init` | Canonical ticket creation for features.yaml |
+| `skills/ticket-init` | Canonical ticket creation for agent-work/features.yaml |
 | `skills/next-feature` | Select next ready feature |
 | `skills/prime` | Context prime: structure docs, git history |
 | `skills/plan-md` | Create implementation plan |
@@ -62,7 +64,7 @@ If you invoke a workflow skill with an explicit ticket immediately after the ski
 
 Shared backlog operations live in `skills/_lib/features_yaml.py` and are invoked through the canonical entrypoint `skills/_lib/features_yaml.sh`.
 
-- Purpose: keep `features.yaml` selection and mutation logic packaged with the repo
+- Purpose: keep `agent-work/features.yaml` selection and mutation logic packaged with the repo
 - Runtime: `uv` manages the script-local PyYAML dependency
 - Contract: `epics`, `next-id`, `next`, `create`, `update`, `complete`, and `describe`
 
@@ -70,7 +72,7 @@ Shared backlog operations live in `skills/_lib/features_yaml.py` and are invoked
 
 ### pv - Portfolio & Feature Viewer
 
-Terminal TUI for visualizing and editing `features.yaml` across projects.
+Terminal TUI for visualizing and editing `agent-work/features.yaml` across projects.
 
 **Install:**
 ```bash
@@ -81,8 +83,8 @@ Terminal TUI for visualizing and editing `features.yaml` across projects.
 ```bash
 pv                    # Portfolio view (scan ~/Code)
 pv /path/to/dir       # Portfolio view (scan specific directory)
-pv features.yaml      # Project view (specific file)
-fv                    # Project view (./features.yaml in current dir)
+pv agent-work/features.yaml  # Project view (specific file)
+fv                          # Project view (./agent-work/features.yaml in current dir)
 ```
 
 **Navigation:**
@@ -108,7 +110,7 @@ fv                    # Project view (./features.yaml in current dir)
 - `e` - Enter edit mode
 - `Tab` - Next field, `j/k` - Cycle status options
 - `Esc` - Exit edit mode
-- `w` - Write changes to features.yaml
+- `w` - Write changes to agent-work/features.yaml
 - `D` - Delete feature (with confirmation)
 
 **Epic view:**
@@ -122,7 +124,7 @@ uv run pytest -q
 
 Pytest is scoped to `tests/` via `pytest.ini`.
 
-## features.yaml Schema
+## agent-work/features.yaml Schema
 
 ```yaml
 - id: auth-001
@@ -138,9 +140,9 @@ Pytest is scoped to `tests/` via `pytest.ini`.
     - Add validation
     - Connect API
   created_at: 2024-01-15
-  plan_file: docs/plans/auth-001.md
+  plan_file: agent-work/plans/auth-001.md
   references:
-    - docs/plans/auth-000.md
+    - agent-work/plans/auth-000.md
   discovered_from: null
   notes: null
 ```

@@ -1,6 +1,6 @@
 ---
 name: next-feature
-description: Select the next feature to implement from features.yaml.
+description: Select the next feature to implement from agent-work/features.yaml.
 ---
 
 Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
@@ -31,7 +31,7 @@ READY OPTIONS
 
 RECOMMENDED NEXT
 [id]
-Suggested plan file: docs/plans/[id].md
+Suggested plan file: agent-work/plans/[id].md
 ```
 
 Rules:
@@ -41,7 +41,7 @@ Rules:
 - `RECOMMENDED NEXT` remains the single canonical next item.
 - If nothing is actionable, report the no-ready situation and include the first few blocked items with unmet dependencies instead of inventing a recommendation.
 
-**Do not modify features.yaml.** Status changes happen in execute/commit.
+**Do not modify agent-work/features.yaml.** Status changes happen in execute/commit.
 
 ### Output
 

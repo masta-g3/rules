@@ -32,13 +32,15 @@ rules/
 │   └── agents/         # Pi-only subagents synced to ~/.pi/agent/agents/
 ├── statusline/         # Claude Code statusline config
 │
-├── docs/
-│   ├── history/        # Archived implementation plans
+├── agent-work/         # Agent-produced workflow artifacts
+│   ├── features.yaml   # This project's feature backlog
 │   ├── plans/          # Active implementation plans
-│   ├── STRUCTURE.md    # This file
-│   └── PARALLEL_AGENTS.md
+│   ├── history/        # Archived implementation plans and workflow notes
+│   └── tickets/        # Ticket-local scripts, logs, and validation artifacts
 │
-├── features.yaml       # This project's feature backlog
+├── docs/
+│   └── STRUCTURE.md    # Durable architecture/onboarding guide
+│
 ├── pytest.ini          # Pytest collection config (scopes default runs to tests/)
 ├── AGENTS.md           # Coding style & behavioral guidelines
 ├── README.md           # Usage documentation
@@ -49,10 +51,12 @@ rules/
 
 ### Feature-Driven Workflow
 
-Projects track work in `features.yaml`:
+Projects track work in `agent-work/features.yaml`:
 ```
-[pending feature] → plan-md → [plan.md] → execute → [in_progress] → review → reflect → commit → [done]
+[pending feature] → plan-md → [agent-work/plans/id.md] → execute → [in_progress] → review → reflect → commit → [done]
 ```
+
+Agent-produced workflow artifacts live under `agent-work/`. Durable architecture, onboarding, and reference documentation stays under `docs/`.
 
 Features have: id, status, epic, depends_on, priority, and optional planning references such as `plan_file` and `references`.
 
@@ -73,9 +77,9 @@ The main workflow excludes experimental autopilot and file-reservation prompts. 
 
 ### pv/fv TUI
 
-Terminal dashboard for `features.yaml` visualization and editing:
-- **pv**: Portfolio view - scans directory tree for all projects
-- **fv**: Feature view - single project's features.yaml
+Terminal dashboard for `agent-work/features.yaml` visualization and editing:
+- **pv**: Portfolio view - scans directory tree for canonical `agent-work/features.yaml` files
+- **fv**: Feature view - current project's `agent-work/features.yaml`
 
 Navigation: Portfolio → Project → Epic → Feature (4-level drill-down)
 
@@ -88,7 +92,7 @@ Modes:
 
 | File | Purpose |
 |------|---------|
-| `features.yaml` | Feature backlog (sequence of feature objects) |
+| `agent-work/features.yaml` | Feature backlog (sequence of feature objects) |
 | `pytest.ini` | Pytest collection scope for repo tests |
 | `AGENTS.md` | Agent behavior rules, copied to project roots |
 | `sync-prompts.sh` | Deploys skills to Claude/Codex/Cursor/Pi skill roots, deploys shared subagents to all harnesses, overlays Pi-only subagents/extensions into Pi, and configures Pi to load its local skill root |
@@ -100,4 +104,4 @@ Modes:
 - **Pi runtime stays additive**: Pi-specific behavior belongs in `extensions/` or `pi/` instead of patching Pi core or overloading shared skills
 - **Experimental prompts stay isolated**: autopilot lives under `experimental/autopilot/` and remains opt-in
 - **State in filenames**: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone
-- **Repo-local YAML helper**: `skills/_lib/features_yaml.sh` is the supported entrypoint for shared `features.yaml` reads/writes, backed by `skills/_lib/features_yaml.py` via `uv`
+- **Repo-local YAML helper**: `skills/_lib/features_yaml.sh` is the supported entrypoint for shared `agent-work/features.yaml` reads/writes, backed by `skills/_lib/features_yaml.py` via `uv`

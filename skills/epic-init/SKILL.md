@@ -19,7 +19,7 @@ Think through: foundation → core → integration → polish. Fold trivial setu
 
 ### 2. Create Epic Doc
 
-Write `docs/plans/{epic}-000.md` — under ~20 lines: one-line goal, scope boundaries, key constraints, and planned feature IDs with one-line descriptions. Features reference this in `references`.
+Write `agent-work/plans/{epic}-000.md` — under ~20 lines: one-line goal, scope boundaries, key constraints, and planned feature IDs with one-line descriptions. Features reference this in `references`.
 
 ### 3. Generate Features
 
@@ -34,7 +34,7 @@ priority: 1  # 1=foundation, 2=core, 3=polish
 depends_on:
   - epic-001
 references:
-  - "docs/plans/{epic}-000.md"
+  - "agent-work/plans/{epic}-000.md"
 ```
 
 ### 4. Report

@@ -2,14 +2,14 @@
 """
 pv - Portfolio & Feature Viewer
 
-Unified TUI for features.yaml tracking.
+Unified TUI for agent-work/features.yaml tracking.
 Navigate: Portfolio → Project → Epic → Feature
 
 Usage:
     pv                    # Scan ~/Code, portfolio view
     pv /path              # Scan specific directory
-    pv features.yaml      # Project view for specific file
-    fv                    # Alias: project view for ./features.yaml
+    pv agent-work/features.yaml  # Project view for specific file
+    fv                    # Alias: project view for ./agent-work/features.yaml
 
 Navigation:
     j/k or ↑/↓  Move selection
@@ -43,6 +43,7 @@ from typing import Any
 # ═══════════════════════════════════════════════════════════════════════════════
 
 BACKLOG_FILE = 'features.yaml'
+CANONICAL_BACKLOG = os.path.join('agent-work', BACKLOG_FILE)
 
 ANSI_ESCAPE = re.compile(r'\033\[[0-9;]*m')
 ENABLE_ANSI = sys.stdout.isatty()
@@ -400,6 +401,11 @@ class Model:
 # DATA MODEL - PORTFOLIO
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
+def project_features_path(project: 'ProjectSummary') -> str:
+    return project.features_path or os.path.join(project.path, CANONICAL_BACKLOG)
+
+
 @dataclass
 class ProjectSummary:
     path: str
@@ -415,6 +421,7 @@ class ProjectSummary:
     oldest_pending_date: str | None = None
     worked_today: bool = False
     archived: bool = False
+    features_path: str | None = None
     _detail: Model | None = field(default=None, repr=False)
 
     @classmethod
@@ -428,10 +435,13 @@ class ProjectSummary:
         if not isinstance(data, list):
             return None
 
-        path = Path(features_path).parent
+        features = Path(features_path)
+        path = features.parent.parent if features.parent.name == 'agent-work' else features.parent
+        if str(path) in ('', '.'):
+            path = Path.cwd()
         name = path.name
 
-        proj = cls(path=str(path), name=name)
+        proj = cls(path=str(path), name=name, features_path=str(features))
         proj.archived = os.path.exists(os.path.join(proj.path, '.archived'))
         proj.last_modified = datetime.fromtimestamp(os.path.getmtime(features_path))
         proj.worked_today = proj.last_modified.date() == datetime.now().date()
@@ -466,8 +476,7 @@ class ProjectSummary:
 
     def load_detail(self) -> Model:
         if self._detail is None:
-            features_path = os.path.join(self.path, BACKLOG_FILE)
-            self._detail = Model.load(features_path)
+            self._detail = Model.load(project_features_path(self))
         return self._detail
 
     @property
@@ -574,7 +583,7 @@ def scan_projects(root: str) -> Portfolio:
         # Prune directories in-place BEFORE os.walk descends into them
         dirnames[:] = [d for d in dirnames if not d.startswith('.') and d not in skip_dirs]
 
-        if BACKLOG_FILE in filenames:
+        if Path(dirpath).name == 'agent-work' and BACKLOG_FILE in filenames:
             features_path = os.path.join(dirpath, BACKLOG_FILE)
             proj = ProjectSummary.from_path(features_path)
             if proj and proj.total > 0:
@@ -1743,8 +1752,8 @@ def view_help(width: int, height: int) -> list[str]:
     lines.append('')
     lines.append(f"  {ansi('pv', bold=True)}                   Scan ~/Code, portfolio view")
     lines.append(f"  {ansi('pv /path', bold=True)}             Scan specific directory")
-    lines.append(f"  {ansi('pv features.yaml', bold=True)}     Project view for specific file")
-    lines.append(f"  {ansi('fv', bold=True)}                   Project view for ./features.yaml")
+    lines.append(f"  {ansi('pv agent-work/features.yaml', bold=True)}  Project view for specific file")
+    lines.append(f"  {ansi('fv', bold=True)}                          Project view for ./agent-work/features.yaml")
     lines.append('')
 
     return lines
@@ -2065,8 +2074,7 @@ def handle_project_input(key: str, state: State) -> State:
         state.view = 'creation'
         load_creation_field(state)
     elif key == 'r':
-        features_path = os.path.join(state.current_project.path, BACKLOG_FILE)
-        state.current_project._detail = Model.load(features_path)
+        state.current_project._detail = Model.load(project_features_path(state.current_project))
         state.flash_message = 'Refreshed'
 
     return state
@@ -2102,8 +2110,7 @@ def handle_epic_input(key: str, state: State) -> State:
         state.view = 'creation'
         load_creation_field(state)
     elif key == 'r':
-        features_path = os.path.join(state.current_project.path, BACKLOG_FILE)
-        state.current_project._detail = Model.load(features_path)
+        state.current_project._detail = Model.load(project_features_path(state.current_project))
         state.flash_message = 'Refreshed'
 
     return state
@@ -2227,8 +2234,7 @@ def handle_feature_input(key: str, state: State) -> State:
                 state.dirty = False
                 state.edit.pending_changes.clear()
         elif key == 'r' and not state.dirty:
-            features_path = os.path.join(state.current_project.path, BACKLOG_FILE)
-            state.current_project._detail = Model.load(features_path)
+            state.current_project._detail = Model.load(project_features_path(state.current_project))
             state.flash_message = 'Refreshed'
         return state
 
@@ -2373,8 +2379,8 @@ def apply_pending_changes(state: State) -> None:
 
 
 def save_features(project: 'ProjectSummary') -> bool:
-    """Save features.yaml. Returns True on success."""
-    features_path = os.path.join(project.path, BACKLOG_FILE)
+    """Save the project's backlog file. Returns True on success."""
+    features_path = project_features_path(project)
     model = project._detail
     if not model:
         return False
@@ -2795,7 +2801,11 @@ def init_project_state(features_path: str) -> State:
     if proj:
         proj._detail = model
     else:
-        proj = ProjectSummary(path=str(Path(features_path).parent), name=Path(features_path).parent.name)
+        features = Path(features_path)
+        project_root = features.parent.parent if features.parent.name == 'agent-work' else features.parent
+        if str(project_root) in ('', '.'):
+            project_root = Path.cwd()
+        proj = ProjectSummary(path=str(project_root), name=project_root.name, features_path=str(features))
         proj._detail = model
     return State(
         view='project',
@@ -2810,11 +2820,11 @@ def detect_entry_point() -> State:
 
     if len(sys.argv) < 2:
         if is_fv_mode:
-            if os.path.exists(BACKLOG_FILE):
-                return init_project_state(BACKLOG_FILE)
+            if os.path.exists(CANONICAL_BACKLOG):
+                return init_project_state(CANONICAL_BACKLOG)
             else:
-                print(f"Error: {BACKLOG_FILE} not found")
-                print(f"Run from a directory containing {BACKLOG_FILE}, or specify path.")
+                print(f"Error: {CANONICAL_BACKLOG} not found")
+                print(f"Run from a directory containing {CANONICAL_BACKLOG}, or specify path.")
                 sys.exit(1)
         else:
             return init_portfolio_state('~/Code')

@@ -32,13 +32,15 @@ CONTROL_CHAR_PATTERN = re.compile(r"[\x00-\x1f\x7f]")
 INVALID_ID_CHARACTERS = {"?", "#", "%"}
 STATUSES = {"pending", "in_progress", "done", "abandoned", "superseded"}
 MUTABLE_STATUSES = STATUSES - {"done"}
+DEFAULT_FEATURES_FILE = "agent-work/features.yaml"
+PLAN_DIR = "agent-work/plans"
 
 
 COMMAND_SPECS = {
     "epics": {
         "summary": "List epic prefixes derived from tracked feature IDs.",
         "arguments": [
-            {"name": "--file", "required": False, "type": "path", "default": "features.yaml"},
+            {"name": "--file", "required": False, "type": "path", "default": DEFAULT_FEATURES_FILE},
             {"name": "--output", "required": False, "type": "text|json", "default": "text"},
         ],
         "output_modes": ["text", "json"],
@@ -47,7 +49,7 @@ COMMAND_SPECS = {
         "summary": "Allocate the next sequential tracked ID for an epic.",
         "arguments": [
             {"name": "epic", "required": True, "type": "string"},
-            {"name": "--file", "required": False, "type": "path", "default": "features.yaml"},
+            {"name": "--file", "required": False, "type": "path", "default": DEFAULT_FEATURES_FILE},
             {"name": "--output", "required": False, "type": "text|json", "default": "text"},
         ],
         "output_modes": ["text", "json"],
@@ -56,16 +58,16 @@ COMMAND_SPECS = {
         "summary": "Select the next actionable feature, preferring in-progress work first.",
         "arguments": [
             {"name": "--epic", "required": False, "type": "string"},
-            {"name": "--file", "required": False, "type": "path", "default": "features.yaml"},
+            {"name": "--file", "required": False, "type": "path", "default": DEFAULT_FEATURES_FILE},
             {"name": "--output", "required": False, "type": "text|json|id", "default": "text"},
         ],
         "output_modes": ["text", "json", "id"],
     },
     "create": {
-        "summary": "Append a new feature object to features.yaml.",
+        "summary": "Append a new feature object to agent-work/features.yaml",
         "arguments": [
             {"name": "--json", "required": True, "type": "json-object"},
-            {"name": "--file", "required": False, "type": "path", "default": "features.yaml"},
+            {"name": "--file", "required": False, "type": "path", "default": DEFAULT_FEATURES_FILE},
             {"name": "--dry-run", "required": False, "type": "flag", "default": False},
             {"name": "--output", "required": False, "type": "text|json", "default": "text"},
         ],
@@ -76,7 +78,7 @@ COMMAND_SPECS = {
         "arguments": [
             {"name": "feature_id", "required": True, "type": "tracked-id"},
             {"name": "--json", "required": True, "type": "json-object"},
-            {"name": "--file", "required": False, "type": "path", "default": "features.yaml"},
+            {"name": "--file", "required": False, "type": "path", "default": DEFAULT_FEATURES_FILE},
             {"name": "--dry-run", "required": False, "type": "flag", "default": False},
             {"name": "--output", "required": False, "type": "text|json", "default": "text"},
         ],
@@ -87,7 +89,7 @@ COMMAND_SPECS = {
         "arguments": [
             {"name": "feature_id", "required": True, "type": "tracked-id"},
             {"name": "--plan-file", "required": True, "type": "path"},
-            {"name": "--file", "required": False, "type": "path", "default": "features.yaml"},
+            {"name": "--file", "required": False, "type": "path", "default": DEFAULT_FEATURES_FILE},
             {"name": "--dry-run", "required": False, "type": "flag", "default": False},
             {"name": "--output", "required": False, "type": "text|json", "default": "text"},
         ],
@@ -418,7 +420,7 @@ def select_next_feature(path_str: str, epic_filter: str | None) -> dict[str, Any
         "command": "next",
         "epic": epic_filter,
         "recommended": recommended.get("id") if recommended else None,
-        "suggested_plan_file": f"docs/plans/{recommended['id']}.md" if recommended else None,
+        "suggested_plan_file": f"{PLAN_DIR}/{recommended['id']}.md" if recommended else None,
         "in_progress": [feature_details(feature) for feature in in_progress],
         "ready": [feature_details(feature) for feature in ready],
         "blocked": blocked_details,
@@ -467,7 +469,7 @@ def emit_text(result: dict[str, Any]) -> None:
 
     if command == "next":
         if result.get("missing_file"):
-            print("No features.yaml found. Create one with /ticket-init or /epic-init.")
+            print(f"No {DEFAULT_FEATURES_FILE} found. Initialize the project with /project-init or create the file with [].")
             return
 
         recommended = result["recommended"]
@@ -562,7 +564,7 @@ def emit_id(result: dict[str, Any]) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Repo-local helper for deterministic features.yaml operations."
+        description="Repo-local helper for deterministic agent-work/features.yaml operations."
     )
     parser.add_argument("--file", dest="global_file", default=argparse.SUPPRESS)
     parser.add_argument(
@@ -656,7 +658,7 @@ def handle_describe(args: argparse.Namespace) -> dict[str, Any]:
 def main(argv: list[str]) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    args.file = getattr(args, "file", getattr(args, "global_file", "features.yaml"))
+    args.file = getattr(args, "file", getattr(args, "global_file", DEFAULT_FEATURES_FILE))
     args.output = getattr(args, "output", getattr(args, "global_output", "text"))
     result = args.handler(args)
 

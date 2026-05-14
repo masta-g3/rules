@@ -53,16 +53,19 @@ We are working at a lean startup, not a large corporation. Code accordingly:
 
 ## Tracked Work State
 
-Tracked work persists across sessions in three places:
+Tracked work persists across sessions under `agent-work/`:
 
-- `features.yaml` — backlog and source of truth: id, status, priority, dependencies, and `plan_file`.
-- `docs/plans/` — active implementation plans (created by `plan-md`, updated during `execute`).
-- `docs/history/` — archived completed plans (moved here by `commit`; `plan_file` is updated to the archived path).
+- `agent-work/features.yaml` — backlog and source of truth: id, status, priority, dependencies, and `plan_file`.
+- `agent-work/plans/` — active implementation plans (created by `plan-md`, updated during `execute`).
+- `agent-work/history/` — archived completed plans (moved here by `commit`; `plan_file` is updated to the archived path).
+- `agent-work/tickets/` — ticket-local scripts, logs, and validation artifacts.
+
+Keep workflow artifacts in `agent-work/`. Keep durable architecture, onboarding, and reference documentation in `docs/`.
 
 User-driven skill workflow (do not advance automatically; stay within the current step):
 `next-feature` → `prime` → `plan-md` → `execute` → `review` → `reflect` → `commit`
 
-### features.yaml schema
+### agent-work/features.yaml schema
 
 Root-level sequence (not wrapped in a mapping):
 
@@ -77,9 +80,9 @@ Root-level sequence (not wrapped in a mapping):
   # optional: discovered_from, plan_file, references, epic, or custom metadata
 ```
 
-### Mutating features.yaml
+### Mutating agent-work/features.yaml
 
-When `features.yaml` exists, avoid reading the full file into context. Use `$SKILLS_ROOT/_lib/features_yaml.sh` for listing epics, generating IDs, selecting the next feature, appending entries, and updating status/plan fields. Only fall back to direct YAML edits for operations the helper does not yet cover.
+When `agent-work/features.yaml` exists, avoid reading the full file into context. Use `$SKILLS_ROOT/_lib/features_yaml.sh` for listing epics, generating IDs, selecting the next feature, appending entries, and updating status/plan fields. Only fall back to direct YAML edits for operations the helper does not yet cover.
 
 ## Skill Helper Setup
 

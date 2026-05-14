@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LOCK_FILE=${LOCK_FILE:-docs/plans/.file-locks.json}
+LOCK_FILE=${LOCK_FILE:-agent-work/plans/.file-locks.json}
 ACTION=${1:-}
 FILE=${2:-}
 FEATURE_ID=${3:-}

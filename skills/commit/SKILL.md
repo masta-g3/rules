@@ -11,12 +11,12 @@ Assume the work has already been reviewed and reflected. Quick final scan for de
 
 If a planning file exists, archive it:
 
-1. Run `$SKILLS_ROOT/commit/scripts/archive_plan.sh <plan-file> <short-desc>` — moves the plan to `docs/history/yyyymmdd_{feature-id}_{short_desc}.md` and removes the original. Use 2-4 word snake_case description (e.g., `user_signup`).
+1. Run `$SKILLS_ROOT/commit/scripts/archive_plan.sh <plan-file> <short-desc>` — moves the plan to `agent-work/history/yyyymmdd_{feature-id}_{short_desc}.md` and removes the original. Use 2-4 word snake_case description (e.g., `user_signup`).
 2. Compact the archived markdown into a concise durable summary. Keep it faithful to implemented work; do not add new scope.
 
-### Update features.yaml
+### Update agent-work/features.yaml
 
-If tracked feature: `$SKILLS_ROOT/_lib/features_yaml.sh complete <feature-id> --plan-file <archive-path>` — sets status to `"done"`, `completed_at` to today, and `plan_file` to archive path. Verify discovered items are logged. Include `features.yaml` in the commit.
+If tracked feature: `$SKILLS_ROOT/_lib/features_yaml.sh complete <feature-id> --plan-file <archive-path>` — sets status to `"done"`, `completed_at` to today, and `plan_file` to archive path. Verify discovered items are logged. Include `agent-work/features.yaml` in the commit.
 
 ### Documentation
 

@@ -11,9 +11,9 @@ fi
 
 BASENAME=$(basename "$PLAN_FILE" .md)
 TODAY=$(date +%Y%m%d)
-mkdir -p docs/history
+mkdir -p agent-work/history
 
-TARGET="docs/history/${TODAY}_${BASENAME}_${SHORT_DESC}.md"
+TARGET="agent-work/history/${TODAY}_${BASENAME}_${SHORT_DESC}.md"
 
 if [[ -e "$TARGET" ]]; then
   echo "archive target already exists: $TARGET" >&2

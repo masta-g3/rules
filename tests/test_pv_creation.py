@@ -22,11 +22,13 @@ def make_model() -> pv.Model:
 
 
 def write_features(tmp_path: Path, features: list[dict]) -> pv.ProjectSummary:
-    features_path = tmp_path / "features.yaml"
+    features_path = tmp_path / "agent-work" / "features.yaml"
+    features_path.parent.mkdir(parents=True, exist_ok=True)
     with features_path.open("w") as f:
         json.dump(features, f)
 
-    project = pv.ProjectSummary(path=str(tmp_path), name=tmp_path.name)
+    project = pv.ProjectSummary.from_path(str(features_path))
+    assert project is not None
     project._detail = pv.Model.load(str(features_path))
     return project
 
@@ -122,10 +124,57 @@ def test_commit_creation_feature_updates_model_and_writes_file(tmp_path: Path):
     assert state.flash_message == "Created auth-002"
     assert "auth-002" in project._detail.features
 
-    saved = yaml.safe_load((tmp_path / "features.yaml").read_text())
+    saved = yaml.safe_load((tmp_path / "agent-work" / "features.yaml").read_text())
     assert [item["id"] for item in saved] == ["auth-001", "auth-002"]
     assert saved[1]["depends_on"] == ["auth-001"]
     assert saved[1]["priority"] == 2
+
+
+def test_project_summary_keeps_project_root_for_agent_work_backlog(tmp_path: Path):
+    project = write_features(tmp_path, [{"id": "auth-001", "epic": "auth", "status": "pending"}])
+
+    assert project.path == str(tmp_path)
+    assert project.name == tmp_path.name
+    assert project.features_path == str(tmp_path / "agent-work" / "features.yaml")
+
+
+def test_scan_projects_discovers_only_agent_work_backlogs(tmp_path: Path):
+    canonical = tmp_path / "canonical"
+    write_features(canonical, [{"id": "auth-001", "epic": "auth", "status": "pending"}])
+
+    legacy = tmp_path / "legacy"
+    legacy.mkdir()
+    (legacy / "features.yaml").write_text(json.dumps([
+        {"id": "old-001", "epic": "old", "status": "pending"}
+    ]))
+
+    portfolio = pv.scan_projects(str(tmp_path))
+
+    assert [project.name for project in portfolio.projects] == ["canonical"]
+
+
+def test_scan_projects_relative_root_keeps_project_name(tmp_path: Path, monkeypatch):
+    write_features(tmp_path, [{"id": "auth-001", "epic": "auth", "status": "pending"}])
+    monkeypatch.chdir(tmp_path)
+
+    portfolio = pv.scan_projects(".")
+
+    assert len(portfolio.projects) == 1
+    assert portfolio.projects[0].path == str(tmp_path)
+    assert portfolio.projects[0].name == tmp_path.name
+
+
+def test_fv_defaults_to_agent_work_backlog(tmp_path: Path, monkeypatch):
+    write_features(tmp_path, [{"id": "auth-001", "epic": "auth", "status": "pending"}])
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(pv.sys, "argv", ["fv"])
+
+    state = pv.detect_entry_point()
+
+    assert state.view == "project"
+    assert state.current_project.path == str(tmp_path)
+    assert state.current_project.name == tmp_path.name
+    assert state.current_project.features_path == "agent-work/features.yaml"
 
 
 def test_preview_helpers_match_creation_shape():

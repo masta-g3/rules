@@ -17,11 +17,11 @@ Iterate through each phase: implement, verify existing features still work, conf
 
 ### Discovered Work
 
-**Tracked features:** check if the work exists in `features.yaml` first — if not, register it via `ticket-init` skill with `discovered_from` set to the parent feature ID.
+**Tracked features:** check if the work exists in `agent-work/features.yaml` first — if not, register it via `ticket-init` skill with `discovered_from` set to the parent feature ID.
 - Blocks current work → pause, report to user, handle it first
 - Parallelizable → add to backlog, continue
 
-Update the plan document with a "Discovered Work" section. Never silently absorb scope.
+Update the plan document with a "Discovered Work" section. Store ticket-local scripts, logs, and validation artifacts under `agent-work/tickets/<feature-id>/` when needed. Never silently absorb scope.
 
 ### Documentation
 
