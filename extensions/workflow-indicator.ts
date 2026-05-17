@@ -1,5 +1,6 @@
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { Type } from "typebox";
 
 const ENTRY_TYPE = "workflow-indicator";
 const WIDGET_ID = "workflow-indicator";
@@ -33,7 +34,7 @@ type StepName = (typeof WORKFLOW)[number]["id"];
 type IndicatorState = {
 	activeStep?: StepName;
 	ticketId?: string;
-	source?: "input" | "command" | "shortcut";
+	source?: "input" | "command" | "shortcut" | "tool";
 	updatedAt?: number;
 };
 
@@ -193,6 +194,29 @@ export default function workflowIndicator(pi: ExtensionAPI): void {
 		handler: async (_args, ctx) => {
 			state = clearState(pi, ctx);
 			ctx.ui.notify("Workflow indicator cleared.", "info");
+		},
+	});
+
+	pi.registerTool({
+		name: "set_workflow_ticket",
+		label: "Set Workflow Ticket",
+		description: "Set the active workflow ticket shown in the Pi workflow rail.",
+		promptSnippet: "Set the active workflow ticket for the current workflow session",
+		promptGuidelines: [
+			"Use set_workflow_ticket when the user asks to switch the active workflow ticket or the current ticket is explicitly identified.",
+		],
+		parameters: Type.Object({
+			ticketId: Type.String({ description: "Ticket id like engine-003" }),
+		}),
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+			const ticketId = parseTicketArg(params.ticketId);
+			if (!ticketId) throw new Error("Invalid ticket id. Use format like engine-003.");
+
+			state = setState(pi, ctx, { ...state, ticketId, source: "tool" });
+			return {
+				content: [{ type: "text", text: `Workflow ticket set to ${ticketId}.` }],
+				details: { ticketId },
+			};
 		},
 	});
 
