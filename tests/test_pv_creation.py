@@ -3,6 +3,7 @@
 import importlib.machinery
 import importlib.util
 import json
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -175,6 +176,56 @@ def test_fv_defaults_to_agent_work_backlog(tmp_path: Path, monkeypatch):
     assert state.current_project.path == str(tmp_path)
     assert state.current_project.name == tmp_path.name
     assert state.current_project.features_path == "agent-work/features.yaml"
+
+
+def test_pv_help_mentions_agent_helper_and_non_tty_snapshot():
+    result = subprocess.run(
+        [str(pv_path), "--help"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "features_yaml.sh" in result.stdout
+    assert "agents/scripts" in result.stdout
+    assert "Non-interactive" in result.stdout
+    assert "snapshot" in result.stdout
+
+
+def test_pv_invalid_path_includes_examples(tmp_path: Path):
+    result = subprocess.run(
+        [str(pv_path), "does-not-exist"],
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "Examples:" in output
+    assert "pv ." in output
+    assert "pv agent-work/features.yaml" in output
+    assert "fv" in output
+
+
+def test_fv_missing_backlog_includes_examples(tmp_path: Path):
+    fv_path = pv_path.with_name("fv")
+    result = subprocess.run(
+        [str(fv_path)],
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "agent-work/features.yaml not found" in output
+    assert "Examples:" in output
+    assert "pv agent-work/features.yaml" in output
+    assert "fv" in output
 
 
 def test_preview_helpers_match_creation_shape():

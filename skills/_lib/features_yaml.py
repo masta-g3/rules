@@ -63,6 +63,15 @@ COMMAND_SPECS = {
         ],
         "output_modes": ["text", "json", "id"],
     },
+    "get": {
+        "summary": "Show one tracked feature by ID, including persisted fields.",
+        "arguments": [
+            {"name": "feature_id", "required": True, "type": "tracked-id"},
+            {"name": "--file", "required": False, "type": "path", "default": DEFAULT_FEATURES_FILE},
+            {"name": "--output", "required": False, "type": "text|json", "default": "text"},
+        ],
+        "output_modes": ["text", "json"],
+    },
     "create": {
         "summary": "Append a new feature object to agent-work/features.yaml",
         "arguments": [
@@ -186,7 +195,11 @@ def ensure_status(status: str) -> str:
     status = ensure_plain_text("status", status)
     if status not in MUTABLE_STATUSES:
         valid = ", ".join(sorted(MUTABLE_STATUSES))
-        fail(f"invalid status for update: {status}. valid values: {valid}. use complete for done")
+        fail(
+            f"invalid status for update: {status}. valid values: {valid}. "
+            "use complete for done, e.g. features_yaml.sh complete <feature-id> "
+            "--plan-file agent-work/history/<feature-id>.md"
+        )
     return status
 
 
@@ -199,6 +212,8 @@ def ensure_plan_path(path_str: str, *, require_existing: bool) -> str:
 
 
 def parse_json_object(raw: str, *, value_name: str) -> dict:
+    if raw == "-":
+        raw = sys.stdin.read()
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as exc:
@@ -257,7 +272,8 @@ def validate_patch(patch: dict) -> dict[str, Any]:
     allowed_keys = {"status", "plan_file"}
     extra_keys = sorted(set(patch) - allowed_keys)
     if extra_keys:
-        fail(f"unsupported update field(s): {', '.join(extra_keys)}")
+        supported = ", ".join(sorted(allowed_keys))
+        fail(f"unsupported update field(s): {', '.join(extra_keys)}. supported fields: {supported}")
     if not patch:
         fail("update payload must not be empty")
 
@@ -283,19 +299,21 @@ def update_feature(path_str: str, feature_id: str, patch: dict, *, dry_run: bool
     clean_patch = validate_patch(patch)
     data = load_features(path_str)
     feature = require_feature(data, feature_id)
+    changed_fields = sorted(key for key, value in clean_patch.items() if feature.get(key) != value)
     updated = dict(feature)
     updated.update(clean_patch)
 
-    if not dry_run:
-        feature.update(clean_patch)
+    if not dry_run and changed_fields:
+        for key in changed_fields:
+            feature[key] = clean_patch[key]
         save_features(path_str, data)
 
     return {
         "command": "update",
-        "changed": not dry_run,
+        "changed": bool(changed_fields) and not dry_run,
         "dry_run": dry_run,
         "feature": feature_details(updated),
-        "updated_fields": sorted(clean_patch),
+        "updated_fields": changed_fields,
     }
 
 
@@ -329,6 +347,13 @@ def complete_feature(
             "completed_at": updated["completed_at"],
         },
     }
+
+
+def get_feature(path_str: str, feature_id: str) -> dict[str, Any]:
+    feature_id = ensure_tracked_id(feature_id)
+    data = load_features(path_str)
+    feature = require_feature(data, feature_id)
+    return {"command": "get", "feature": dict(feature)}
 
 
 def list_epics(path_str: str) -> dict[str, Any]:
@@ -432,7 +457,12 @@ def select_next_feature(path_str: str, epic_filter: str | None) -> dict[str, Any
 def describe_command(command_name: str | None) -> dict[str, Any]:
     if command_name:
         if command_name not in COMMAND_SPECS:
-            fail(f"unknown command for describe: {command_name}")
+            valid = ", ".join(sorted(COMMAND_SPECS))
+            fail(
+                f"unknown command for describe: {command_name}. "
+                f"describe expects one of: {valid}. "
+                f"To inspect a feature, use: features_yaml.sh get {command_name} --output json"
+            )
         return {
             "entrypoint": "skills/_lib/features_yaml.sh",
             "implementation": "skills/_lib/features_yaml.py",
@@ -465,6 +495,19 @@ def emit_text(result: dict[str, Any]) -> None:
 
     if command == "next-id":
         print(result["next_id"])
+        return
+
+    if command == "get":
+        feature = result["feature"]
+        status = feature.get("status") or "-"
+        print(f"{feature.get('id')} [{status}]")
+        for key in ("priority", "depends_on", "plan_file", "description"):
+            if key not in feature:
+                continue
+            value = feature[key]
+            if isinstance(value, list):
+                value = ", ".join(str(item) for item in value) or "none"
+            print(f"{key}: {value}")
         return
 
     if command == "next":
@@ -603,21 +646,70 @@ def build_parser() -> argparse.ArgumentParser:
     )
     next_parser.set_defaults(handler=handle_next)
 
-    create = subparsers.add_parser("create", parents=[file_parent, mutation_parent])
+    get = subparsers.add_parser(
+        "get",
+        parents=[file_parent, read_output_parent],
+        description="Show one tracked feature by ID, including persisted fields.",
+        epilog="""Examples:
+  features_yaml.sh get tui-002
+  features_yaml.sh get tui-002 --output json
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    get.add_argument("feature_id")
+    get.set_defaults(handler=handle_get)
+
+    create = subparsers.add_parser(
+        "create",
+        parents=[file_parent, mutation_parent],
+        description="Append a new feature object. Use --json - to read the payload from stdin.",
+        epilog="""Examples:
+  features_yaml.sh create --json '{"id":"tui-002","status":"pending"}'
+  echo '{"id":"tui-002","status":"pending"}' | features_yaml.sh create --json - --output json
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     create.add_argument("--json", required=True)
     create.set_defaults(handler=handle_create)
 
-    update = subparsers.add_parser("update", parents=[file_parent, mutation_parent])
+    update = subparsers.add_parser(
+        "update",
+        parents=[file_parent, mutation_parent],
+        description="Patch a tracked feature. Supported fields: status, plan_file.",
+        epilog="""Examples:
+  features_yaml.sh update tui-002 --json '{"plan_file":"agent-work/plans/tui-002.md"}'
+  echo '{"status":"in_progress"}' | features_yaml.sh update tui-002 --json - --output json
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     update.add_argument("feature_id")
     update.add_argument("--json", required=True)
     update.set_defaults(handler=handle_update)
 
-    complete = subparsers.add_parser("complete", parents=[file_parent, mutation_parent])
+    complete = subparsers.add_parser(
+        "complete",
+        parents=[file_parent, mutation_parent],
+        description="Finalize a tracked feature with an archived plan path.",
+        epilog="""Examples:
+  features_yaml.sh complete tui-002 --plan-file agent-work/history/20260521_tui-002.md
+  features_yaml.sh complete tui-002 --plan-file agent-work/history/20260521_tui-002.md --output json
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     complete.add_argument("feature_id")
     complete.add_argument("--plan-file", required=True)
     complete.set_defaults(handler=handle_complete)
 
-    describe = subparsers.add_parser("describe")
+    describe = subparsers.add_parser(
+        "describe",
+        description="Describe the helper contract or a specific helper command.",
+        epilog="""Examples:
+  features_yaml.sh describe
+  features_yaml.sh describe update
+  features_yaml.sh get tui-002 --output json
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     describe.add_argument("describe_command", nargs="?")
     describe.add_argument("--output", default=argparse.SUPPRESS, choices=("text", "json"))
     describe.set_defaults(handler=handle_describe)
@@ -635,6 +727,10 @@ def handle_next_id(args: argparse.Namespace) -> dict[str, Any]:
 
 def handle_next(args: argparse.Namespace) -> dict[str, Any]:
     return select_next_feature(args.file, args.epic)
+
+
+def handle_get(args: argparse.Namespace) -> dict[str, Any]:
+    return get_feature(args.file, args.feature_id)
 
 
 def handle_create(args: argparse.Namespace) -> dict[str, Any]:

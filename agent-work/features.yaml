@@ -412,3 +412,23 @@
   references: []
   created_at: '2026-05-21'
   completed_at: '2026-05-21'
+- id: cli-002
+  epic: cli
+  status: done
+  title: Improve CLI agent usability
+  description: User can use helper and pv/fv CLIs with clearer agent-friendly lookup,
+    help, errors, stdin JSON, and retry semantics
+  steps:
+  - Add direct feature lookup to features_yaml.sh
+  - Improve helper help and error recovery
+  - Support stdin JSON and no-op update semantics
+  - Clarify pv/fv help for human TUI versus agent automation
+  priority: 2
+  depends_on:
+  - cli-001
+  discovered_from: cli-001
+  plan_file: agent-work/history/20260522_cli-002_cli_usability.md
+  references:
+  - agent-work/tickets/cli-001/CLI_ASSESSMENT.md
+  created_at: '2026-05-21'
+  completed_at: '2026-05-22'

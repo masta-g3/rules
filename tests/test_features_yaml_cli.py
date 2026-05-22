@@ -25,11 +25,17 @@ class FeaturesYamlCliTest(unittest.TestCase):
         self.features_file.parent.mkdir(parents=True, exist_ok=True)
         self.features_file.write_text(json.dumps(payload, indent=2))
 
-    def run_helper(self, *args: str, expect_ok: bool = True) -> subprocess.CompletedProcess[str]:
+    def run_helper(
+        self,
+        *args: str,
+        expect_ok: bool = True,
+        input_text: str | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
             [str(HELPER), *args],
             cwd=self.workdir,
             text=True,
+            input=input_text,
             capture_output=True,
             check=False,
         )
@@ -108,6 +114,57 @@ class FeaturesYamlCliTest(unittest.TestCase):
 
         result = self.run_helper("--output", "id", "next")
         self.assertEqual(result.stdout.strip(), "skill-001")
+
+    def test_get_feature_outputs_full_feature_json(self) -> None:
+        feature = {
+            "id": "skill-006",
+            "epic": "skill",
+            "status": "pending",
+            "title": "Simplify helper",
+            "description": "Agent can inspect persisted fields",
+            "priority": 2,
+            "depends_on": ["skill-005"],
+            "plan_file": "agent-work/plans/skill-006.md",
+            "references": ["agent-work/tickets/cli-001/CLI_ASSESSMENT.md"],
+        }
+        self.write_features([feature])
+
+        result = self.run_helper(
+            "--file",
+            str(self.features_file),
+            "get",
+            "skill-006",
+            "--output",
+            "json",
+        )
+
+        self.assertEqual(json.loads(result.stdout), {"command": "get", "feature": feature})
+
+    def test_get_feature_text_is_human_usable(self) -> None:
+        self.write_features([
+            {
+                "id": "skill-006",
+                "status": "pending",
+                "description": "Agent can inspect persisted fields",
+                "priority": 2,
+                "depends_on": ["skill-005"],
+                "plan_file": "agent-work/plans/skill-006.md",
+            }
+        ])
+
+        result = self.run_helper("--file", str(self.features_file), "get", "skill-006")
+
+        self.assertIn("skill-006 [pending]", result.stdout)
+        self.assertIn("priority: 2", result.stdout)
+        self.assertIn("depends_on: skill-005", result.stdout)
+        self.assertIn("plan_file: agent-work/plans/skill-006.md", result.stdout)
+        self.assertIn("description: Agent can inspect persisted fields", result.stdout)
+
+    def test_describe_feature_id_points_to_get(self) -> None:
+        result = self.run_helper("describe", "skill-006", expect_ok=False)
+
+        self.assertIn("describe expects one of", result.stderr)
+        self.assertIn("get skill-006 --output json", result.stderr)
 
     def test_next_reports_blocked_items(self) -> None:
         self.write_features(
@@ -206,6 +263,66 @@ class FeaturesYamlCliTest(unittest.TestCase):
         self.assertEqual(payload["feature"]["plan_file"], plan_path)
         self.assertIn("plan_file: agent-work/plans/skill-006.md", self.features_file.read_text())
 
+    def test_json_dash_reads_stdin_for_create_and_update(self) -> None:
+        self.write_features([])
+
+        create = self.run_helper(
+            "--file",
+            str(self.features_file),
+            "create",
+            "--json",
+            "-",
+            "--output",
+            "json",
+            input_text=json.dumps({"id": "skill-006", "status": "pending"}),
+        )
+        self.assertEqual(json.loads(create.stdout)["feature"]["id"], "skill-006")
+
+        update = self.run_helper(
+            "--file",
+            str(self.features_file),
+            "update",
+            "skill-006",
+            "--json",
+            "-",
+            "--output",
+            "json",
+            input_text=json.dumps({"plan_file": "agent-work/plans/skill-006.md"}),
+        )
+        self.assertEqual(
+            json.loads(update.stdout)["feature"]["plan_file"],
+            "agent-work/plans/skill-006.md",
+        )
+
+    def test_repeated_update_reports_unchanged(self) -> None:
+        self.write_features([{"id": "skill-006", "status": "pending"}])
+        plan_path = "agent-work/plans/skill-006.md"
+
+        self.run_helper(
+            "--file",
+            str(self.features_file),
+            "update",
+            "skill-006",
+            "--json",
+            json.dumps({"plan_file": plan_path}),
+        )
+        original = self.features_file.read_text()
+
+        repeated = self.run_helper(
+            "--file",
+            str(self.features_file),
+            "update",
+            "skill-006",
+            "--json",
+            json.dumps({"plan_file": plan_path}),
+            "--output",
+            "json",
+        )
+        payload = json.loads(repeated.stdout)
+        self.assertFalse(payload["changed"])
+        self.assertEqual(payload["updated_fields"], [])
+        self.assertEqual(self.features_file.read_text(), original)
+
     def test_update_rejects_unsupported_fields_and_done_status(self) -> None:
         self.write_features([{"id": "skill-006", "status": "pending"}])
 
@@ -219,6 +336,7 @@ class FeaturesYamlCliTest(unittest.TestCase):
             expect_ok=False,
         )
         self.assertIn("unsupported update field(s): priority", unsupported.stderr)
+        self.assertIn("supported fields: plan_file, status", unsupported.stderr)
 
         done_status = self.run_helper(
             "--file",
@@ -230,6 +348,14 @@ class FeaturesYamlCliTest(unittest.TestCase):
             expect_ok=False,
         )
         self.assertIn("use complete for done", done_status.stderr)
+        self.assertIn("--plan-file", done_status.stderr)
+
+    def test_update_help_includes_examples_and_supported_fields(self) -> None:
+        result = self.run_helper("update", "--help")
+
+        self.assertIn("Examples:", result.stdout)
+        self.assertIn("Supported fields: status, plan_file", result.stdout)
+        self.assertIn("--json -", result.stdout)
 
     def test_update_dry_run_does_not_mutate_file(self) -> None:
         self.write_features([{"id": "skill-006", "status": "pending"}])

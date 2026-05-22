@@ -11,6 +11,14 @@ Usage:
     pv agent-work/features.yaml  # Project view for specific file
     fv                    # Alias: project view for ./agent-work/features.yaml
 
+Agent/script usage:
+    pv/fv are human TUI tools. For deterministic YAML operations and JSON/id output,
+    agents/scripts should use skills/_lib/features_yaml.sh.
+
+Non-interactive:
+    When stdin is not a TTY, pv/fv render one read-only snapshot and exit 0.
+    This is for inspection, not machine-readable parsing.
+
 Navigation:
     j/k or ↑/↓  Move selection
     Enter       Drill down (project/epic/feature)
@@ -35,7 +43,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from shutil import get_terminal_size
-from typing import Any
+from typing import Any, NoReturn
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -2814,6 +2822,13 @@ def init_project_state(features_path: str) -> State:
     )
 
 
+def exit_not_found(arg: str) -> NoReturn:
+    print(f"Error: {arg} not found")
+    print(f"cwd: {Path.cwd()}")
+    print("Examples: pv ., pv agent-work/features.yaml, fv")
+    sys.exit(1)
+
+
 def detect_entry_point() -> State:
     prog_name = os.path.basename(sys.argv[0])
     is_fv_mode = prog_name in ('fv', 'fv.py')
@@ -2822,10 +2837,7 @@ def detect_entry_point() -> State:
         if is_fv_mode:
             if os.path.exists(CANONICAL_BACKLOG):
                 return init_project_state(CANONICAL_BACKLOG)
-            else:
-                print(f"Error: {CANONICAL_BACKLOG} not found")
-                print(f"Run from a directory containing {CANONICAL_BACKLOG}, or specify path.")
-                sys.exit(1)
+            exit_not_found(CANONICAL_BACKLOG)
         else:
             return init_portfolio_state('~/Code')
 
@@ -2837,15 +2849,13 @@ def detect_entry_point() -> State:
 
     if arg.endswith(('.yaml', '.yml', '.json')):
         if not os.path.exists(arg):
-            print(f"Error: {arg} not found")
-            sys.exit(1)
+            exit_not_found(arg)
         return init_project_state(arg)
 
     if os.path.isdir(arg):
         return init_portfolio_state(arg)
 
-    print(f"Error: {arg} not found")
-    sys.exit(1)
+    exit_not_found(arg)
 
 
 def main():

@@ -67,13 +67,16 @@ Shared backlog operations live in `skills/_lib/features_yaml.py` and are invoked
 
 - Purpose: keep `agent-work/features.yaml` selection and mutation logic packaged with the repo
 - Runtime: `uv` manages the script-local PyYAML dependency
-- Contract: `epics`, `next-id`, `next`, `create`, `update`, `complete`, and `describe`
+- Contract: `epics`, `next-id`, `next`, `get`, `create`, `update`, `complete`, and `describe`
+- Direct lookup: `skills/_lib/features_yaml.sh get <feature-id> --output json`
+- Pipeline input: `create --json -` and `update <feature-id> --json -` read JSON objects from stdin
+- Retry behavior: repeated no-op `update` returns `changed:false` and does not rewrite the file
 
 ## CLI Tools
 
 ### pv - Portfolio & Feature Viewer
 
-Terminal TUI for visualizing and editing `agent-work/features.yaml` across projects.
+Terminal TUI for visualizing and editing `agent-work/features.yaml` across projects. `pv`/`fv` are human tools; agents and scripts should use `skills/_lib/features_yaml.sh` for deterministic JSON/id output.
 
 **Install:**
 ```bash
@@ -87,6 +90,8 @@ pv /path/to/dir       # Portfolio view (scan specific directory)
 pv agent-work/features.yaml  # Project view (specific file)
 fv                          # Project view (./agent-work/features.yaml in current dir)
 ```
+
+When stdin is not a TTY, `pv`/`fv` render one read-only snapshot and exit 0. Treat that as inspection output, not a machine-readable API.
 
 **Navigation:**
 - `j/k` or `↑/↓` - Move selection
