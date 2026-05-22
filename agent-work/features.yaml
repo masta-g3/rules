@@ -395,3 +395,20 @@
   references: []
   created_at: '2026-05-13'
   completed_at: '2026-05-13'
+- id: cli-001
+  epic: cli
+  status: done
+  title: Assess CLI agent usability issues
+  description: User can assess helper and pv/fv CLI usability issues with targeted
+    subagent user-like tests
+  steps:
+  - Design assessment matrix for features_yaml.sh and pv/fv
+  - Use targeted subagents as realistic CLI users
+  - Capture prioritized findings and fixes
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: agent-work/history/20260521_cli-001_cli_study.md
+  references: []
+  created_at: '2026-05-21'
+  completed_at: '2026-05-21'
