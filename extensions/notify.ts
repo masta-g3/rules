@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { basename } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-const TITLE = "Pi";
+const APP_NAME = "Pi";
 const READY = "Ready for input";
 const TEST = "Notification test";
 const SOUND_PATH = "/System/Library/Sounds/Glass.aiff";
@@ -48,23 +48,29 @@ function notify(title: string, body: string): void {
 	process.stdout.write("\x07");
 }
 
-function sessionBody(pi: ExtensionAPI, ctx: ExtensionContext, status: string): string {
+function sessionName(pi: ExtensionAPI, ctx: ExtensionContext): string {
+	return pi.getSessionName() ?? basename(ctx.sessionManager.getSessionFile() ?? "ephemeral");
+}
+
+function sessionTitle(pi: ExtensionAPI, ctx: ExtensionContext): string {
+	return `${APP_NAME} · ${sessionName(pi, ctx)}`;
+}
+
+function sessionBody(_pi: ExtensionAPI, ctx: ExtensionContext, status: string): string {
 	const project = basename(ctx.cwd);
-	const session = pi.getSessionName() ?? basename(ctx.sessionManager.getSessionFile() ?? "ephemeral");
-	const model = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "no model";
-	return [status, `Project: ${project}`, `Session: ${session}`, `Model: ${model}`].join("\n");
+	return [`${status}`, project].join("\n");
 }
 
 export default function (pi: ExtensionAPI) {
 	pi.on("agent_end", async (_event, ctx) => {
 		if (!ctx.hasUI) return;
-		notify(TITLE, sessionBody(pi, ctx, READY));
+		notify(sessionTitle(pi, ctx), sessionBody(pi, ctx, READY));
 	});
 
 	pi.registerCommand("notify-test", {
 		description: "Send a test notification and sound",
 		handler: async (_args, ctx) => {
-			notify(TITLE, sessionBody(pi, ctx, TEST));
+			notify(sessionTitle(pi, ctx), sessionBody(pi, ctx, TEST));
 			ctx.ui.notify("Sent notification test", "info");
 		},
 	});

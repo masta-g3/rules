@@ -72,9 +72,9 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn("display notification", source)
         self.assertIn("afplay", source)
         self.assertIn("sessionBody", source)
-        self.assertIn("Project:", source)
-        self.assertIn("Session:", source)
-        self.assertIn("Model:", source)
+        self.assertIn("basename(ctx.cwd)", source)
+        self.assertIn("status}`, project].join", source)
+        self.assertNotIn("Model:", source)
 
     def test_skill_thinking_sets_and_restores_level(self) -> None:
         source = SKILL_THINKING_EXTENSION.read_text()
