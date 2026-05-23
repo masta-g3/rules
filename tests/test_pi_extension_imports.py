@@ -73,7 +73,12 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn("afplay", source)
         self.assertIn("sessionBody", source)
         self.assertIn("basename(ctx.cwd)", source)
-        self.assertIn("status}`, project].join", source)
+        self.assertIn("sessionName(pi, ctx)", source)
+        self.assertIn('`${project} - ${sessionName(pi, ctx)}`', source)
+        self.assertIn('function notificationTitle(status: string): string', source)
+        self.assertIn('return `Pi ${status}`', source)
+        self.assertIn('notify(notificationTitle(READY), sessionBody(pi, ctx))', source)
+        self.assertIn('notify(notificationTitle(TEST), sessionBody(pi, ctx))', source)
         self.assertNotIn("Model:", source)
 
     def test_skill_thinking_sets_and_restores_level(self) -> None:

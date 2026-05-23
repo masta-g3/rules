@@ -3,7 +3,6 @@ import { existsSync } from "node:fs";
 import { basename } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-const APP_NAME = "Pi";
 const READY = "Ready for input";
 const TEST = "Notification test";
 const SOUND_PATH = "/System/Library/Sounds/Glass.aiff";
@@ -52,25 +51,25 @@ function sessionName(pi: ExtensionAPI, ctx: ExtensionContext): string {
 	return pi.getSessionName() ?? basename(ctx.sessionManager.getSessionFile() ?? "ephemeral");
 }
 
-function sessionTitle(pi: ExtensionAPI, ctx: ExtensionContext): string {
-	return `${APP_NAME} · ${sessionName(pi, ctx)}`;
+function sessionBody(pi: ExtensionAPI, ctx: ExtensionContext): string {
+	const project = basename(ctx.cwd);
+	return `${project} - ${sessionName(pi, ctx)}`;
 }
 
-function sessionBody(_pi: ExtensionAPI, ctx: ExtensionContext, status: string): string {
-	const project = basename(ctx.cwd);
-	return [`${status}`, project].join("\n");
+function notificationTitle(status: string): string {
+	return `Pi ${status}`;
 }
 
 export default function (pi: ExtensionAPI) {
 	pi.on("agent_end", async (_event, ctx) => {
 		if (!ctx.hasUI) return;
-		notify(sessionTitle(pi, ctx), sessionBody(pi, ctx, READY));
+		notify(notificationTitle(READY), sessionBody(pi, ctx));
 	});
 
 	pi.registerCommand("notify-test", {
 		description: "Send a test notification and sound",
 		handler: async (_args, ctx) => {
-			notify(sessionTitle(pi, ctx), sessionBody(pi, ctx, TEST));
+			notify(notificationTitle(TEST), sessionBody(pi, ctx));
 			ctx.ui.notify("Sent notification test", "info");
 		},
 	});
