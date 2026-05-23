@@ -9,6 +9,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXTENSION = REPO_ROOT / "extensions" / "workflow-indicator.ts"
 SKILL_THINKING_EXTENSION = REPO_ROOT / "extensions" / "skill-thinking.ts"
+NOTIFY_EXTENSION = REPO_ROOT / "extensions" / "notify.ts"
 EXPECTED_SKILL_THINKING = {
     "commit": "low",
     "epic-init": "high",
@@ -60,6 +61,16 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn("ExtensionAPI", source)
         self.assertNotIn("@mariozechner/pi-coding-agent", source)
         self.assertNotIn("@mariozechner/pi-tui", source)
+
+    def test_notify_uses_current_pi_package_and_macos_sound(self) -> None:
+        source = NOTIFY_EXTENSION.read_text()
+
+        self.assertIn('from "@earendil-works/pi-coding-agent"', source)
+        self.assertNotIn("@mariozechner/pi-coding-agent", source)
+        self.assertIn('pi.on("agent_end"', source)
+        self.assertIn('pi.registerCommand("notify-test"', source)
+        self.assertIn("display notification", source)
+        self.assertIn("afplay", source)
 
     def test_skill_thinking_sets_and_restores_level(self) -> None:
         source = SKILL_THINKING_EXTENSION.read_text()

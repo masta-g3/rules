@@ -55,6 +55,8 @@ Pi-only subagents live in `pi/agents/` and overlay into `~/.pi/agent/agents/` af
 
 `extensions/skill-thinking.ts` reads `metadata.thinkingLevel` from workflow skill frontmatter for typed `/skill:<name>` commands, sets Pi's thinking level for that turn, and restores the previous level when the turn ends. Without the extension installed, the metadata is inert; non-Pi harnesses ignore it.
 
+`extensions/notify.ts` sends a native macOS notification plus a direct `afplay` sound when Pi returns to input. Use `/notify-test` after `/reload` to verify local sound/notification permissions.
+
 Current Pi-specific extension work also includes a minimalist workflow rail that highlights the active tracked-work skill step inside Pi:
 
 `next-feature → prime → plan-md → execute → review → reflect → commit`
