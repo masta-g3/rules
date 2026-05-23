@@ -49,11 +49,13 @@ Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, a
 
 ## Pi Runtime Assets
 
-Project-local Pi extensions live in `extensions/` and sync into `~/.pi/agent/extensions/` via `./sync-prompts.sh`.
+Project-local Pi extensions live in `extensions/` and sync into `~/.pi/agent/extensions/` via `./sync-prompts.sh`. Pi auto-loads synced extensions on startup; use `/reload` in an existing Pi session after syncing.
 
 Pi-only subagents live in `pi/agents/` and overlay into `~/.pi/agent/agents/` after the shared `agents/` sync. Use this for agents with Pi-specific providers, tools, or skills.
 
-Current Pi-specific extension work includes a minimalist workflow rail that highlights the active tracked-work skill step inside Pi:
+`extensions/skill-thinking.ts` reads `metadata.thinkingLevel` from workflow skill frontmatter for typed `/skill:<name>` commands, sets Pi's thinking level for that turn, and restores the previous level when the turn ends. Without the extension installed, the metadata is inert; non-Pi harnesses ignore it.
+
+Current Pi-specific extension work also includes a minimalist workflow rail that highlights the active tracked-work skill step inside Pi:
 
 `next-feature → prime → plan-md → execute → review → reflect → commit`
 

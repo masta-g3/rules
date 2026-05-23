@@ -2,6 +2,8 @@
 name: project-init
 description: Initialize a new project with scaffolding for multi-session development.
 argument-hint: "[project description]"
+metadata:
+  thinkingLevel: high
 ---
 
 Given the provided project description, set up the foundation for multi-session development.

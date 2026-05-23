@@ -2,6 +2,8 @@
 name: prime
 description: Context priming to prepare to execute a task.
 argument-hint: "[task]"
+metadata:
+  thinkingLevel: low
 ---
 
 Gather the context needed to work confidently on the task:

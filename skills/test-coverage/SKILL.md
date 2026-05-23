@@ -1,6 +1,8 @@
 ---
 name: test-coverage
 description: Assess project test coverage, propose critical tests, implement on confirmation.
+metadata:
+  thinkingLevel: high
 ---
 
 Analyze the project's test coverage and propose tests that would catch real bugs.

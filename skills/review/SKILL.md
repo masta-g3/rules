@@ -1,6 +1,8 @@
 ---
 name: review
 description: Review finished work before reflection and commit.
+metadata:
+  thinkingLevel: high
 ---
 
 Review the active task after implementation and before `/reflect`.

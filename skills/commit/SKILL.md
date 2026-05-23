@@ -1,6 +1,8 @@
 ---
 name: commit
 description: Commit files from session and archive/clean-up associated files.
+metadata:
+  thinkingLevel: low
 ---
 
 Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.

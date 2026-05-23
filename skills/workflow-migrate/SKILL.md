@@ -2,6 +2,8 @@
 name: workflow-migrate
 description: Prepare an explicit migration plan for repos using legacy root features.yaml or docs-based workflow artifacts.
 argument-hint: "[migration request]"
+metadata:
+  thinkingLevel: medium
 ---
 
 Use this skill when a user asks to migrate a repository from the legacy workflow layout to canonical `agent-work/` paths.

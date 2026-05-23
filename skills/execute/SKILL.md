@@ -1,6 +1,8 @@
 ---
 name: execute
 description: Execute on a plan.
+metadata:
+  thinkingLevel: medium
 ---
 
 Work directly from the active plan or task we have been discussing.

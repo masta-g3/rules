@@ -1,6 +1,8 @@
 ---
 name: reflect
 description: Reflect on reviewed work and update durable docs or agent guidance before commit.
+metadata:
+  thinkingLevel: medium
 ---
 
 Update durable documentation and agent guidance after implementation has passed review, so docs describe the final reviewed result.

@@ -102,7 +102,7 @@ Modes:
 ## Design Patterns
 
 - **Single-file tools**: `bin/pv` is self-contained Python (requires PyYAML)
-- **Skill-first workflows**: `skills/*/SKILL.md` defines the main behavior; scripts handle deterministic mutations
+- **Skill-first workflows**: `skills/*/SKILL.md` defines the main behavior; scripts handle deterministic mutations. Workflow skills may include `metadata.thinkingLevel` for Pi's skill-thinking extension; other harnesses ignore it.
 - **Pi runtime stays additive**: Pi-specific behavior belongs in `extensions/` or `pi/` instead of patching Pi core or overloading shared skills
 - **Experimental prompts stay isolated**: autopilot lives under `experimental/autopilot/` and remains opt-in
 - **State in filenames**: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone
