@@ -18,8 +18,10 @@ Update durable documentation and agent guidance after implementation has passed 
 3. If a learning fits both a domain doc and `AGENTS.md`, put the full truth in the domain doc and only add a short `AGENTS.md` pointer/pitfall if agents are likely to miss it.
 4. Do not duplicate existing docs. Add only the delta: new truth, stale truth correction, or a sharper operational rule agents are likely to miss.
 5. Keep updates concise and factual. Prefer editing, replacing, or deleting stale text over appending; do not grow docs unless the new guidance will change future behavior.
-6. Edit `AGENTS.md` sparingly — add only rules whose absence would cause dead ends or repeated mistakes; trim ones that have become too specific, stale, or low-signal.
-7. If no durable update is needed, make no edits.
+6. Docs should describe the current state of the product/system, not the history of how it changed; avoid backward-compatibility, migration, or "previously..." notes unless they affect a real public contract or operator action.
+7. For non-trivial durable doc/guidance edits, invoke the `docs-critic` subagent once to check clarity, fit, and whether the additions are truly durable. Skip when there are no edits or only tiny mechanical fixes such as typos, links, paths, or formatting. Fix only clear issues; deletion is acceptable when the critique shows the update is not worth keeping.
+8. Edit `AGENTS.md` sparingly — add only rules whose absence would cause dead ends or repeated mistakes; trim ones that have become too specific, stale, or low-signal.
+9. If no durable update is needed, make no edits.
 
 ### Boundaries
 

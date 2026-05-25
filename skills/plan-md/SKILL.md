@@ -8,7 +8,9 @@ metadata:
 
 Create a detailed Markdown implementation plan for the provided request. Avoid scope creep.
 
-If scope, approach, or dependencies are unclear, interview the user with the user ask tool before planning — walk through each decision branch one at a time. Don't carry unresolved assumptions forward.
+If scope, approach, or dependencies are unclear, investigate repo-answerable questions first, then interview the user with the user ask tool before planning — walk through each decision branch one at a time. Don't carry unresolved assumptions forward.
+
+When the user asks to reason through a design, or the request is too broad or conceptually ambiguous to plan safely, enter design-interview mode before writing the plan: ask one question at a time, explain your recommended answer, and continue until the product direction, domain concepts, boundaries, and tradeoffs are resolved enough to plan.
 
 ### Plan File Location & Naming
 

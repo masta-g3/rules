@@ -93,3 +93,5 @@ Before running skill helper commands, set `SKILLS_ROOT` from the active harness 
 - Claude: `export SKILLS_ROOT="$HOME/.claude/skills"`
 - Cursor: `export SKILLS_ROOT="$HOME/.cursor/skills"`
 - Pi: `export SKILLS_ROOT="$HOME/.pi/agent/skills"`
+
+Skills may be added, removed, or updated during a session. When the user asks to use a specific skill, check the active `$SKILLS_ROOT/<skill-name>/SKILL.md` before assuming it is unavailable or relying on an earlier skill list.
