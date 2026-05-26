@@ -39,7 +39,7 @@ Include a context-files section:
 
 4. If UI work, include a design direction section. Use the **frontend design skill** if available; otherwise specify theme tokens, typography, and color choices centrally — no scattered magic values.
 
-5. Divide into incremental phases (foundation → core → polish), each with its own `[ ]` checklist and a verification step at the end.
+5. Divide into incremental test-first phases (foundation → core → polish), each with its own `[ ]` checklist and verification step. For implementation phases, write/update the failing test first, make the smallest passing change, then refactor.
    - **Bulk-change checklist:** for cross-cutting changes (20+ files), enumerate every affected file in a `[ ]` checklist grouped by directory or module.
 
 6. Include a **verification strategy** for each phase:
