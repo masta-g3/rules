@@ -2,7 +2,7 @@
 name: frontend-designer
 description: Frontend design specialist for user-provided UI/UX design tasks.
 tools: read, grep, find, ls
-model: claude-bridge/claude-opus-4-7
+model: claude-bridge/claude-opus-4-8
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false
