@@ -174,7 +174,7 @@ Pytest is scoped to `tests/` via `pytest.ini`.
 ./sync-prompts.sh --silent   # suppresses the sync summary
 ```
 
-Sync also ensures `npm:pi-subagents` and `~/.pi/agent/skills` are listed in `~/.pi/agent/settings.json`.
+Sync also ensures `npm:pi-tmux-subagents` and `~/.pi/agent/skills` are listed in `~/.pi/agent/settings.json`.
 
 If `~/.claude/settings.json` exists, sync also refreshes the Claude statusline command.
 

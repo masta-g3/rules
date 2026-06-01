@@ -95,3 +95,4 @@ Before running skill helper commands, set `SKILLS_ROOT` from the active harness 
 - Pi: `export SKILLS_ROOT="$HOME/.pi/agent/skills"`
 
 Skills may be added, removed, or updated during a session. When the user asks to use a specific skill, check the active `$SKILLS_ROOT/<skill-name>/SKILL.md` before assuming it is unavailable or relying on an earlier skill list.
+- If the user pastes a complete skill block, use it directly; only re-read the skill file when the block is incomplete, stale-sensitive, or references external files/scripts.

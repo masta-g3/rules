@@ -181,7 +181,7 @@ sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
 sync_overlay_dir "${repo_root}/pi/agents/" "${pi_root}/agents/" "pi_subagents"
 sync_dir "${repo_root}/extensions/" "${pi_root}/extensions/" "extensions"
 
-ensure_pi_package "npm:pi-subagents"
+ensure_pi_package "npm:pi-tmux-subagents"
 ensure_pi_skill_path "~/.pi/agent/skills" "~/.claude/skills"
 
 sync_dir "${repo_root}/statusline/" "${claude_root}/statusline/" "statusline"
