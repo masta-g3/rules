@@ -87,7 +87,7 @@ When `agent-work/features.yaml` exists, avoid reading the full file into context
 
 ## Skill Helper Setup
 
-Before running skill helper commands, set `SKILLS_ROOT` from the active harness install path1:
+Before running skill helper commands, set `SKILLS_ROOT` once per shell/session from the active harness install path:
 
 - Codex: `export SKILLS_ROOT="$HOME/.codex/skills"`
 - Claude: `export SKILLS_ROOT="$HOME/.claude/skills"`
@@ -95,4 +95,5 @@ Before running skill helper commands, set `SKILLS_ROOT` from the active harness 
 - Pi: `export SKILLS_ROOT="$HOME/.pi/agent/skills"`
 
 Skills may be added, removed, or updated during a session. When the user asks to use a specific skill, check the active `$SKILLS_ROOT/<skill-name>/SKILL.md` before assuming it is unavailable or relying on an earlier skill list.
+- Do not re-export `SKILLS_ROOT` before every command; set it only when missing or when the harness context changes.
 - If the user pastes a complete skill block, use it directly; only re-read the skill file when the block is incomplete, stale-sensitive, or references external files/scripts.
