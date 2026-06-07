@@ -169,10 +169,12 @@ Pytest is scoped to `tests/` via `pytest.ini`.
 ## Setup
 
 ```bash
-./sync-prompts.sh            # copies skills to ~/.claude/skills, ~/.codex/skills, ~/.cursor/skills, ~/.pi/agent/skills; copies AGENTS.md/subagents to those plus ~/.pi/agent; copies repo Pi extensions to ~/.pi/agent/extensions
+./sync-prompts.sh            # leaves Codex unprompted; copies workflow skills/subagents to Claude, Cursor, and Pi; copies Pi extensions to ~/.pi/agent/extensions
 ./sync-prompts.sh --clean    # also removes stale synced files from synced target directories
 ./sync-prompts.sh --silent   # suppresses the sync summary
 ```
+
+Codex receives no `AGENTS.md`, skills, or subagents. Sync prunes repo-managed Codex prompt/workflow assets so Codex stays suitable for chat, browser-style research, and ad hoc tasks rather than tracked project workflow.
 
 Sync also ensures `npm:pi-tmux-subagents` and `~/.pi/agent/skills` are listed in `~/.pi/agent/settings.json`.
 

@@ -23,6 +23,7 @@ EXPECTED_SKILL_THINKING = {
     "test-coverage": "high",
     "ticket-init": "medium",
     "workflow-migrate": "medium",
+    "workflow-orchestrator": "medium",
 }
 VALID_THINKING_LEVELS = {"off", "minimal", "low", "medium", "high", "xhigh"}
 

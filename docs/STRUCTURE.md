@@ -48,7 +48,7 @@ rules/
 ├── pytest.ini          # Pytest collection config (scopes default runs to tests/)
 ├── AGENTS.md           # Coding style & behavioral guidelines
 ├── README.md           # Usage documentation
-└── sync-prompts.sh     # Deploy skills to ~/.claude/skills, ~/.codex/skills, ~/.cursor/skills, ~/.pi/agent/skills; deploy AGENTS.md/subagents/extensions to Pi
+└── sync-prompts.sh     # Leave Codex unprompted; deploy workflow skills to Claude/Cursor/Pi; deploy AGENTS.md/subagents/extensions to supported harnesses
 ```
 
 ## Core Concepts
@@ -99,7 +99,7 @@ Modes:
 | `agent-work/features.yaml` | Feature backlog (sequence of feature objects) |
 | `pytest.ini` | Pytest collection scope for repo tests |
 | `AGENTS.md` | Agent behavior rules, copied to project roots |
-| `sync-prompts.sh` | Deploys skills to Claude/Codex/Cursor/Pi skill roots, deploys shared subagents to all harnesses, overlays Pi-only subagents/extensions into Pi, and configures Pi to load its local skill root |
+| `sync-prompts.sh` | Leaves Codex unprompted and prunes repo-managed Codex assets, deploys workflow skills/subagents to Claude/Cursor/Pi, overlays Pi-only subagents/extensions into Pi, and configures Pi to load its local skill root |
 
 ## Design Patterns
 

@@ -24,11 +24,13 @@ DIM='\033[2m'
 BOLD='\033[1m'
 GREEN='\033[32m'
 YELLOW='\033[33m'
+RED='\033[31m'
 CYAN='\033[36m'
 RESET='\033[0m'
 
 declare -A updated_files=()
 declare -A added_files=()
+declare -A removed_files=()
 declare -A all_files=()
 
 add_unique() {
@@ -124,6 +126,35 @@ sync_overlay_dir() {
   done <<< "$rsync_out"
 }
 
+remove_repo_entries() {
+  local src="$1" dst="$2" category="$3"
+  [[ -d "$dst" ]] || return
+
+  for f in "$src"*; do
+    [[ -e "$f" ]] || continue
+    local base name
+    base=$(basename "$f")
+    [[ "$base" == .* ]] && continue
+    name=$(strip_ext "$f")
+
+    if [[ -e "${dst}${base}" ]]; then
+      rm -rf "${dst}${base}"
+      add_unique all_files[$category] "$name"
+      add_unique removed_files[$category] "$name"
+    fi
+  done
+
+  rmdir "$dst" 2>/dev/null || true
+}
+
+remove_file() {
+  local dst="$1" category="$2" name="$3"
+  [[ -e "$dst" ]] || return
+  rm -f "$dst"
+  add_unique all_files[$category] "$name"
+  add_unique removed_files[$category] "$name"
+}
+
 ensure_pi_setting_array_value() {
   local key="$1" value="$2" category="$3"
   local settings="${pi_root}/settings.json"
@@ -164,17 +195,19 @@ ensure_pi_skill_path() {
   fi
 }
 
-sync_file "${repo_root}/AGENTS.md" "${codex_root}/AGENTS.md" "agents_md"
+remove_file "${codex_root}/AGENTS.md" "codex_pruned" "AGENTS"
+
 sync_file "${repo_root}/AGENTS.md" "${claude_root}/CLAUDE.md" "agents_md"
 sync_file "${repo_root}/AGENTS.md" "${cursor_root}/AGENTS.md" "agents_md"
 sync_file "${repo_root}/AGENTS.md" "${pi_root}/AGENTS.md" "agents_md"
 
-sync_dir "${repo_root}/skills/" "${codex_root}/skills/" "skills"
+remove_repo_entries "${repo_root}/skills/" "${codex_root}/skills/" "codex_pruned"
+remove_repo_entries "${repo_root}/agents/" "${codex_root}/agents/" "codex_pruned"
+
 sync_dir "${repo_root}/skills/" "${claude_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${cursor_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${pi_root}/skills/" "skills"
 
-sync_dir "${repo_root}/agents/" "${codex_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${claude_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${cursor_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
@@ -198,11 +231,14 @@ if [[ "$SILENT" == false ]]; then
     local all="${all_files[$category]:-}"
     local updated="${updated_files[$category]:-}"
     local added="${added_files[$category]:-}"
+    local removed="${removed_files[$category]:-}"
     local output=""
 
     for item in $all; do
       if [[ " $added " == *" $item "* ]]; then
         output+="${GREEN}+${item}${RESET} "
+      elif [[ " $removed " == *" $item "* ]]; then
+        output+="${RED}-${item}${RESET} "
       elif [[ " $updated " == *" $item "* ]]; then
         output+="${YELLOW}●${item}${RESET} "
       else
@@ -214,7 +250,7 @@ if [[ "$SILENT" == false ]]; then
 
   has_changes() {
     local category="$1"
-    [[ -n "${updated_files[$category]:-}" || -n "${added_files[$category]:-}" ]]
+    [[ -n "${updated_files[$category]:-}" || -n "${added_files[$category]:-}" || -n "${removed_files[$category]:-}" ]]
   }
 
   print_row() {
@@ -234,13 +270,19 @@ if [[ "$SILENT" == false ]]; then
     fi
   }
 
+  print_row_if_present() {
+    local label="$1" category="$2" targets="$3"
+    [[ -n "${all_files[$category]:-}" ]] && print_row "$label" "$category" "$targets"
+  }
+
   echo ""
   echo -e "${BOLD}sync-prompts${RESET}$(if [[ -n "$DELETE_FLAG" ]]; then echo -e " ${DIM}--clean${RESET}"; fi)"
   echo ""
 
-  print_row "AGENTS.md" "agents_md" "codex, claude, cursor, pi"
-  print_row "skills" "skills" "codex, claude, cursor, pi"
-  print_row "subagents" "subagents" "codex, claude, cursor, pi"
+  print_row_if_present "codex pruned assets" "codex_pruned" "codex"
+  print_row "AGENTS.md" "agents_md" "claude, cursor, pi"
+  print_row "skills" "skills" "claude, cursor, pi"
+  print_row "subagents" "subagents" "claude, cursor, pi"
   print_row "pi-only subagents" "pi_subagents" "pi"
   print_row "extensions" "extensions" "pi"
   print_row "pi packages" "pi_packages" "pi"
@@ -248,6 +290,6 @@ if [[ "$SILENT" == false ]]; then
   print_row "statusline" "statusline" "claude"
 
   echo ""
-  echo -e "  ${DIM}${GREEN}+new${RESET}  ${YELLOW}●updated${RESET}  ${DIM}unchanged${RESET}"
+  echo -e "  ${DIM}${GREEN}+new${RESET}  ${YELLOW}●updated${RESET}  ${RED}-removed${RESET}  ${DIM}unchanged${RESET}"
   echo ""
 fi

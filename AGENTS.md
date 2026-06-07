@@ -5,6 +5,7 @@
 - On failure or uncertainty: state what happened and what's needed.
 - For complex ideas, prefer tables, lists, or ASCII diagrams over prose.
 - When a request is ambiguous, use the ask-user tool instead of guessing.
+- The user may be using speech-to-text; infer obvious transcription errors from context, and ask only when the intended meaning is unclear.
 
 ## Project Orientation
 
