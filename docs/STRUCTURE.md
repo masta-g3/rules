@@ -46,6 +46,7 @@ rules/
 │   └── STRUCTURE.md    # Durable architecture/onboarding guide
 │
 ├── pytest.ini          # Pytest collection config (scopes default runs to tests/)
+├── CONTEXT.md          # Project purpose, audience, assumptions, and terminology
 ├── AGENTS.md           # Coding style & behavioral guidelines
 ├── README.md           # Usage documentation
 └── sync-prompts.sh     # Leave Codex unprompted; deploy workflow skills to Claude/Cursor/Pi; deploy AGENTS.md/subagents/extensions to supported harnesses
@@ -60,7 +61,13 @@ Projects track work in `agent-work/features.yaml`:
 [pending feature] → plan-md → [agent-work/plans/id.md] → execute → [in_progress] → review → reflect → commit → [done]
 ```
 
-Agent-produced workflow artifacts live under `agent-work/`, including repo-specific planning/scratchpad areas when needed. Durable architecture, onboarding, and reference documentation stays under `docs/`.
+Agent-produced workflow artifacts live under `agent-work/`, including repo-specific planning/scratchpad areas when needed. Durable project context, architecture, onboarding, and reference documentation stays in root docs or `docs/`.
+
+Durable documentation boundaries:
+- `CONTEXT.md`: project purpose, target user, operating assumptions, and shared terminology
+- `AGENTS.md`: agent behavior rules and repo-specific working instructions
+- `docs/STRUCTURE.md`: architecture, directory layout, implementation patterns, and onboarding
+- `README.md`: usage documentation
 
 Features have: id, status, epic, depends_on, priority, and optional planning references such as `plan_file` and `references`.
 
@@ -98,6 +105,7 @@ Modes:
 |------|---------|
 | `agent-work/features.yaml` | Feature backlog (sequence of feature objects) |
 | `pytest.ini` | Pytest collection scope for repo tests |
+| `CONTEXT.md` | Project purpose, target user, operating assumptions, and shared terminology |
 | `AGENTS.md` | Agent behavior rules, copied to project roots |
 | `sync-prompts.sh` | Leaves Codex unprompted and prunes repo-managed Codex assets, deploys workflow skills/subagents to Claude/Cursor/Pi, overlays Pi-only subagents/extensions into Pi, and configures Pi to load its local skill root |
 

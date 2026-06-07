@@ -449,3 +449,57 @@
   references: []
   created_at: '2026-05-22'
   completed_at: '2026-05-22'
+- id: docs-001
+  epic: docs
+  status: done
+  title: Add minimal project context documentation workflow
+  description: User can capture a project-specific CONTEXT.md with purpose, audience,
+    operating assumptions, and shared terminology alongside STRUCTURE.md and AGENTS.md.
+  steps:
+  - Define root CONTEXT.md as the single minimal context document for a repo, separate
+    from AGENTS.md behavior rules and docs/STRUCTURE.md architecture guidance.
+  - Update project-init so new projects can initialize CONTEXT.md alongside other
+    durable project guidance.
+  - Add an interview-driven context gathering flow because project purpose, audience,
+    and terminology cannot be reliably inferred from files alone.
+  - Keep the interview focused but multi-step, roughly 10-15 concise questions covering
+    purpose, target user, project maturity, non-goals, terminology, and documentation
+    boundaries.
+  - Ensure reflect/docs-related guidance updates CONTEXT.md only when durable project
+    meaning, target audience, or terminology changes, not for implementation summaries.
+  - Update docs/STRUCTURE.md and related docs to mention CONTEXT.md in the durable
+    documentation model.
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: agent-work/history/20260607_docs-001_context_workflow.md
+  references: []
+  created_at: '2026-06-07'
+  completed_at: '2026-06-07'
+- id: docs-002
+  epic: docs
+  status: pending
+  title: Add docs-health documentation audit skill
+  description: User can assess durable documentation health for freshness, clarity,
+    organization, usefulness, and low-noise coverage before choosing whether to apply
+    focused edits.
+  steps:
+  - 'Create a docs-health skill modeled after test-coverage: assess first, report
+    concise high-value fixes, implement only after confirmation.'
+  - Audit README.md, docs/STRUCTURE.md, CONTEXT.md, relevant docs/**, and project-local
+    AGENTS.md while excluding agent-work history and temporary artifacts as primary
+    docs.
+  - Include checks for stale content, dead links, duplicated truth, unclear organization,
+    terminology drift, and over-documentation.
+  - 'Make anti-bloat explicit: prefer deletion, tightening, or moving content before
+    adding new documentation.'
+  - Include a minimal gap analysis and a Not Worth Documenting section to discourage
+    exhaustive coverage.
+  - Invoke docs-critic after non-trivial durable documentation edits.
+  priority: 2
+  depends_on:
+  - docs-001
+  discovered_from: null
+  plan_file: null
+  references: []
+  created_at: '2026-06-07'

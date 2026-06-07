@@ -10,7 +10,24 @@ Given the provided project description, set up the foundation for multi-session 
 
 ### Clarify Before Scaffolding
 
-Ensure you understand the user's vision before making architectural decisions—what problem it solves, who it's for, and any tech preferences or constraints. Ask clarifying questions if needed. Early architectural decisions are costly to change.
+Ensure you understand the user's context and vision before making architectural decisions—what the project is, why it exists, who it's for, what kind of project it is, and any tech preferences or constraints. Ask clarifying questions if needed. Early context and architecture decisions are costly to change.
+
+### Context Interview
+
+Before creating `CONTEXT.md`, ask enough focused questions to capture project context that cannot be inferred from files. Batch questions where possible, but avoid one huge questionnaire. Cover:
+
+1. What is this project?
+2. Why does it exist?
+3. What does success look like?
+4. Who is the primary target user?
+5. What kind of project is this: production product, internal tool, personal utility, experimental PoC, library, prompt/workflow repo, etc.?
+6. What is explicitly out of scope?
+7. What constraints or operating assumptions matter?
+8. Which terms have project-specific meaning?
+9. Which synonyms should agents avoid?
+10. What should not be documented even if it appears in the codebase?
+
+Use the answers to write a concise root `CONTEXT.md`. Do not infer project purpose, audience, or terminology from code alone when the user has not provided it.
 
 ### 1. Create Project Structure
 
@@ -19,14 +36,22 @@ Initialize the project with appropriate tooling:
 - Set up version control
 - Create dependency manifest with pinned versions
 - Create minimal `README.md` (project name, brief description, how to run)
+- Create root `CONTEXT.md`
 - Create empty `agent-work/features.yaml` (`[]`)
 - Create `agent-work/plans/`, `agent-work/history/`, and `agent-work/tickets/` for workflow artifacts
 
-### 2. Create `docs/STRUCTURE.md`
+### 2. Create Durable Project Docs
 
-The living vision document that guides all subsequent work. Include:
+Create root `CONTEXT.md` as the project context document. Include:
 
-- **Vision**: project purpose, target users, core experience
+- **Purpose**: why the project exists and what success looks like
+- **Target user**: who the project primarily serves
+- **Project type**: production product, internal tool, personal utility, experimental PoC, library, prompt/workflow repo, etc.
+- **Operating assumptions**: durable constraints or principles that shape decisions
+- **Language**: project-specific terms with tight definitions and `_Avoid_:` synonyms when useful
+
+Create `docs/STRUCTURE.md` as the architecture and onboarding guide. Include:
+
 - **Tech stack**: technologies chosen and why
 - **Architecture**: component diagram, file structure, data flow
 - **Data models**: key schemas/entities (can be skeletal initially)
@@ -36,7 +61,7 @@ For UI projects, also include:
 - **Navigation/flows**: user journeys, state diagrams
 - **Design direction**: color palette, typography, visual patterns
 
-STRUCTURE.md captures the *why* and *how*—detailed enough that any engineer can implement correctly. It evolves as the project grows.
+`CONTEXT.md` captures the durable *why* and project language. `docs/STRUCTURE.md` captures the implementation *how*—detailed enough that any engineer can navigate and extend the project correctly. Both evolve as the project grows, but neither should contain implementation history or temporary workflow notes.
 
 ### 3. Initial Commit
 
@@ -44,7 +69,8 @@ Commit the scaffolding with a message like:
 ```
 Initialize project structure
 
-- docs/STRUCTURE.md: architecture and vision
+- CONTEXT.md: project purpose, audience, and terminology
+- docs/STRUCTURE.md: architecture and onboarding
 - Empty agent-work/features.yaml for backlog tracking
 - [Stack/framework] scaffold
 ```
@@ -56,7 +82,7 @@ Summarize what was created and recommend next step:
 ```
 Project initialized: [name]
 Stack: [technologies]
-Structure: README.md, docs/STRUCTURE.md, agent-work/features.yaml
+Structure: README.md, CONTEXT.md, docs/STRUCTURE.md, agent-work/features.yaml
 
 Next: Run /epic-init "[first epic description]" to decompose your first batch of work.
 ```
