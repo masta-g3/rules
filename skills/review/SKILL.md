@@ -9,10 +9,10 @@ Review the active task after implementation and before `/reflect`.
 
 ### Review Process
 
-Verify: correctness (does it solve the task?), minimal surface area, no scope creep, no unnecessary abstractions, no backward compatibility layers unless explicitly requested, no AI bloat.
+Verify: correctness (does it solve the task?), minimal surface area, no scope creep, no unnecessary abstractions, no one-use wrappers/classes that should be inlined, no broad exception handling or silent fallbacks, no backward compatibility layers unless explicitly requested, no AI bloat.
 
 1. Identify the files changed during implementation. Exclude commit-step artifacts (plan archival and `agent-work/features.yaml` completion updates), but include explicitly planned documentation deliverables.
-2. Read them. Check that the change is as narrow as possible — flag duplication, unnecessary abstractions, pattern drift, or edits that widen the impact surface.
+2. Read them. Check that the change is as narrow as possible — flag duplication, unnecessary abstractions, one-use functions/classes that do not improve clarity, broad `try/except`, silent failures, fallback behavior, pattern drift, or edits that widen the impact surface.
 3. Check for residue: debug prints, commented-out code, TODO/FIXME markers from completed work, prompt-generated bloat.
 4. For non-trivial changes, invoke the `code-critic` reviewer subagent once with the assembled file list.
 5. Fix only clear, high-impact issues. Ignore low-confidence or out-of-scope feedback; re-run only after material changes.
