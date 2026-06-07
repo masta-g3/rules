@@ -17,6 +17,7 @@ rules/
 ├── skills/             # Canonical workflow skills
 │   ├── _lib/           # Shared deterministic shell helpers
 │   ├── commit/
+│   ├── docs-health/
 │   ├── epic-init/
 │   ├── execute/
 │   ├── next-feature/

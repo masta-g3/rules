@@ -43,6 +43,7 @@ Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, a
 | `skills/commit` | Archive plan, finalize tracked work, commit |
 | `skills/workflow-orchestrator` | Parent-gated persistent-subagent automation for one ticket or epic/backlog sweeps |
 | `skills/test-coverage` | Analyze test coverage |
+| `skills/docs-health` | Assess durable documentation health |
 
 ## Experimental
 

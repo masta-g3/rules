@@ -478,7 +478,7 @@
   completed_at: '2026-06-07'
 - id: docs-002
   epic: docs
-  status: pending
+  status: done
   title: Add docs-health documentation audit skill
   description: User can assess durable documentation health for freshness, clarity,
     organization, usefulness, and low-noise coverage before choosing whether to apply
@@ -500,6 +500,7 @@
   depends_on:
   - docs-001
   discovered_from: null
-  plan_file: null
+  plan_file: agent-work/history/20260607_docs-002_docs_health_skill.md
   references: []
   created_at: '2026-06-07'
+  completed_at: '2026-06-07'

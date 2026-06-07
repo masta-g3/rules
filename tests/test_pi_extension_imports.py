@@ -12,6 +12,7 @@ SKILL_THINKING_EXTENSION = REPO_ROOT / "extensions" / "skill-thinking.ts"
 NOTIFY_EXTENSION = REPO_ROOT / "extensions" / "notify.ts"
 EXPECTED_SKILL_THINKING = {
     "commit": "low",
+    "docs-health": "high",
     "epic-init": "high",
     "execute": "medium",
     "next-feature": "minimal",
