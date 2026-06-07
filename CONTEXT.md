@@ -23,26 +23,20 @@ This is a prompt and workflow rules repo. It is not an application runtime, prod
 - Keep workflows explicit and user-gated unless automation is intentionally requested.
 - Prefer lean, durable guidance over comprehensive process documentation.
 - Document current project truth, not implementation history.
-- Put temporary agent work in `agent-work/`; keep durable context, structure, and usage docs separate.
 
 ## Language
 
 **Workflow**:  
-A named sequence of human/agent steps that moves work from selection through commit.  
-_Avoid_: pipeline, automation
+A named sequence of human/agent steps that moves work from selection through commit.
 
 **Orchestrator**:  
-The human or parent agent coordinating workflow progress, subagents, and decisions about when to advance.  
-_Avoid_: manager, supervisor
+The human or parent agent coordinating workflow progress, subagents, and decisions about when to advance.
 
 **Skill**:  
-A reusable instruction set for a specific agent task.  
-_Avoid_: command, plugin
+A reusable instruction set for a specific agent task.
 
 **Durable documentation**:  
-Documentation that describes current project truth and should remain useful across sessions.  
-_Avoid_: notes, summaries, logs
+Documentation that describes current project truth and should remain useful across sessions.
 
 **Workflow artifact**:  
-Task-local state produced while planning, executing, reviewing, or committing work.  
-_Avoid_: documentation, records
+Task-local state produced while planning, executing, reviewing, or committing work.
