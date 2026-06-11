@@ -128,7 +128,7 @@ sync_overlay_dir() {
 
 remove_repo_entries() {
   local src="$1" dst="$2" category="$3"
-  [[ -d "$dst" ]] || return
+  [[ -d "$dst" ]] || return 0
 
   for f in "$src"*; do
     [[ -e "$f" ]] || continue
@@ -149,7 +149,7 @@ remove_repo_entries() {
 
 remove_file() {
   local dst="$1" category="$2" name="$3"
-  [[ -e "$dst" ]] || return
+  [[ -e "$dst" ]] || return 0
   rm -f "$dst"
   add_unique all_files[$category] "$name"
   add_unique removed_files[$category] "$name"
