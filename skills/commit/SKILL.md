@@ -7,7 +7,7 @@ metadata:
 
 Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
 
-Assume the work has already been reviewed and reflected. Quick final scan for debug artifacts or prompt residue before proceeding.
+Assume the work has already been reviewed and reflected. Quick final scan for debug artifacts, prompt residue, and stale ticket-local scratch files before proceeding. If `agent-work/tickets/<feature-id>/` was touched, keep only artifacts that remain useful after commit.
 
 ### Archive Planning Document
 

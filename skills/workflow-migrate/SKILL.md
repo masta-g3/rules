@@ -17,7 +17,7 @@ Core workflow artifacts:
 - `agent-work/features.yaml` — tracked backlog and source of truth
 - `agent-work/plans/` — active implementation plans
 - `agent-work/history/` — archived implementation plans and workflow notes
-- `agent-work/tickets/` — on-demand ticket-local temporary artifacts
+- `agent-work/tickets/` — sparse, on-demand ticket-local evidence or reproduction artifacts
 
 Optional repo-specific workflow areas may also live under `agent-work/<name>/` for planning notes, scratchpads, investigations, migration logs, or other non-durable agent artifacts that do not belong in durable docs.
 
@@ -54,7 +54,7 @@ If the repo is safe to plan, produce a concise brief with the detected facts and
 - move `docs/plans/*` to `agent-work/plans/`
 - move `docs/history/*` to `agent-work/history/`
 - create `agent-work/tickets/.gitkeep`
-- use `agent-work/tickets/<feature-id>/` on demand for temporary ticket-local scripts, logs, outputs, screenshots, and validation evidence
+- use `agent-work/tickets/<feature-id>/` sparingly for ticket-local scripts, large logs, outputs, screenshots, and validation evidence that should survive the turn
 - move other non-durable planning/scratchpad artifacts into a clear `agent-work/<name>/` location selected for that repo
 - update `plan_file` and `references` values from old paths to new paths
 - update project docs or agent prompts that still instruct agents to use old paths

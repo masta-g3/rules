@@ -24,7 +24,7 @@ For projects with backlog tracking via `agent-work/features.yaml`:
 
 Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone. Creating a plan keeps tracked work `pending`; `execute` moves it to `in_progress`; `commit` moves it to `done` after `reflect` handles durable documentation updates.
 
-Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, active plans in `plans/`, archives in `history/`, ticket-local temporary scripts/logs/evidence in `tickets/`, and repo-specific planning or scratchpad areas when needed. Durable documentation remains in `docs/`.
+Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, active plans in `plans/`, archives in `history/`, sparse ticket-local evidence or reproduction assets in `tickets/`, and repo-specific planning or scratchpad areas when needed. Durable documentation remains in `docs/`.
 
 ## Skills
 

@@ -23,7 +23,7 @@ Iterate through each phase: implement, verify existing features still work, conf
 - Blocks current work → pause, report to user, handle it first
 - Parallelizable → add to backlog, continue
 
-Update the plan document with a "Discovered Work" section. Store ticket-local scripts, logs, and validation artifacts under `agent-work/tickets/<feature-id>/` when needed. Never silently absorb scope.
+Update the plan document with a "Discovered Work" section. Use `agent-work/tickets/<feature-id>/` sparingly: keep only artifacts needed for review, reproduction, or evidence; use `/tmp` or `mktemp -d` for throwaway experiments; consolidate text into `notes.md` or `validation.md`; delete obsolete files before handoff. Never silently absorb scope.
 
 ### Documentation
 

@@ -40,7 +40,7 @@ rules/
 │   ├── features.yaml   # This project's feature backlog
 │   ├── plans/          # Active implementation plans
 │   ├── history/        # Archived implementation plans and workflow notes
-│   ├── tickets/        # On-demand ticket-local temporary scripts, logs, and validation artifacts
+│   ├── tickets/        # Sparse ticket-local evidence/reproduction artifacts
 │   └── <name>/         # Optional repo-specific non-durable planning/scratchpad areas
 │
 ├── docs/
@@ -62,7 +62,7 @@ Projects track work in `agent-work/features.yaml`:
 [pending feature] → plan-md → [agent-work/plans/id.md] → execute → [in_progress] → review → reflect → commit → [done]
 ```
 
-Agent-produced workflow artifacts live under `agent-work/`, including repo-specific planning/scratchpad areas when needed. Durable project context, architecture, onboarding, and reference documentation stays in root docs or `docs/`.
+Agent-produced workflow artifacts live under `agent-work/`, including repo-specific planning/scratchpad areas when needed. Keep `agent-work/tickets/` sparse: use it only for ticket-local evidence or reproduction assets that should survive the turn. Durable project context, architecture, onboarding, and reference documentation stays in root docs or `docs/`.
 
 Durable documentation boundaries:
 - `CONTEXT.md`: project purpose, target user, operating assumptions, and shared terminology

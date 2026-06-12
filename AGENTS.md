@@ -60,10 +60,18 @@ Tracked work persists across sessions under `agent-work/`:
 - `agent-work/features.yaml` — backlog and source of truth: id, status, priority, dependencies, and `plan_file`.
 - `agent-work/plans/` — active implementation plans (created by `plan-md`, updated during `execute`).
 - `agent-work/history/` — archived completed plans (moved here by `commit`; `plan_file` is updated to the archived path).
-- `agent-work/tickets/` — on-demand ticket-local temporary scripts, logs, outputs, screenshots, and validation artifacts.
+- `agent-work/tickets/` — sparse, on-demand ticket-local artifacts needed for review or reproduction: temporary scripts, large logs, outputs, screenshots, and validation evidence.
 - `agent-work/<name>/` — optional repo-specific non-durable planning, scratchpad, investigation, or migration artifacts when they do not fit the core directories.
 
 Keep workflow artifacts and non-durable agent scratch work in `agent-work/`. Keep durable architecture, onboarding, and reference documentation in `docs/`.
+
+### Ticket Artifact Discipline
+
+Use `agent-work/tickets/<feature-id>/` sparingly:
+- Do not create files just to record ordinary reasoning, command transcripts, progress updates, or per-turn summaries. Put current state in the plan checklist and final response.
+- For one-off experiments or temporary validation, prefer `mktemp -d` or `/tmp`; remove temp files before finishing.
+- Persist only artifacts needed after the turn for review, reproduction, or evidence. Consolidate text into a single `notes.md` or `validation.md` instead of many small files.
+- Before handoff or commit, delete obsolete ticket artifacts or state why the remaining artifacts are worth keeping.
 
 User-driven skill workflow (do not advance automatically; stay within the current step):
 `next-feature` → `prime` → `plan-md` → `execute` → `review` → `reflect` → `commit`
