@@ -272,7 +272,9 @@ if [[ "$SILENT" == false ]]; then
 
   print_row_if_present() {
     local label="$1" category="$2" targets="$3"
-    [[ -n "${all_files[$category]:-}" ]] && print_row "$label" "$category" "$targets"
+    if [[ -n "${all_files[$category]:-}" ]]; then
+      print_row "$label" "$category" "$targets"
+    fi
   }
 
   echo ""

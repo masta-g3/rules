@@ -18,6 +18,7 @@
 ## Collaboration and Codebase Workflow
 
 - Other engineers or agents may be working on this repository concurrently. If you notice unexpected changes (new files, modified code, updated dependencies), do not revert or overwrite them — adapt to the current state. If others' changes break your work or block progress, report the conflict to the user instead of guessing a fix.
+- Stay on the branch and checkout initially provided. Do not create or switch branches, create git worktrees, merge, rebase, or otherwise change git topology unless the user explicitly requests it or approves a proposed workflow that requires it.
 
 ## Implementation Principles
 
