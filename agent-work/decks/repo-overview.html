@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Rules Repository Overview</title>
+<style>
+/*
+  explain-html template
+  Self-contained technical briefing deck: scrollable, keyboard-navigable, printable.
+  Blueprint preset with restrained custom layout helpers for repository diagrams.
+*/
+
+:root {
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", "Avenir Next", "Helvetica Neue", sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, "Cascadia Code", monospace;
+
+  --step--1: clamp(0.82rem, 0.78rem + 0.18vw, 0.94rem);
+  --step-0: clamp(1rem, 0.94rem + 0.32vw, 1.18rem);
+  --step-1: clamp(1.24rem, 1.10rem + 0.62vw, 1.62rem);
+  --step-2: clamp(1.55rem, 1.32rem + 1.02vw, 2.22rem);
+  --step-3: clamp(1.94rem, 1.56rem + 1.68vw, 3.05rem);
+  --step-4: clamp(2.42rem, 1.82rem + 2.70vw, 4.20rem);
+
+  --sp-1: 0.5rem;
+  --sp-2: 0.75rem;
+  --sp-3: 1rem;
+  --sp-4: 1.5rem;
+  --sp-5: 2.5rem;
+  --sp-6: 4rem;
+  --sp-7: 6rem;
+
+  --radius: 12px;
+  --measure: 68ch;
+  --slide-max: 1080px;
+  --slide-pad: clamp(var(--sp-4), 5vw, var(--sp-7));
+
+  --paper: #fbfaf7;
+  --raise: #ffffff;
+  --ink: #182022;
+  --muted: #5a666a;
+  --line: #dce6e8;
+  --accent: #2f6f7e;
+  --accent-soft: #e4f0f1;
+  --code-bg: #f1f6f6;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(27, 68, 77, 0.08);
+}
+
+:root[data-theme="dark"] {
+  --paper: #111719;
+  --raise: #182123;
+  --ink: #edf3f4;
+  --muted: #9dafb4;
+  --line: #2a3a3e;
+  --accent: #73c7d4;
+  --accent-soft: #183035;
+  --code-bg: #151d20;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 36px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --paper: #111719;
+    --raise: #182123;
+    --ink: #edf3f4;
+    --muted: #9dafb4;
+    --line: #2a3a3e;
+    --accent: #73c7d4;
+    --accent-soft: #183035;
+    --code-bg: #151d20;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 36px rgba(0, 0, 0, 0.45);
+  }
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 620;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--sp-3);
+}
+h1 { font-size: var(--step-4); }
+h2 { font-size: var(--step-3); }
+h3 { font-size: var(--step-1); }
+p { margin: 0 0 var(--sp-3); }
+a { color: var(--accent); }
+code { font-family: var(--font-mono); }
+
+.skip {
+  position: fixed;
+  left: -999px;
+  top: var(--sp-3);
+  z-index: 100;
+  background: var(--raise);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-2) var(--sp-3);
+}
+.skip:focus { left: var(--sp-3); }
+
+.deck {
+  height: 100dvh;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+}
+
+.slide {
+  min-height: 100dvh;
+  scroll-snap-align: start;
+  display: grid;
+  place-items: center;
+  padding: var(--slide-pad);
+  border-bottom: 1px solid var(--line);
+}
+.slide:focus { outline: none; }
+
+.slide__inner { width: 100%; max-width: var(--slide-max); }
+.slide__inner > * { max-width: var(--measure); }
+.slide__inner.wide > * { max-width: 100%; }
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 var(--sp-3);
+}
+.kicker.muted { color: var(--muted); }
+.lead { color: var(--muted); font-size: var(--step-1); max-width: var(--measure); }
+.note { color: var(--muted); margin-top: var(--sp-3); max-width: var(--measure); }
+
+.grid { display: grid; gap: var(--sp-4); max-width: 100%; }
+.grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.panel {
+  background: var(--raise);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--sp-4);
+}
+.panel--accent {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent), var(--line) 35%);
+}
+.panel > :last-child { margin-bottom: 0; }
+.panel h3 code { font-size: 0.9em; }
+
+.diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 220px;
+  color: var(--ink);
+  background: var(--raise);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.diagram text { font-family: var(--font-mono); }
+.svg-label {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.svg-label small { color: var(--muted); font-size: 12px; }
+
+.flow-list {
+  list-style: none;
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+}
+.flow-list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-3);
+  align-items: start;
+  background: var(--raise);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-3) var(--sp-4);
+}
+.num { font-family: var(--font-mono); font-size: var(--step-1); color: var(--accent); line-height: 1.2; }
+
+.spec-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--sp-2) var(--sp-4);
+  margin: 0;
+}
+.spec-list dt { color: var(--muted); font-family: var(--font-mono); }
+.spec-list dd { margin: 0; }
+
+.callout { border-left: 3px solid var(--accent); padding: var(--sp-2) 0 var(--sp-2) var(--sp-4); }
+.callout h2 { margin-bottom: 0; }
+.takeaways { display: grid; gap: var(--sp-2); padding-left: 1.15em; }
+
+.tag-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }
+.tag {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  padding: 0.25rem 0.65rem;
+}
+
+.progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 180ms ease;
+  z-index: 50;
+}
+.counter {
+  position: fixed;
+  right: var(--sp-4);
+  bottom: var(--sp-4);
+  z-index: 50;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--raise), transparent 6%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-1) var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+}
+
+@media (max-width: 760px) {
+  .grid.two, .grid.three { grid-template-columns: 1fr; }
+  .spec-list { grid-template-columns: 1fr; }
+}
+
+@media print {
+  :root {
+    --paper: #ffffff;
+    --raise: #ffffff;
+    --ink: #000000;
+    --muted: #444444;
+    --line: #dddddd;
+    --accent: #2f6f7e;
+    --accent-soft: #e8f2f3;
+    --code-bg: #f7f7f7;
+  }
+  .deck { height: auto; overflow: visible; scroll-snap-type: none; }
+  .slide { min-height: auto; page-break-after: always; border: 0; padding: 2cm; }
+  .progress, .counter, .skip { display: none !important; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<main class="deck" id="main">
+<section class="slide" id="slide-1" aria-labelledby="title">
+  <div class="slide__inner">
+    <p class="kicker">Technical Overview</p>
+    <h1 id="title">Agent Rules: workflow prompts for AI coding agents</h1>
+    <p class="lead">This repository packages reusable skills, subagents, runtime extensions, and workflow rules that make agent-led software development more reliable, lean, and repeatable.</p>
+    <div class="tag-row" aria-label="Repository scope">
+      <span class="tag">prompt/workflow rules repo</span>
+      <span class="tag">human-gated workflow</span>
+      <span class="tag">multi-harness sync</span>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="slide-2" aria-labelledby="concept">
+  <div class="slide__inner">
+    <p class="kicker">Concept</p>
+    <h2 id="concept">A small operating system for agent-assisted development</h2>
+    <p class="lead">The repo is not an app runtime or SDK; it is a set of instructions and deterministic helpers that keep agent work explicit, reviewable, and durable across sessions.</p>
+    <div class="grid two">
+      <article class="panel panel--accent">
+        <h3>Why it exists</h3>
+        <p>AI coding sessions drift unless work selection, planning, implementation, review, reflection, and commit boundaries are named and user-gated.</p>
+      </article>
+      <article class="panel">
+        <h3>What success looks like</h3>
+        <p>Agents maintain real projects with less bloat, clearer handoffs, sparse workflow artifacts, and durable documentation that describes current truth.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="slide-3" aria-labelledby="skill-chain">
+  <div class="slide__inner wide">
+    <p class="kicker">Workflow</p>
+    <h2 id="skill-chain">Skill chain</h2>
+    <svg class="diagram" viewBox="0 0 1080 410" role="img" aria-labelledby="skill-chain-title skill-chain-desc">
+      <title id="skill-chain-title">Feature-driven workflow skill chain</title>
+      <desc id="skill-chain-desc">A left-to-right loop from next-feature through prime, plan-md, execute, review, reflect, commit, and back to next-feature. Review and reflect are highlighted as checkpoints.</desc>
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"></path>
+        </marker>
+      </defs>
+      <rect x="38" y="42" width="1004" height="232" rx="22" fill="var(--accent-soft)" stroke="var(--line)"></rect>
+      <g text-anchor="middle">
+        <g>
+          <rect x="68" y="126" width="124" height="66" rx="14" fill="var(--raise)" stroke="var(--line)"></rect>
+          <foreignObject x="68" y="126" width="124" height="66"><div class="svg-label">next-feature</div></foreignObject>
+        </g>
+        <g>
+          <rect x="221" y="126" width="92" height="66" rx="14" fill="var(--raise)" stroke="var(--line)"></rect>
+          <text x="267" y="166" fill="currentColor">prime</text>
+        </g>
+        <g>
+          <rect x="342" y="126" width="106" height="66" rx="14" fill="var(--raise)" stroke="var(--line)"></rect>
+          <text x="395" y="166" fill="currentColor">plan-md</text>
+        </g>
+        <g>
+          <rect x="477" y="126" width="104" height="66" rx="14" fill="var(--raise)" stroke="var(--line)"></rect>
+          <text x="529" y="166" fill="currentColor">execute</text>
+        </g>
+        <g>
+          <rect x="610" y="116" width="108" height="86" rx="16" fill="var(--raise)" stroke="var(--accent)" stroke-width="3"></rect>
+          <text x="664" y="158" fill="currentColor">review</text>
+          <text x="664" y="183" fill="var(--muted)" font-size="14">inspect</text>
+        </g>
+        <g>
+          <rect x="747" y="116" width="108" height="86" rx="16" fill="var(--raise)" stroke="var(--accent)" stroke-width="3"></rect>
+          <text x="801" y="158" fill="currentColor">reflect</text>
+          <text x="801" y="183" fill="var(--muted)" font-size="14">docs</text>
+        </g>
+        <g>
+          <rect x="884" y="126" width="98" height="66" rx="14" fill="var(--raise)" stroke="var(--line)"></rect>
+          <text x="933" y="166" fill="currentColor">commit</text>
+        </g>
+      </g>
+      <g stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#arrow)">
+        <path d="M 193 159 L 211 159"></path>
+        <path d="M 314 159 L 332 159"></path>
+        <path d="M 449 159 L 467 159"></path>
+        <path d="M 582 159 L 600 159"></path>
+        <path d="M 719 159 L 737 159"></path>
+        <path d="M 856 159 L 874 159"></path>
+        <path d="M 933 204 C 933 330 130 330 130 205"></path>
+      </g>
+      <g font-family="var(--font-body)" font-size="22" fill="var(--muted)">
+        <text x="68" y="316">Handoff labels mark the next user-invoked step; the workflow does not auto-advance.</text>
+        <text x="68" y="354">workflow-orchestrator and autopilot exist as explicit opt-in exceptions, not the default path.</text>
+      </g>
+    </svg>
+    <p class="note">The core loop makes human decisions visible: choose work, prepare context, plan, implement, inspect, update durable knowledge, then commit cleanly.</p>
+  </div>
+</section>
+
+<section class="slide" id="slide-4" aria-labelledby="workflow-modes">
+  <div class="slide__inner wide">
+    <p class="kicker">Workflow modes</p>
+    <h2 id="workflow-modes">Standalone work and tracked features use the same checkpoints</h2>
+    <div class="grid two">
+      <article class="panel">
+        <p class="kicker muted">Standalone</p>
+        <h3>Ad-hoc task</h3>
+        <p><code>prime → plan-md → execute → review → reflect → commit</code></p>
+        <p>Useful for quick work without backlog state. The user invokes each checkpoint directly, and plan names are descriptive, such as <code>DARK_MODE.md</code>.</p>
+      </article>
+      <article class="panel panel--accent">
+        <p class="kicker">Feature-driven</p>
+        <h3>Multi-session tracked task</h3>
+        <p><code>next-feature → prime → plan-md → execute → review → reflect → commit</code></p>
+        <p><code>next-feature</code> chooses ready backlog work; <code>features.yaml</code> tracks status: <code>pending → in_progress → done</code>. Plan names carry ticket IDs, such as <code>auth-001.md</code>.</p>
+      </article>
+    </div>
+    <p class="note">The difference is state management, not engineering quality: both modes still require explicit review and reflection before commit.</p>
+  </div>
+</section>
+
+<section class="slide" id="slide-5" aria-labelledby="directory-layout">
+  <div class="slide__inner wide">
+    <p class="kicker">Anatomy</p>
+    <h2 id="directory-layout">Main directories and how they fit together</h2>
+    <div class="grid three">
+      <article class="panel">
+        <h3><code>skills/</code></h3>
+        <p>Canonical reusable workflows. Each <code>SKILL.md</code> defines agent behavior; <code>skills/_lib/</code> holds deterministic shell/Python helpers for shared state operations.</p>
+      </article>
+      <article class="panel">
+        <h3><code>agent-work/</code></h3>
+        <p>Agent-produced workflow state: backlog in <code>features.yaml</code>, active plans in <code>plans/</code>, archived plans in <code>history/</code>, and sparse evidence in <code>tickets/</code>.</p>
+      </article>
+      <article class="panel">
+        <h3><code>agents/</code>, <code>pi/</code>, <code>extensions/</code></h3>
+        <p>Reviewers and runtime overlays. <code>agents/</code> provides focused critics; <code>pi/</code> and <code>extensions/</code> make workflow skills visible and ergonomic inside Pi.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="slide-6" aria-labelledby="skill-map">
+  <div class="slide__inner wide">
+    <p class="kicker">Skill map</p>
+    <h2 id="skill-map">Skills cluster by workflow responsibility</h2>
+    <ol class="flow-list">
+      <li><span class="num">01</span><span><strong>Start and select work</strong><br><code>project-init</code>, <code>epic-init</code>, <code>ticket-init</code>, and <code>next-feature</code> create or choose tracked work without guessing scope.</span></li>
+      <li><span class="num">02</span><span><strong>Prepare, plan, and implement</strong><br><code>prime</code>, <code>plan-md</code>, and <code>execute</code> turn selected work into focused edits with baseline verification.</span></li>
+      <li><span class="num">03</span><span><strong>Inspect, preserve, and finish</strong><br><code>review</code>, <code>reflect</code>, and <code>commit</code> inspect completed work, update durable docs, archive plans, and finalize tracked state.</span></li>
+      <li><span class="num">04</span><span><strong>Support and opt-in automation</strong><br><code>docs-health</code>, <code>test-coverage</code>, <code>workflow-migrate</code>, <code>workflow-orchestrator</code>, and <code>explain-html</code> handle specialized analysis or explicit automation.</span></li>
+    </ol>
+  </div>
+</section>
+
+<section class="slide" id="slide-7" aria-labelledby="boundaries">
+  <div class="slide__inner">
+    <p class="kicker">Boundaries</p>
+    <h2 id="boundaries">Durable knowledge and workflow artifacts stay separate</h2>
+    <dl class="spec-list">
+      <dt><code>CONTEXT.md</code></dt><dd>Project purpose, target user, operating assumptions, and shared terminology.</dd>
+      <dt><code>AGENTS.md</code></dt><dd>Behavioral rules for coding agents: communication, workflow discipline, testing, and implementation principles.</dd>
+      <dt><code>docs/STRUCTURE.md</code></dt><dd>Architecture and onboarding guide: directory layout, key files, concepts, and run/build notes.</dd>
+      <dt><code>README.md</code></dt><dd>User-facing usage reference for workflows, skills, CLI tools, setup, and schema.</dd>
+      <dt><code>agent-work/</code></dt><dd>Non-durable workflow state and evidence; useful for coordination, not a replacement for durable docs.</dd>
+    </dl>
+  </div>
+</section>
+
+<section class="slide" id="slide-8" aria-labelledby="takeaways">
+  <div class="slide__inner">
+    <p class="kicker">Summary</p>
+    <h2 id="takeaways">Takeaways for team discussion</h2>
+    <ul class="takeaways">
+      <li>The repo packages an opinionated but lean workflow for AI coding agents, not product code.</li>
+      <li>The default workflow is user-gated: skills emit handoff labels, and humans or parent agents decide when to advance.</li>
+      <li>State has clear homes: durable truth in docs, tracked work in <code>agent-work/features.yaml</code>, and sparse evidence under <code>agent-work/tickets/</code>.</li>
+      <li><code>sync-prompts.sh</code> is the distribution bridge: it copies shared skills/subagents to Claude, Cursor, and Pi, overlays Pi runtime assets, and keeps Codex free of tracked-work prompts.</li>
+    </ul>
+  </div>
+</section>
+</main>
+
+<div class="counter" id="counter" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+(() => {
+  const deck = document.getElementById('main');
+  const slides = [...deck.querySelectorAll('.slide')];
+  const progress = document.getElementById('progress');
+  const counter = document.getElementById('counter');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let current = 0;
+
+  slides.forEach((slide, index) => {
+    slide.id ||= `slide-${index + 1}`;
+    slide.tabIndex = -1;
+  });
+
+  const update = (index) => {
+    if (!slides.length) return;
+    current = Math.max(0, Math.min(index, slides.length - 1));
+    progress.style.transform = `scaleX(${(current + 1) / slides.length})`;
+    counter.textContent = `${current + 1} / ${slides.length}`;
+  };
+
+  const go = (index) => {
+    update(index);
+    slides[current].scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' });
+    slides[current].focus({ preventScroll: true });
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) update(slides.indexOf(entry.target));
+    });
+  }, { threshold: 0.55 });
+
+  slides.forEach((slide) => observer.observe(slide));
+
+  addEventListener('keydown', (event) => {
+    if (event.target.matches('input, textarea, select, button, a')) return;
+    switch (event.key) {
+      case 'ArrowDown':
+      case 'ArrowRight':
+      case 'PageDown':
+      case ' ':
+        event.preventDefault();
+        go(current + 1);
+        break;
+      case 'ArrowUp':
+      case 'ArrowLeft':
+      case 'PageUp':
+        event.preventDefault();
+        go(current - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        go(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        go(slides.length - 1);
+        break;
+    }
+  });
+
+  update(0);
+})();
+</script>
+</body>
+</html>

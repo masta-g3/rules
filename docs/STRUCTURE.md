@@ -20,6 +20,7 @@ rules/
 │   ├── docs-health/
 │   ├── epic-init/
 │   ├── execute/
+│   ├── explain-html/
 │   ├── next-feature/
 │   ├── plan-md/
 │   ├── prime/
@@ -41,6 +42,7 @@ rules/
 │   ├── plans/          # Active implementation plans
 │   ├── history/        # Archived implementation plans and workflow notes
 │   ├── tickets/        # Sparse ticket-local evidence/reproduction artifacts
+│   ├── decks/          # Generated HTML presentation/explainer artifacts
 │   └── <name>/         # Optional repo-specific non-durable planning/scratchpad areas
 │
 ├── docs/
@@ -114,6 +116,7 @@ Modes:
 
 - **Single-file tools**: `bin/pv` is self-contained Python (requires PyYAML)
 - **Skill-first workflows**: `skills/*/SKILL.md` defines the main behavior; scripts handle deterministic mutations. Workflow skills may include `metadata.thinkingLevel` for Pi's skill-thinking extension; other harnesses ignore it.
+- **HTML explainers**: `skills/explain-html` creates self-contained, presentation-like technical overviews using bundled HTML/CSS/JS templates and reusable explanation patterns.
 - **Focused reviewer subagents**: `agents/*` contains reusable critics for plan, code, and documentation review; workflow skills invoke them only at the relevant checkpoint.
 - **Pi runtime stays additive**: Pi-specific behavior belongs in `extensions/` or `pi/` instead of patching Pi core or overloading shared skills
 - **Experimental prompts stay isolated**: autopilot lives under `experimental/autopilot/` and remains opt-in

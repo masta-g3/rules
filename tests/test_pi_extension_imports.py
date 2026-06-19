@@ -15,6 +15,7 @@ EXPECTED_SKILL_THINKING = {
     "docs-health": "high",
     "epic-init": "high",
     "execute": "medium",
+    "explain-html": "high",
     "next-feature": "minimal",
     "plan-md": "high",
     "prime": "low",

@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+/*
+  explain-html template
+  Self-contained technical briefing deck: scrollable, keyboard-navigable, printable.
+  Choose one theme preset by editing only :root tokens. Do not scatter colors or spacing values.
+*/
+
+:root {
+  /* Slate preset: warm editorial technical */
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "Avenir Next", "Helvetica Neue", sans-serif;
+  --font-mono: "Berkeley Mono", "SF Mono", ui-monospace, "Cascadia Code", monospace;
+
+  --step--1: clamp(0.82rem, 0.78rem + 0.18vw, 0.94rem);
+  --step-0: clamp(1rem, 0.94rem + 0.32vw, 1.18rem);
+  --step-1: clamp(1.24rem, 1.10rem + 0.62vw, 1.62rem);
+  --step-2: clamp(1.55rem, 1.32rem + 1.02vw, 2.22rem);
+  --step-3: clamp(1.94rem, 1.56rem + 1.68vw, 3.05rem);
+  --step-4: clamp(2.42rem, 1.82rem + 2.70vw, 4.20rem);
+
+  --sp-1: 0.5rem;
+  --sp-2: 0.75rem;
+  --sp-3: 1rem;
+  --sp-4: 1.5rem;
+  --sp-5: 2.5rem;
+  --sp-6: 4rem;
+  --sp-7: 6rem;
+
+  --radius: 12px;
+  --measure: 68ch;
+  --slide-max: 1080px;
+  --slide-pad: clamp(var(--sp-4), 5vw, var(--sp-7));
+
+  --paper: #fbfaf7;
+  --raise: #ffffff;
+  --ink: #1a1c1e;
+  --muted: #5c6166;
+  --line: #e4e1d9;
+  --accent: #b5651d;
+  --accent-soft: #f4e9dc;
+  --code-bg: #f3f1ec;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.07);
+}
+
+/* Optional preset swaps:
+Blueprint: --font-display:"Newsreader", Georgia, serif; --font-body:"IBM Plex Sans", "Avenir Next", sans-serif; --font-mono:"IBM Plex Mono", "SF Mono", monospace; --accent:#2f6f7e; --accent-soft:#e4f0f1;
+Carbon: --font-display:"Spectral", Georgia, serif; --font-body:"Public Sans", "Avenir Next", sans-serif; --font-mono:"JetBrains Mono", "SF Mono", monospace; --accent:#6b5bd6; --accent-soft:#ece9ff;
+Paper: --font-display:"Iowan Old Style", Georgia, serif; --font-body:"Gill Sans", "Avenir Next", sans-serif; --font-mono:"Geist Mono", "SF Mono", monospace; --accent:#13674f; --accent-soft:#e2f0eb;
+*/
+
+:root[data-theme="dark"] {
+  --paper: #16181a;
+  --raise: #1e2124;
+  --ink: #ececec;
+  --muted: #9aa0a6;
+  --line: #2c2f33;
+  --accent: #e0913f;
+  --accent-soft: #2a2118;
+  --code-bg: #1b1e21;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 36px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --paper: #16181a;
+    --raise: #1e2124;
+    --ink: #ececec;
+    --muted: #9aa0a6;
+    --line: #2c2f33;
+    --accent: #e0913f;
+    --accent-soft: #2a2118;
+    --code-bg: #1b1e21;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 36px rgba(0, 0, 0, 0.45);
+  }
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 620;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--sp-3);
+}
+
+h1 { font-size: var(--step-4); }
+h2 { font-size: var(--step-3); }
+h3 { font-size: var(--step-1); }
+p { margin: 0 0 var(--sp-3); }
+a { color: var(--accent); }
+
+.skip {
+  position: fixed;
+  left: -999px;
+  top: var(--sp-3);
+  z-index: 100;
+  background: var(--raise);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-2) var(--sp-3);
+}
+.skip:focus { left: var(--sp-3); }
+
+.deck {
+  height: 100dvh;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+}
+
+.slide {
+  min-height: 100dvh;
+  scroll-snap-align: start;
+  display: grid;
+  place-items: center;
+  padding: var(--slide-pad);
+  border-bottom: 1px solid var(--line);
+}
+.slide:focus { outline: none; }
+
+.slide__inner {
+  width: 100%;
+  max-width: var(--slide-max);
+}
+.slide__inner > * { max-width: var(--measure); }
+.slide__inner.wide > * { max-width: 100%; }
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 var(--sp-3);
+}
+.kicker.muted { color: var(--muted); }
+.lead {
+  color: var(--muted);
+  font-size: var(--step-1);
+  max-width: var(--measure);
+}
+.note { color: var(--muted); margin-top: var(--sp-3); max-width: var(--measure); }
+
+.grid {
+  display: grid;
+  gap: var(--sp-4);
+  max-width: 100%;
+}
+.grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.panel {
+  background: var(--raise);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--sp-4);
+}
+.panel--accent {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent), var(--line) 35%);
+}
+.panel > :last-child { margin-bottom: 0; }
+
+.diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 220px;
+  color: var(--ink);
+  background: var(--raise);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.diagram text { font-family: var(--font-mono); }
+.svg-label {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.svg-label small { color: var(--muted); font-size: 12px; }
+
+.flow-list {
+  list-style: none;
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+}
+.flow-list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-3);
+  align-items: start;
+  background: var(--raise);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-3) var(--sp-4);
+}
+.num {
+  font-family: var(--font-mono);
+  font-size: var(--step-1);
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+.spec-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--sp-2) var(--sp-4);
+  margin: 0;
+}
+.spec-list dt {
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+.spec-list dd { margin: 0; }
+
+.callout {
+  border-left: 3px solid var(--accent);
+  padding: var(--sp-2) 0 var(--sp-2) var(--sp-4);
+}
+.callout h2 { margin-bottom: 0; }
+
+.takeaways {
+  display: grid;
+  gap: var(--sp-2);
+  padding-left: 1.15em;
+}
+
+pre {
+  margin: 0;
+  padding: var(--sp-4);
+  overflow: auto;
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  line-height: 1.55;
+  max-width: 100%;
+}
+code { font-family: var(--font-mono); }
+
+.progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 180ms ease;
+  z-index: 50;
+}
+.counter {
+  position: fixed;
+  right: var(--sp-4);
+  bottom: var(--sp-4);
+  z-index: 50;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--raise), transparent 6%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-1) var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+}
+
+@media (max-width: 760px) {
+  .grid.two, .grid.three { grid-template-columns: 1fr; }
+  .spec-list { grid-template-columns: 1fr; }
+}
+
+@media print {
+  :root {
+    --paper: #ffffff;
+    --raise: #ffffff;
+    --ink: #000000;
+    --muted: #444444;
+    --line: #dddddd;
+    --accent: #8a4d16;
+    --accent-soft: #f6efe6;
+    --code-bg: #f7f7f7;
+  }
+  .deck {
+    height: auto;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+  .slide {
+    min-height: auto;
+    page-break-after: always;
+    border: 0;
+    padding: 2cm;
+  }
+  .progress, .counter, .skip { display: none !important; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<main class="deck" id="main">
+{{SLIDES}}
+</main>
+
+<div class="counter" id="counter" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+(() => {
+  const deck = document.getElementById('main');
+  const slides = [...deck.querySelectorAll('.slide')];
+  const progress = document.getElementById('progress');
+  const counter = document.getElementById('counter');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let current = 0;
+
+  slides.forEach((slide, index) => {
+    slide.id ||= `slide-${index + 1}`;
+    slide.tabIndex = -1;
+  });
+
+  const update = (index) => {
+    if (!slides.length) return;
+    current = Math.max(0, Math.min(index, slides.length - 1));
+    progress.style.transform = `scaleX(${(current + 1) / slides.length})`;
+    counter.textContent = `${current + 1} / ${slides.length}`;
+  };
+
+  const go = (index) => {
+    update(index);
+    slides[current].scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' });
+    slides[current].focus({ preventScroll: true });
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) update(slides.indexOf(entry.target));
+    });
+  }, { threshold: 0.55 });
+
+  slides.forEach((slide) => observer.observe(slide));
+
+  addEventListener('keydown', (event) => {
+    if (event.target.matches('input, textarea, select, button, a')) return;
+    switch (event.key) {
+      case 'ArrowDown':
+      case 'ArrowRight':
+      case 'PageDown':
+      case ' ':
+        event.preventDefault();
+        go(current + 1);
+        break;
+      case 'ArrowUp':
+      case 'ArrowLeft':
+      case 'PageUp':
+        event.preventDefault();
+        go(current - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        go(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        go(slides.length - 1);
+        break;
+    }
+  });
+
+  update(0);
+})();
+</script>
+</body>
+</html>
