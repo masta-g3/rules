@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>long-execute workflow variant</title>
+<style>
+:root {
+  --font-display: "Avenir Next", "Helvetica Neue", sans-serif;
+  --font-body: "Avenir Next", "Helvetica Neue", sans-serif;
+  --font-mono: "Berkeley Mono", "SF Mono", ui-monospace, "Cascadia Code", monospace;
+  --step--1: clamp(0.82rem, 0.78rem + 0.18vw, 0.94rem);
+  --step-0: clamp(1rem, 0.94rem + 0.32vw, 1.18rem);
+  --step-1: clamp(1.24rem, 1.10rem + 0.62vw, 1.62rem);
+  --step-2: clamp(1.55rem, 1.32rem + 1.02vw, 2.22rem);
+  --step-3: clamp(1.94rem, 1.56rem + 1.68vw, 3.05rem);
+  --step-4: clamp(2.42rem, 1.82rem + 2.70vw, 4.20rem);
+  --sp-1: 0.5rem;
+  --sp-2: 0.75rem;
+  --sp-3: 1rem;
+  --sp-4: 1.5rem;
+  --sp-5: 2.5rem;
+  --sp-6: 4rem;
+  --sp-7: 6rem;
+  --radius: 16px;
+  --measure: 68ch;
+  --slide-max: 1120px;
+  --slide-pad: clamp(var(--sp-4), 5vw, var(--sp-7));
+  --paper: #111417;
+  --raise: #181d21;
+  --raise-2: #20262b;
+  --ink: #eef2f4;
+  --muted: #a0abb3;
+  --line: #2d353b;
+  --accent: #5fd4d6;
+  --accent-soft: #173137;
+  --code-bg: #15191d;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 14px 36px rgba(0, 0, 0, 0.35);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background: radial-gradient(circle at 20% 0%, rgba(95, 212, 214, 0.10), transparent 34rem), var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 680;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+  margin: 0 0 var(--sp-3);
+}
+h1 { font-size: var(--step-4); }
+h2 { font-size: var(--step-3); }
+h3 { font-size: var(--step-1); }
+p { margin: 0 0 var(--sp-3); }
+a { color: var(--accent); }
+.skip {
+  position: fixed;
+  left: -999px;
+  top: var(--sp-3);
+  z-index: 100;
+  background: var(--raise);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-2) var(--sp-3);
+}
+.skip:focus { left: var(--sp-3); }
+.deck {
+  height: 100dvh;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+}
+.slide {
+  min-height: 100dvh;
+  scroll-snap-align: start;
+  display: grid;
+  place-items: center;
+  padding: var(--slide-pad);
+  border-bottom: 1px solid var(--line);
+}
+.slide:focus { outline: none; }
+.slide__inner { width: 100%; max-width: var(--slide-max); }
+.slide__inner > * { max-width: var(--measure); }
+.slide__inner.wide > * { max-width: 100%; }
+.kicker {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 var(--sp-3);
+}
+.kicker.muted { color: var(--muted); }
+.lead { color: var(--muted); font-size: var(--step-1); max-width: var(--measure); }
+.note { color: var(--muted); margin-top: var(--sp-3); max-width: var(--measure); }
+.grid { display: grid; gap: var(--sp-4); max-width: 100%; }
+.grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.panel {
+  background: color-mix(in srgb, var(--raise), transparent 4%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--sp-4);
+}
+.panel--accent { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent), var(--line) 40%); }
+.panel > :last-child { margin-bottom: 0; }
+.diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 260px;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--raise), var(--code-bg));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.svg-label {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.18;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.svg-label small { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.marker-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-3) 0 0; }
+.marker {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.36rem 0.66rem;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  color: var(--muted);
+  background: var(--code-bg);
+  white-space: nowrap;
+}
+.marker--continue { color: var(--accent); border-color: color-mix(in srgb, var(--accent), var(--line) 35%); background: var(--accent-soft); }
+.spec-list { display: grid; grid-template-columns: minmax(10rem, max-content) 1fr; gap: var(--sp-2) var(--sp-4); margin: 0; }
+.spec-list dt { color: var(--muted); font-family: var(--font-mono); }
+.spec-list dd { margin: 0; }
+.takeaways { display: grid; gap: var(--sp-2); padding-left: 1.15em; }
+.path {
+  font-family: var(--font-mono);
+  color: var(--ink);
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.08rem 0.32rem;
+}
+.progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 180ms ease;
+  z-index: 50;
+}
+.counter {
+  position: fixed;
+  right: var(--sp-4);
+  bottom: var(--sp-4);
+  z-index: 50;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--raise), transparent 6%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-1) var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+}
+@media (max-width: 760px) {
+  .grid.two, .grid.three { grid-template-columns: 1fr; }
+  .spec-list { grid-template-columns: 1fr; }
+  .diagram { min-height: 220px; }
+}
+@media print {
+  :root { --paper: #fff; --raise: #fff; --raise-2: #f7f7f7; --ink: #000; --muted: #444; --line: #ddd; --accent: #00666a; --accent-soft: #e8f6f6; --code-bg: #f7f7f7; }
+  body { background: #fff; }
+  .deck { height: auto; overflow: visible; scroll-snap-type: none; }
+  .slide { min-height: auto; page-break-after: always; border: 0; padding: 2cm; }
+  .progress, .counter, .skip { display: none !important; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<main class="deck" id="main">
+  <section class="slide" aria-labelledby="title">
+    <div class="slide__inner">
+      <p class="kicker">Technical proposal</p>
+      <h1 id="title">long-execute workflow variant</h1>
+      <p class="lead">A bounded auto-continuation wrapper for approved plans: <code>execute</code> stays authoritative, while a small runtime controller decides whether another visible turn should continue the same work.</p>
+      <div class="marker-row" aria-label="Key labels">
+        <span class="marker marker--continue">LONG EXECUTE CONTINUE</span>
+        <span class="marker">READY FOR REVIEW</span>
+        <span class="marker">BLOCKED — &lt;reason&gt;</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" aria-labelledby="why">
+    <div class="slide__inner">
+      <p class="kicker">Why it exists</p>
+      <h2 id="why">Some plans need more than one safe implementation turn.</h2>
+      <p class="lead">Today, the maintainer repeatedly invokes <code>execute</code> for long plans. The proposal keeps each turn visible but removes the manual nudge when the agent explicitly says safe work remains.</p>
+      <div class="grid two">
+        <article class="panel">
+          <p class="kicker muted">Current</p>
+          <p>Manual continuation between slices of the same approved plan.</p>
+        </article>
+        <article class="panel panel--accent">
+          <p class="kicker">Proposed</p>
+          <p>Bounded continuation only after an exact final-line marker, with the same <code>execute</code> rules still governing the work.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" aria-labelledby="boundary">
+    <div class="slide__inner wide">
+      <p class="kicker">Layer boundary</p>
+      <h2 id="boundary">Semantics stay portable; continuation stays isolated.</h2>
+      <svg class="diagram" viewBox="0 0 960 430" role="img" aria-labelledby="boundary-title boundary-desc">
+        <title id="boundary-title">long-execute layer boundary</title>
+        <desc id="boundary-desc">Three layers: execute is authoritative, long-execute is a runtime skill wrapper, and the extension owns the continuation mechanic. Pi receives the skill overlay while other harnesses do not.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="var(--muted)"/></marker>
+          <marker id="arrow-accent" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="var(--accent)"/></marker>
+        </defs>
+        <rect x="80" y="70" width="330" height="72" rx="16" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <foreignObject x="92" y="78" width="306" height="56"><div class="svg-label">skills/execute<br><small>authoritative implementation semantics</small></div></foreignObject>
+        <line x1="245" y1="145" x2="245" y2="190" stroke="var(--accent)" stroke-width="2.5" marker-end="url(#arrow-accent)"/>
+        <rect x="80" y="195" width="330" height="72" rx="16" fill="var(--raise-2)" stroke="var(--line)"/>
+        <foreignObject x="92" y="203" width="306" height="56"><div class="svg-label">pi/skills/long-execute<br><small>short wrapper prompt</small></div></foreignObject>
+        <line x1="245" y1="270" x2="245" y2="315" stroke="var(--muted)" stroke-width="2" marker-end="url(#arrow)"/>
+        <rect x="80" y="320" width="330" height="72" rx="16" fill="var(--raise-2)" stroke="var(--line)"/>
+        <foreignObject x="92" y="328" width="306" height="56"><div class="svg-label">extensions/long-execute.ts<br><small>turn continuation controller</small></div></foreignObject>
+
+        <path d="M430 232 C520 232 535 150 620 150" fill="none" stroke="var(--accent)" stroke-width="2.5" marker-end="url(#arrow-accent)"/>
+        <rect x="640" y="112" width="230" height="76" rx="16" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <foreignObject x="652" y="120" width="206" height="60"><div class="svg-label">Pi skill root<br><small>overlay receives long-execute</small></div></foreignObject>
+
+        <path d="M430 256 C540 300 565 292 620 292" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="7 7" marker-end="url(#arrow)"/>
+        <rect x="640" y="254" width="230" height="76" rx="16" fill="transparent" stroke="var(--line)" stroke-dasharray="7 7"/>
+        <foreignObject x="652" y="262" width="206" height="60"><div class="svg-label">Shared harnesses<br><small>no long-execute overlay</small></div></foreignObject>
+      </svg>
+      <p class="note">The important boundary: <span class="path">skills/execute</span> remains the source of truth; the new pieces only add a controlled way to ask for the next turn.</p>
+    </div>
+  </section>
+
+  <section class="slide" aria-labelledby="loop">
+    <div class="slide__inner wide">
+      <p class="kicker">Continuation loop</p>
+      <h2 id="loop">The extension reacts after the assistant finishes.</h2>
+      <svg class="diagram" viewBox="0 0 1040 430" role="img" aria-labelledby="loop-title loop-desc">
+        <title id="loop-title">agent_end continuation branch</title>
+        <desc id="loop-desc">An agent turn ends, the extension reads the final non-empty assistant line, and either stops, stops at max turns, or injects a visible follow-up user message when the line is exactly LONG EXECUTE CONTINUE.</desc>
+        <defs>
+          <marker id="la" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="var(--muted)"/></marker>
+          <marker id="la-accent" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="var(--accent)"/></marker>
+        </defs>
+        <rect x="48" y="178" width="150" height="72" rx="16" fill="var(--raise-2)" stroke="var(--line)"/>
+        <foreignObject x="58" y="186" width="130" height="56"><div class="svg-label">agent turn<br><small>implements a safe slice</small></div></foreignObject>
+        <line x1="198" y1="214" x2="262" y2="214" stroke="var(--muted)" stroke-width="2" marker-end="url(#la)"/>
+        <rect x="268" y="178" width="150" height="72" rx="16" fill="var(--raise-2)" stroke="var(--line)"/>
+        <foreignObject x="278" y="186" width="130" height="56"><div class="svg-label">agent_end<br><small>turn is complete</small></div></foreignObject>
+        <line x1="418" y1="214" x2="482" y2="214" stroke="var(--muted)" stroke-width="2" marker-end="url(#la)"/>
+        <rect x="488" y="166" width="190" height="96" rx="16" fill="var(--raise-2)" stroke="var(--line)"/>
+        <foreignObject x="500" y="174" width="166" height="80"><div class="svg-label">read final non-empty assistant line</div></foreignObject>
+
+        <path d="M678 214 C735 214 750 104 805 104" fill="none" stroke="var(--muted)" stroke-width="2" marker-end="url(#la)"/>
+        <rect x="812" y="66" width="180" height="76" rx="16" fill="transparent" stroke="var(--line)"/>
+        <foreignObject x="824" y="74" width="156" height="60"><div class="svg-label">stop label<br><small>clear state</small></div></foreignObject>
+
+        <path d="M678 214 C748 214 750 214 805 214" fill="none" stroke="var(--accent)" stroke-width="3" marker-end="url(#la-accent)"/>
+        <rect x="812" y="176" width="180" height="76" rx="16" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <foreignObject x="824" y="184" width="156" height="60"><div class="svg-label">exact continue marker<br><small>send visible follow-up</small></div></foreignObject>
+        <path d="M902 252 C902 352 122 352 122 258" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="9 7" marker-end="url(#la-accent)"/>
+
+        <path d="M678 214 C735 214 750 324 805 324" fill="none" stroke="var(--muted)" stroke-width="2" marker-end="url(#la)"/>
+        <rect x="812" y="286" width="180" height="76" rx="16" fill="transparent" stroke="var(--line)"/>
+        <foreignObject x="824" y="294" width="156" height="60"><div class="svg-label">max turns reached<br><small>clear state</small></div></foreignObject>
+
+        <text x="488" y="310" fill="var(--muted)" font-family="var(--font-mono)" font-size="14">Stop wins if labels conflict.</text>
+      </svg>
+      <p class="note">The injected prompt is a normal follow-up user message, so the automation is visible in the conversation instead of hidden in a system prompt mutation.</p>
+    </div>
+  </section>
+
+  <section class="slide" aria-labelledby="contract">
+    <div class="slide__inner wide">
+      <p class="kicker">Stop / continue contract</p>
+      <h2 id="contract">The loop is string-gated, bounded, and interruptible.</h2>
+      <div class="grid two">
+        <article class="panel panel--accent">
+          <h3>Continue</h3>
+          <p>Only when the final non-empty assistant line is exactly:</p>
+          <div class="marker-row"><span class="marker marker--continue">LONG EXECUTE CONTINUE</span></div>
+        </article>
+        <article class="panel">
+          <h3>Stop</h3>
+          <p>When the final line is a stop label, max turns are reached, or the user manually interrupts.</p>
+          <div class="marker-row">
+            <span class="marker">READY FOR REVIEW</span>
+            <span class="marker">NEEDS USER</span>
+            <span class="marker">PENDING STEPS</span>
+            <span class="marker">BLOCKED …</span>
+          </div>
+        </article>
+      </div>
+      <dl class="spec-list" style="margin-top: var(--sp-4);">
+        <dt>Default bound</dt><dd>6 continuation turns before state is cleared.</dd>
+        <dt>Manual control</dt><dd><code>/long-execute-stop</code> clears state; <code>/long-execute-status</code> reports active state.</dd>
+        <dt>Parsing rule</dt><dd>Final non-empty assistant line only; no whole-response <code>contains</code> checks.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="slide" aria-labelledby="prompt-components">
+    <div class="slide__inner wide">
+      <p class="kicker">Prompts, components, interaction</p>
+      <h2 id="prompt-components">The audit guard lives in the prompts; the extension only loops.</h2>
+      <div class="grid three">
+        <article class="panel panel--accent">
+          <h3>Skill prompt</h3>
+          <p>Delegates to <code>execute</code>, overrides unfinished-work handoff labels, and requires a completion audit before any terminal handoff.</p>
+          <div class="marker-row"><span class="marker">READY FOR REVIEW</span><span class="marker marker--continue">LONG EXECUTE CONTINUE</span></div>
+        </article>
+        <article class="panel">
+          <h3>Continuation prompt</h3>
+          <p>Re-reads <code>execute</code> and the plan, then checks every unchecked or recently checked item against actual repository state.</p>
+          <div class="marker-row"><span class="marker marker--continue">continue if incomplete</span></div>
+        </article>
+        <article class="panel">
+          <h3>Extension controller</h3>
+          <p>Does not judge code quality. It reads the final label, enforces max turns, clears on interruption, and sends the next visible user message.</p>
+          <div class="marker-row"><span class="marker">stop wins</span></div>
+        </article>
+      </div>
+      <dl class="spec-list" style="margin-top: var(--sp-4);">
+        <dt>Audit before done</dt><dd>Verify claimed checklist completion against files, tests, docs, and phase verification.</dd>
+        <dt>No shortcut claim</dt><dd>If anything is partial or unverified, the agent must keep working or stop as blocked instead of declaring review-ready.</dd>
+        <dt>Unfinished work</dt><dd>Use exact final line <code>LONG EXECUTE CONTINUE</code>; do not use <code>PENDING STEPS</code> when safe work remains.</dd>
+        <dt>Interaction model</dt><dd>Each automated turn is still a normal conversation turn, so the audit instruction is visible and repeatable.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="slide" aria-labelledby="takeaways">
+    <div class="slide__inner">
+      <p class="kicker">Decision anchors</p>
+      <h2 id="takeaways">What this design buys, and what it refuses.</h2>
+      <ul class="takeaways">
+        <li><strong>Contained drift:</strong> implementation policy remains in <code>execute</code>; long-execute only adds continuation labels.</li>
+        <li><strong>Visible automation:</strong> continuation happens through a follow-up user message, not by appending invisible instructions.</li>
+        <li><strong>Completion pressure:</strong> the prompts require an audit before <code>READY FOR REVIEW</code>, reducing shortcut “done” claims.</li>
+        <li><strong>Scoped availability:</strong> <span class="path">pi/skills/</span> overlays to the Pi skill root only; shared harness skills stay unchanged.</li>
+        <li><strong>No workflow creep:</strong> it does not auto-run review, reflect, or commit.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<div class="counter" id="counter" aria-live="polite" aria-atomic="true"></div>
+<script>
+(() => {
+  const deck = document.getElementById('main');
+  const slides = [...deck.querySelectorAll('.slide')];
+  const progress = document.getElementById('progress');
+  const counter = document.getElementById('counter');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let current = 0;
+  slides.forEach((slide, index) => {
+    slide.id ||= `slide-${index + 1}`;
+    slide.tabIndex = -1;
+  });
+  const update = (index) => {
+    if (!slides.length) return;
+    current = Math.max(0, Math.min(index, slides.length - 1));
+    progress.style.transform = `scaleX(${(current + 1) / slides.length})`;
+    counter.textContent = `${current + 1} / ${slides.length}`;
+  };
+  const go = (index) => {
+    update(index);
+    slides[current].scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' });
+    slides[current].focus({ preventScroll: true });
+  };
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) update(slides.indexOf(entry.target));
+    });
+  }, { threshold: 0.55 });
+  slides.forEach((slide) => observer.observe(slide));
+  addEventListener('keydown', (event) => {
+    if (event.target.matches('input, textarea, select, button, a')) return;
+    switch (event.key) {
+      case 'ArrowDown':
+      case 'ArrowRight':
+      case 'PageDown':
+      case ' ':
+        event.preventDefault();
+        go(current + 1);
+        break;
+      case 'ArrowUp':
+      case 'ArrowLeft':
+      case 'PageUp':
+        event.preventDefault();
+        go(current - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        go(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        go(slides.length - 1);
+        break;
+    }
+  });
+  update(0);
+})();
+</script>
+</body>
+</html>

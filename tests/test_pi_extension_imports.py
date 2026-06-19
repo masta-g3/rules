@@ -10,6 +10,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 EXTENSION = REPO_ROOT / "extensions" / "workflow-indicator.ts"
 SKILL_THINKING_EXTENSION = REPO_ROOT / "extensions" / "skill-thinking.ts"
 NOTIFY_EXTENSION = REPO_ROOT / "extensions" / "notify.ts"
+LONG_EXECUTE_EXTENSION = REPO_ROOT / "extensions" / "long-execute.ts"
+SYNC_PROMPTS = REPO_ROOT / "sync-prompts.sh"
 EXPECTED_SKILL_THINKING = {
     "commit": "low",
     "docs-health": "high",
@@ -96,6 +98,46 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn("parseFrontmatter", source)
         self.assertIn("metadata", source)
         self.assertIn("thinkingLevel", source)
+
+    def test_sync_prompts_syncs_pi_only_skills_to_pi(self) -> None:
+        source = SYNC_PROMPTS.read_text()
+
+        self.assertIn('${repo_root}/pi/skills/', source)
+        self.assertIn('${pi_root}/skills/', source)
+        self.assertIn('"pi_skills"', source)
+        self.assertIn('print_row "pi-only skills" "pi_skills" "pi"', source)
+        self.assertNotIn('${claude_root}/skills/" "pi_skills"', source)
+        self.assertNotIn('${cursor_root}/skills/" "pi_skills"', source)
+        self.assertNotIn('${codex_root}/skills/" "pi_skills"', source)
+
+    def test_long_execute_extension_contract(self) -> None:
+        source = LONG_EXECUTE_EXTENSION.read_text()
+
+        self.assertIn('from "@earendil-works/pi-coding-agent"', source)
+        self.assertIn('pi.on("input"', source)
+        self.assertIn('pi.on("agent_end"', source)
+        self.assertIn('pi.sendUserMessage(CONTINUATION_PROMPT, { deliverAs: "followUp" })', source)
+        self.assertIn('LONG EXECUTE CONTINUE', source)
+        self.assertIn('long-execute-stop', source)
+        self.assertIn('long-execute-status', source)
+        self.assertIn('finalNonEmptyAssistantLine', source)
+        self.assertIn('trimmed === CONTINUE_LABEL', source)
+        self.assertNotIn('.includes(CONTINUE_LABEL)', source)
+        self.assertIn('hasStopLabel(event.messages)', source)
+        self.assertIn('!isContinueLabel(label)', source)
+        self.assertLess(source.index('hasStopLabel(event.messages)'), source.index('!isContinueLabel(label)'))
+        self.assertIn('state.turnCount + 1 >= state.maxTurns', source)
+        self.assertIn('Long-execute stopped: max turns reached.', source)
+        self.assertIn('Manual input clears active long-execute state.', source)
+        self.assertIn('Do not use \\`PENDING STEPS\\` when safe implementation work remains.', source)
+        self.assertIn('The continue marker must be the entire final line exactly:', source)
+
+    def test_long_execute_skill_overrides_pending_steps(self) -> None:
+        source = (REPO_ROOT / "pi" / "skills" / "long-execute" / "SKILL.md").read_text()
+
+        self.assertIn("End labels override `execute` session-end labels", source)
+        self.assertIn("Do not use `PENDING STEPS` when safe implementation work remains.", source)
+        self.assertIn("The continue marker must be the entire final line exactly: `LONG EXECUTE CONTINUE`.", source)
 
     def test_workflow_skills_define_expected_thinking_levels(self) -> None:
         skill_names = {path.parent.name for path in (REPO_ROOT / "skills").glob("*/SKILL.md")}

@@ -504,3 +504,24 @@
   references: []
   created_at: '2026-06-07'
   completed_at: '2026-06-07'
+- id: long-execute-001
+  epic: long-execute
+  status: done
+  title: Add long-execute workflow variant
+  description: User can run a bounded long-execute workflow variant that follows execute
+    semantics while a Pi extension safely auto-continues implementation turns.
+  steps:
+  - Add a long-execute skill that delegates implementation semantics to execute.
+  - Add a minimal Pi extension that detects long-execute and injects bounded continuation
+    prompts after explicit continuation markers.
+  - Include prompt review by an Opus 4.8 subagent before execution.
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: agent-work/history/20260619_long-execute-001_long_execute.md
+  references:
+  - skills/execute/SKILL.md
+  - extensions/workflow-indicator.ts
+  - extensions/skill-thinking.ts
+  created_at: '2026-06-19'
+  completed_at: '2026-06-19'

@@ -56,6 +56,10 @@ Project-local Pi extensions live in `extensions/` and sync into `~/.pi/agent/ext
 
 Pi-only subagents live in `pi/agents/` and overlay into `~/.pi/agent/agents/` after the shared `agents/` sync. Use this for agents with Pi-specific providers, tools, or skills.
 
+Pi-only skills live in `pi/skills/` and overlay into `~/.pi/agent/skills/` after the shared `skills/` sync. Use this only for skills that depend on Pi runtime behavior and should not appear in Claude, Cursor, or Codex skill roots.
+
+`pi/skills/long-execute` provides `/skill:long-execute <ticket-id>` for approved implementation plans that may need multiple bounded turns. It delegates implementation behavior to `execute`, adds explicit `LONG EXECUTE CONTINUE` / stop labels, and relies on `extensions/long-execute.ts` to send a visible follow-up user message only when the final assistant line is exactly `LONG EXECUTE CONTINUE`. The extension stops on review readiness, blockers, missing markers, manual user input, or the max-turn limit. Use `/long-execute-status` to inspect active state and `/long-execute-stop` to clear it.
+
 `extensions/skill-thinking.ts` reads `metadata.thinkingLevel` from workflow skill frontmatter for typed `/skill:<name>` commands, sets Pi's thinking level for that turn, and restores the previous level when the turn ends. Without the extension installed, the metadata is inert; non-Pi harnesses ignore it.
 
 `extensions/notify.ts` sends a native macOS notification plus a direct `afplay` sound when Pi returns to input. Use `/notify-test` after `/reload` to verify local sound/notification permissions.
@@ -171,7 +175,7 @@ Pytest is scoped to `tests/` via `pytest.ini`.
 ## Setup
 
 ```bash
-./sync-prompts.sh            # leaves Codex unprompted; copies workflow skills/subagents to Claude, Cursor, and Pi; copies Pi extensions to ~/.pi/agent/extensions
+./sync-prompts.sh            # leaves Codex unprompted; copies workflow skills/subagents to Claude, Cursor, and Pi; overlays Pi-only skills/subagents/extensions into ~/.pi/agent
 ./sync-prompts.sh --clean    # also removes stale synced files from synced target directories
 ./sync-prompts.sh --silent   # suppresses the sync summary
 ```

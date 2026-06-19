@@ -34,7 +34,8 @@ rules/
 ├── agents/             # Shared reviewer subagents synced to supported harnesses
 ├── extensions/         # Pi-only runtime extensions synced to ~/.pi/agent/extensions/
 ├── pi/                 # Pi-only prompt assets
-│   └── agents/         # Pi-only subagents synced to ~/.pi/agent/agents/
+│   ├── agents/         # Pi-only subagents synced to ~/.pi/agent/agents/
+│   └── skills/         # Pi-only skills synced to ~/.pi/agent/skills/
 ├── statusline/         # Claude Code statusline config
 │
 ├── agent-work/         # Agent-produced workflow artifacts
@@ -110,7 +111,7 @@ Modes:
 | `pytest.ini` | Pytest collection scope for repo tests |
 | `CONTEXT.md` | Project purpose, target user, operating assumptions, and shared terminology |
 | `AGENTS.md` | Agent behavior rules, copied to project roots |
-| `sync-prompts.sh` | Leaves Codex unprompted and prunes repo-managed Codex assets, deploys workflow skills/subagents to Claude/Cursor/Pi, overlays Pi-only subagents/extensions into Pi, and configures Pi to load its local skill root |
+| `sync-prompts.sh` | Leaves Codex unprompted and prunes repo-managed Codex assets, deploys workflow skills/subagents to Claude/Cursor/Pi, overlays Pi-only skills/subagents/extensions into Pi, and configures Pi to load its local skill root |
 
 ## Design Patterns
 
@@ -118,7 +119,7 @@ Modes:
 - **Skill-first workflows**: `skills/*/SKILL.md` defines the main behavior; scripts handle deterministic mutations. Workflow skills may include `metadata.thinkingLevel` for Pi's skill-thinking extension; other harnesses ignore it.
 - **HTML explainers**: `skills/explain-html` creates self-contained, presentation-like technical overviews using bundled HTML/CSS/JS templates and reusable explanation patterns.
 - **Focused reviewer subagents**: `agents/*` contains reusable critics for plan, code, and documentation review; workflow skills invoke them only at the relevant checkpoint.
-- **Pi runtime stays additive**: Pi-specific behavior belongs in `extensions/` or `pi/` instead of patching Pi core or overloading shared skills
+- **Pi runtime stays additive**: Pi-specific behavior belongs in `extensions/` or `pi/` instead of patching Pi core or overloading shared skills. `pi/skills/*` is for Pi-only skill overlays such as `long-execute`, while shared `skills/*` stays portable.
 - **Experimental prompts stay isolated**: autopilot lives under `experimental/autopilot/` and remains opt-in
 - **State in filenames**: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone
 - **Repo-local YAML helper**: `skills/_lib/features_yaml.sh` is the supported entrypoint for shared `agent-work/features.yaml` reads/writes, backed by `skills/_lib/features_yaml.py` via `uv`
