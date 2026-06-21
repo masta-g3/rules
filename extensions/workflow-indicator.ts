@@ -1,10 +1,18 @@
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
 const ENTRY_TYPE = "workflow-indicator";
 const WIDGET_ID = "workflow-indicator";
 const SKILL_PREFIX = /^\/skill:([a-z0-9-]+)(?:\s|$)/;
+const LONG_EXECUTE_SKILL = "long-execute";
+const LONG_EXECUTE_CONTINUATION_PREFIX = "Continue long-execute for the same plan.";
+const LONG_EXECUTE_CONTINUE_LABEL = "LONG EXECUTE CONTINUE";
+const LONG_EXECUTE_DEFAULT_MAX_TURNS = 6;
+const LEX_PULSE_MS = 700;
 const ADVANCE_SHORTCUT = "ctrl+shift+right";
 const ADVANCE_DOUBLE_PRESS_MS = 800;
 
@@ -34,6 +42,9 @@ type StepName = (typeof WORKFLOW)[number]["id"];
 type IndicatorState = {
 	activeStep?: StepName;
 	ticketId?: string;
+	executionMode?: "long";
+	longTurnCount?: number;
+	longMaxTurns?: number;
 	source?: "input" | "command" | "shortcut" | "tool";
 	updatedAt?: number;
 };
@@ -43,6 +54,25 @@ type CustomEntry = {
 	customType?: string;
 	data?: IndicatorState;
 };
+
+let activeTui: TUI | undefined;
+let lexPulseOn = true;
+let lexPulseTimer: ReturnType<typeof setInterval> | undefined;
+
+function syncLexPulse(active: boolean): void {
+	if (!active) {
+		if (lexPulseTimer) clearInterval(lexPulseTimer);
+		lexPulseTimer = undefined;
+		lexPulseOn = true;
+		return;
+	}
+
+	if (lexPulseTimer) return;
+	lexPulseTimer = setInterval(() => {
+		lexPulseOn = !lexPulseOn;
+		activeTui?.requestRender();
+	}, LEX_PULSE_MS);
+}
 
 function isStepName(value: string): value is StepName {
 	return WORKFLOW.some((step) => step.id === value);
@@ -65,9 +95,17 @@ function buildSkillCommand(stepName: StepName, ticketId?: string): string {
 	return ticketId ? `/skill:${stepName} ${ticketId}` : `/skill:${stepName}`;
 }
 
+function extractSkill(text: string): string | undefined {
+	return text.match(SKILL_PREFIX)?.[1];
+}
+
 function extractStep(text: string): StepName | undefined {
-	const stepName = text.match(SKILL_PREFIX)?.[1];
+	const stepName = extractSkill(text);
 	return stepName && isStepName(stepName) ? stepName : undefined;
+}
+
+function isLongExecuteContinuation(text: string): boolean {
+	return text.trimStart().startsWith(LONG_EXECUTE_CONTINUATION_PREFIX);
 }
 
 function extractSkillTicket(text: string): string | undefined {
@@ -105,8 +143,22 @@ function clearState(pi: ExtensionAPI, ctx: ExtensionContext): IndicatorState {
 	return setState(pi, ctx, {});
 }
 
+function clearLongMode(pi: ExtensionAPI, ctx: ExtensionContext, state: IndicatorState): IndicatorState {
+	return setState(pi, ctx, {
+		...state,
+		executionMode: undefined,
+		longTurnCount: undefined,
+		longMaxTurns: undefined,
+	});
+}
+
 function renderTicket(theme: ExtensionContext["ui"]["theme"], ticketId?: string): string {
 	return ticketId ? `${theme.fg(TOKENS.rail, " · ")}${theme.fg(TOKENS.ticket, ticketId)}` : "";
+}
+
+function renderStepShort(step: (typeof WORKFLOW)[number], state: IndicatorState): string {
+	if (step.id === "execute" && state.executionMode === "long") return lexPulseOn ? "LEX ✦" : "LEX ✧";
+	return step.short;
 }
 
 function renderRail(state: IndicatorState, theme: ExtensionContext["ui"]["theme"]): { full: string; compact: string } {
@@ -115,15 +167,16 @@ function renderRail(state: IndicatorState, theme: ExtensionContext["ui"]["theme"
 
 	const separator = theme.fg(TOKENS.rail, " ─ ");
 	const full = WORKFLOW.map((step) => {
+		const short = renderStepShort(step, state);
 		if (step.id === activeStep.id) {
-			return theme.bg(TOKENS.activeBg, theme.fg(TOKENS.activeFg, step.short));
+			return theme.bg(TOKENS.activeBg, theme.fg(TOKENS.activeFg, short));
 		}
-		return theme.fg(TOKENS.muted, step.short);
+		return theme.fg(TOKENS.muted, short);
 	}).join(separator);
 
 	const compact = `${theme.fg(TOKENS.muted, `${getStepIndex(activeStep.id) + 1}/${WORKFLOW.length} `)}${theme.bg(
 		TOKENS.activeBg,
-		theme.fg(TOKENS.activeFg, activeStep.short),
+		theme.fg(TOKENS.activeFg, renderStepShort(activeStep, state)),
 	)}`;
 	return { full, compact };
 }
@@ -148,19 +201,64 @@ function renderIndicator(width: number, state: IndicatorState, theme: ExtensionC
 	return truncateToWidth(rail.compact, width);
 }
 
+function isAssistantMessage(message: AgentMessage): message is AssistantMessage {
+	return message.role === "assistant" && Array.isArray(message.content);
+}
+
+function assistantText(message: AssistantMessage): string {
+	return message.content
+		.filter((block): block is TextContent => block.type === "text")
+		.map((block) => block.text)
+		.join("\n");
+}
+
+function finalAssistantLines(messages: AgentMessage[]): string[] {
+	const lastAssistant = [...messages].reverse().find(isAssistantMessage);
+	if (!lastAssistant) return [];
+
+	return assistantText(lastAssistant)
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean);
+}
+
+function isLongExecuteStopLabel(label: string): boolean {
+	return label === "READY FOR REVIEW" || label === "NEEDS USER" || label === "PENDING STEPS" || label.startsWith("BLOCKED");
+}
+
+function shouldClearLongMode(messages: AgentMessage[], state: IndicatorState): boolean {
+	const lines = finalAssistantLines(messages);
+	if (lines.some(isLongExecuteStopLabel)) return true;
+	if (lines.at(-1) !== LONG_EXECUTE_CONTINUE_LABEL) return true;
+	return (state.longTurnCount ?? 0) + 1 >= (state.longMaxTurns ?? LONG_EXECUTE_DEFAULT_MAX_TURNS);
+}
+
+function nextLongModeState(state: IndicatorState): IndicatorState {
+	return {
+		...state,
+		longTurnCount: (state.longTurnCount ?? 0) + 1,
+		longMaxTurns: state.longMaxTurns ?? LONG_EXECUTE_DEFAULT_MAX_TURNS,
+	};
+}
+
 function applyWidget(ctx: ExtensionContext, state: IndicatorState): void {
+	syncLexPulse(state.executionMode === "long");
+
 	if (!state.activeStep) {
 		ctx.ui.setWidget(WIDGET_ID, undefined);
 		return;
 	}
 
-	ctx.ui.setWidget(WIDGET_ID, (_tui, theme) => ({
-		render(width: number): string[] {
-			const line = renderIndicator(width, state, theme);
-			return line ? [line] : [];
-		},
-		invalidate(): void {},
-	}));
+	ctx.ui.setWidget(WIDGET_ID, (tui, theme) => {
+		activeTui = tui;
+		return {
+			render(width: number): string[] {
+				const line = renderIndicator(width, state, theme);
+				return line ? [line] : [];
+			},
+			invalidate(): void {},
+		};
+	});
 }
 
 export default function workflowIndicator(pi: ExtensionAPI): void {
@@ -258,18 +356,41 @@ export default function workflowIndicator(pi: ExtensionAPI): void {
 				return;
 			}
 
-			state = setState(pi, ctx, { ...state, activeStep: nextStep, source: "shortcut" });
+			state = setState(pi, ctx, {
+				...state,
+				activeStep: nextStep,
+				executionMode: undefined,
+				longTurnCount: undefined,
+				longMaxTurns: undefined,
+				source: "shortcut",
+			});
 			pi.sendUserMessage(command);
 		},
 	});
 
 	pi.on("input", async (event, ctx) => {
 		if (event.source === "extension") {
+			if (state.executionMode === "long" && !isLongExecuteContinuation(event.text)) state = clearLongMode(pi, ctx, state);
+			return { action: "continue" };
+		}
+
+		const skillName = extractSkill(event.text);
+		if (skillName === LONG_EXECUTE_SKILL) {
+			state = setState(pi, ctx, {
+				...state,
+				activeStep: "execute",
+				ticketId: extractSkillTicket(event.text) ?? state.ticketId,
+				executionMode: "long",
+				longTurnCount: 0,
+				longMaxTurns: LONG_EXECUTE_DEFAULT_MAX_TURNS,
+				source: "input",
+			});
 			return { action: "continue" };
 		}
 
 		const stepName = extractStep(event.text);
 		if (!stepName) {
+			if (state.executionMode === "long" && !isLongExecuteContinuation(event.text)) state = clearLongMode(pi, ctx, state);
 			return { action: "continue" };
 		}
 
@@ -277,9 +398,18 @@ export default function workflowIndicator(pi: ExtensionAPI): void {
 			...state,
 			activeStep: stepName,
 			ticketId: extractSkillTicket(event.text) ?? state.ticketId,
+			executionMode: undefined,
+			longTurnCount: undefined,
+			longMaxTurns: undefined,
 			source: "input",
 		});
 		return { action: "continue" };
+	});
+
+	pi.on("agent_end", async (event, ctx) => {
+		if (state.executionMode !== "long") return;
+
+		state = shouldClearLongMode(event.messages, state) ? clearLongMode(pi, ctx, state) : setState(pi, ctx, nextLongModeState(state));
 	});
 
 	pi.on("before_agent_start", async (event) => {
@@ -304,5 +434,10 @@ export default function workflowIndicator(pi: ExtensionAPI): void {
 
 		state = findLatestState(ctx.sessionManager.getBranch());
 		applyWidget(ctx, state);
+	});
+
+	pi.on("session_shutdown", async () => {
+		syncLexPulse(false);
+		activeTui = undefined;
 	});
 }

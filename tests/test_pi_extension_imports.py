@@ -59,6 +59,25 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn('source?: "input" | "command" | "shortcut" | "tool";', source)
         self.assertIn('source: "tool"', source)
 
+    def test_workflow_indicator_renders_long_execute_mode(self) -> None:
+        source = EXTENSION.read_text()
+
+        self.assertIn('const LONG_EXECUTE_SKILL = "long-execute";', source)
+        self.assertIn('activeStep: "execute"', source)
+        self.assertIn('executionMode: "long"', source)
+        self.assertIn('return lexPulseOn ? "LEX ✦" : "LEX ✧";', source)
+        self.assertIn('activeTui?.requestRender()', source)
+        self.assertIn('const LEX_PULSE_MS = 700;', source)
+        self.assertIn('isLongExecuteContinuation(event.text)', source)
+        self.assertIn('event.source === "extension"', source)
+        self.assertIn('state.executionMode === "long" && !isLongExecuteContinuation(event.text)', source)
+        self.assertIn('source: "shortcut"', source)
+        self.assertIn('pi.on("agent_end"', source)
+        self.assertIn('shouldClearLongMode(event.messages, state)', source)
+        self.assertIn('lines.some(isLongExecuteStopLabel)', source)
+        self.assertIn('lines.at(-1) !== LONG_EXECUTE_CONTINUE_LABEL', source)
+        self.assertNotIn('{ id: "long-execute"', source)
+
     def test_skill_thinking_uses_current_pi_packages(self) -> None:
         source = SKILL_THINKING_EXTENSION.read_text()
 
