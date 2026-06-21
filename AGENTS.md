@@ -53,6 +53,7 @@ We are working at a lean startup, not a large corporation. Code accordingly:
 
 - Follow **Test Driven Development**: write tests first, iterate until passing.
 - Use ephemeral tests to validate features; remove all temporary test code and artifacts when done.
+- Keep durable tests focused on current product contracts and likely regressions. Remove or loosen implementation-phase scaffold tests/files that only verified TDD progress, exact helper names, prompt substrings, or temporary internal structure once the feature is working.
 
 ## Tracked Work State
 
@@ -65,7 +66,7 @@ Tracked work persists across sessions under `agent-work/`:
 - `agent-work/decks/` — requested HTML briefing/explainer artifacts created for review or maintainer communication.
 - `agent-work/<name>/` — optional repo-specific non-durable planning, scratchpad, investigation, or migration artifacts when they do not fit the core directories.
 
-Keep workflow artifacts and non-durable agent scratch work in `agent-work/`. Keep durable architecture, onboarding, and reference documentation in `docs/`. Keep requested `agent-work/decks/` HTML artifacts; remove failed preview exports or generated derivatives unless they are explicitly needed as evidence.
+Keep workflow artifacts and non-durable scratch work in `agent-work/`; keep durable architecture, onboarding, and reference documentation in `docs/`. Before handoff or commit, delete `agent-work/` scratch files, temporary logs, generated previews, and one-off experiment outputs unless they remain useful for active plans, review, reproduction, evidence, requested decks, or archived history.
 
 ### Ticket Artifact Discipline
 

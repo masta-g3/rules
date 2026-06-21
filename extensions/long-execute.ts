@@ -126,26 +126,6 @@ function hasStopLabel(messages: AgentMessage[]): boolean {
 export default function longExecute(pi: ExtensionAPI): void {
 	let state = initialState();
 
-	pi.registerCommand("long-execute-stop", {
-		description: "Stop the active long-execute continuation loop",
-		handler: async (_args, ctx) => {
-			state = clearState(pi, ctx, "Long-execute stopped.");
-		},
-	});
-
-	pi.registerCommand("long-execute-status", {
-		description: "Show long-execute continuation status",
-		handler: async (_args, ctx) => {
-			if (!state.active) {
-				ctx.ui.notify("Long-execute inactive.", "info");
-				return;
-			}
-
-			const ticket = state.ticketId ? ` for ${state.ticketId}` : "";
-			ctx.ui.notify(`Long-execute active${ticket}: ${state.turnCount}/${state.maxTurns} continuation turns used.`, "info");
-		},
-	});
-
 	pi.on("input", async (event, ctx) => {
 		if (event.source === "extension") {
 			return { action: "continue" };

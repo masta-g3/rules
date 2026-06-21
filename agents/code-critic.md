@@ -73,6 +73,7 @@ Focus on **implementation craft and drift from the approved plan**.
 - TODO/FIXME markers for completed work
 - Commented-out code blocks
 - Test data or mock values in production code
+- Implementation-phase scaffold tests that only lock exact helper names, prompt substrings, or temporary internal structure instead of current product contracts
 
 ## Review Process
 
