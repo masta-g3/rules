@@ -54,6 +54,16 @@ COMMAND_SPECS = {
         ],
         "output_modes": ["text", "json"],
     },
+    "register": {
+        "summary": "Append a new feature object with the next sequential tracked ID for an epic.",
+        "arguments": [
+            {"name": "--json", "required": True, "type": "json-object"},
+            {"name": "--file", "required": False, "type": "path", "default": DEFAULT_FEATURES_FILE},
+            {"name": "--dry-run", "required": False, "type": "flag", "default": False},
+            {"name": "--output", "required": False, "type": "text|json", "default": "text"},
+        ],
+        "output_modes": ["text", "json"],
+    },
     "next": {
         "summary": "Select the next actionable feature, preferring in-progress work first.",
         "arguments": [
@@ -237,20 +247,37 @@ def feature_details(feature: dict) -> dict[str, Any]:
     return details
 
 
-def create_feature(path_str: str, payload: dict, *, dry_run: bool) -> dict[str, Any]:
+def next_feature_id(data: list[dict], epic: str) -> str:
+    max_id = 0
+    for feature in data:
+        feature_id = feature.get("id")
+        if not isinstance(feature_id, str):
+            continue
+        match = ID_PATTERN.match(feature_id)
+        if not match or match.group("epic") != epic:
+            continue
+        max_id = max(max_id, int(match.group("num")))
+    return f"{epic}-{max_id + 1:03d}"
+
+
+def validate_new_feature(payload: dict, *, command: str) -> str:
     feature_id = payload.get("id")
     if not isinstance(feature_id, str):
-        fail("create payload must include string field: id")
+        fail(f"{command} payload must include string field: id")
     ensure_tracked_id(feature_id)
     status = payload.get("status")
     if isinstance(status, str) and status not in STATUSES:
         valid = ", ".join(sorted(STATUSES))
-        fail(f"invalid status in create payload: {status}. valid values: {valid}")
+        fail(f"invalid status in {command} payload: {status}. valid values: {valid}")
     if "plan_file" in payload and payload["plan_file"] is not None:
         if not isinstance(payload["plan_file"], str):
-            fail("create payload field plan_file must be a string or null")
+            fail(f"{command} payload field plan_file must be a string or null")
         ensure_plan_path(payload["plan_file"], require_existing=False)
+    return feature_id
 
+
+def append_feature(path_str: str, payload: dict, *, command: str, dry_run: bool) -> dict[str, Any]:
+    feature_id = validate_new_feature(payload, command=command)
     data = load_features(path_str)
     if any(feature.get("id") == feature_id for feature in data):
         fail(f"feature already exists in features.yaml: {feature_id}")
@@ -261,7 +288,41 @@ def create_feature(path_str: str, payload: dict, *, dry_run: bool) -> dict[str, 
         save_features(path_str, data)
 
     return {
-        "command": "create",
+        "command": command,
+        "changed": not dry_run,
+        "dry_run": dry_run,
+        "feature": feature_details(result),
+    }
+
+
+def create_feature(path_str: str, payload: dict, *, dry_run: bool) -> dict[str, Any]:
+    return append_feature(path_str, payload, command="create", dry_run=dry_run)
+
+
+def register_feature(path_str: str, payload: dict, *, dry_run: bool) -> dict[str, Any]:
+    if "id" in payload:
+        fail("register payload must not include id; it is generated from epic")
+    epic = payload.get("epic")
+    if not isinstance(epic, str):
+        fail("register payload must include string field: epic")
+    epic = ensure_epic(epic)
+
+    data = load_features(path_str)
+    result = dict(payload)
+    result["epic"] = epic
+    result["id"] = next_feature_id(data, epic)
+    result.setdefault("status", "pending")
+    result.setdefault("created_at", date.today().isoformat())
+    validate_new_feature(result, command="register")
+
+    if any(feature.get("id") == result["id"] for feature in data):
+        fail(f"feature already exists in features.yaml: {result['id']}")
+    if not dry_run:
+        data.append(result)
+        save_features(path_str, data)
+
+    return {
+        "command": "register",
         "changed": not dry_run,
         "dry_run": dry_run,
         "feature": feature_details(result),
@@ -369,16 +430,7 @@ def list_epics(path_str: str) -> dict[str, Any]:
 def next_id(path_str: str, epic: str) -> dict[str, Any]:
     epic = ensure_epic(epic)
     data = load_features(path_str)
-    max_id = 0
-    for feature in data:
-        feature_id = feature.get("id")
-        if not isinstance(feature_id, str):
-            continue
-        match = ID_PATTERN.match(feature_id)
-        if not match or match.group("epic") != epic:
-            continue
-        max_id = max(max_id, int(match.group("num")))
-    return {"command": "next-id", "epic": epic, "next_id": f"{epic}-{max_id + 1:03d}"}
+    return {"command": "next-id", "epic": epic, "next_id": next_feature_id(data, epic)}
 
 
 def filter_by_epic(data: list[dict], epic_filter: str | None) -> list[dict]:
@@ -565,8 +617,13 @@ def emit_text(result: dict[str, Any]) -> None:
         print(f"Suggested plan file: {result['suggested_plan_file']}")
         return
 
-    if command in {"create", "update", "complete"}:
-        action = {"create": "created", "update": "updated", "complete": "completed"}[command]
+    if command in {"create", "register", "update", "complete"}:
+        action = {
+            "create": "created",
+            "register": "created",
+            "update": "updated",
+            "complete": "completed",
+        }[command]
         prefix = "Dry run:" if result["dry_run"] else action.capitalize() + ":"
         print(f"{prefix} {result['feature']['id']}")
         return
@@ -672,6 +729,19 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--json", required=True)
     create.set_defaults(handler=handle_create)
 
+    register = subparsers.add_parser(
+        "register",
+        parents=[file_parent, mutation_parent],
+        description="Append a new feature object with the next ID for an epic. Use --json - to read the payload from stdin.",
+        epilog="""Examples:
+  features_yaml.sh register --json '{"epic":"tui","title":"Add table filters"}'
+  echo '{"epic":"tui","title":"Add table filters"}' | features_yaml.sh register --json - --output json
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    register.add_argument("--json", required=True)
+    register.set_defaults(handler=handle_register)
+
     update = subparsers.add_parser(
         "update",
         parents=[file_parent, mutation_parent],
@@ -736,6 +806,11 @@ def handle_get(args: argparse.Namespace) -> dict[str, Any]:
 def handle_create(args: argparse.Namespace) -> dict[str, Any]:
     payload = parse_json_object(args.json, value_name="create payload")
     return create_feature(args.file, payload, dry_run=args.dry_run)
+
+
+def handle_register(args: argparse.Namespace) -> dict[str, Any]:
+    payload = parse_json_object(args.json, value_name="register payload")
+    return register_feature(args.file, payload, dry_run=args.dry_run)
 
 
 def handle_update(args: argparse.Namespace) -> dict[str, Any]:

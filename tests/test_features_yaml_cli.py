@@ -7,6 +7,8 @@ import unittest
 from datetime import date
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HELPER = REPO_ROOT / "skills" / "_lib" / "features_yaml.sh"
@@ -222,6 +224,110 @@ class FeaturesYamlCliTest(unittest.TestCase):
 
         result = self.run_helper("next")
         self.assertIn("No agent-work/features.yaml found", result.stdout)
+
+    def test_register_allocates_next_id_and_appends_feature(self) -> None:
+        self.write_features(
+            [
+                {"id": "skill-001", "status": "pending"},
+                {"id": "skill-003", "status": "pending"},
+                {"id": "docs-010", "status": "pending"},
+            ]
+        )
+
+        result = self.run_helper(
+            "--file",
+            str(self.features_file),
+            "register",
+            "--json",
+            json.dumps(
+                {
+                    "epic": "skill",
+                    "title": "Register tickets",
+                    "description": "Agent can register tickets",
+                }
+            ),
+            "--output",
+            "json",
+        )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["command"], "register")
+        self.assertTrue(payload["changed"])
+        self.assertEqual(payload["feature"]["id"], "skill-004")
+        features = yaml.safe_load(self.features_file.read_text())
+        self.assertEqual(len(features), 4)
+        self.assertEqual(
+            features[-1],
+            {
+                "epic": "skill",
+                "title": "Register tickets",
+                "description": "Agent can register tickets",
+                "id": "skill-004",
+                "status": "pending",
+                "created_at": date.today().isoformat(),
+            },
+        )
+
+    def test_register_rejects_explicit_id_and_missing_epic(self) -> None:
+        self.write_features([])
+
+        explicit_id = self.run_helper(
+            "--file",
+            str(self.features_file),
+            "register",
+            "--json",
+            json.dumps({"id": "skill-001", "epic": "skill"}),
+            expect_ok=False,
+        )
+        self.assertIn("register payload must not include id", explicit_id.stderr)
+
+        missing_epic = self.run_helper(
+            "--file",
+            str(self.features_file),
+            "register",
+            "--json",
+            json.dumps({"title": "Missing epic"}),
+            expect_ok=False,
+        )
+        self.assertIn("register payload must include string field: epic", missing_epic.stderr)
+
+    def test_register_dry_run_does_not_mutate_file(self) -> None:
+        self.write_features([])
+        original = self.features_file.read_text()
+
+        result = self.run_helper(
+            "--file",
+            str(self.features_file),
+            "register",
+            "--json",
+            json.dumps({"epic": "skill", "title": "Dry run"}),
+            "--dry-run",
+            "--output",
+            "json",
+        )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["command"], "register")
+        self.assertTrue(payload["dry_run"])
+        self.assertFalse(payload["changed"])
+        self.assertEqual(payload["feature"]["id"], "skill-001")
+        self.assertEqual(self.features_file.read_text(), original)
+
+    def test_register_reads_json_from_stdin(self) -> None:
+        self.write_features([])
+
+        result = self.run_helper(
+            "--file",
+            str(self.features_file),
+            "register",
+            "--json",
+            "-",
+            "--output",
+            "json",
+            input_text=json.dumps({"epic": "skill", "title": "From stdin"}),
+        )
+
+        self.assertEqual(json.loads(result.stdout)["feature"]["id"], "skill-001")
 
     def test_create_then_update_plan_file_keeps_string_value(self) -> None:
         self.write_features([])

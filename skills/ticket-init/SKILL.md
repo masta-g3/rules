@@ -23,33 +23,27 @@ Epic prefixes should be concise, self-explanatory slugs of 1-3 short words, usua
 $SKILLS_ROOT/_lib/features_yaml.sh epics
 ```
 
-### 2. Generate ID
+### 2. Register Ticket
 
-For each ticket request, generate the next sequential number within the epic:
-```bash
-$SKILLS_ROOT/_lib/features_yaml.sh next-id "$EPIC"
-```
-
-### 3. Build & Append
+For each ticket request, register the feature under the chosen epic. The helper generates the next ticket ID during creation.
 
 ```yaml
-- id: "{epic}-{nnn}"
-  epic: "{epic}"
-  status: pending
-  title: "{concise title}"
-  description: "{action-oriented: 'User can [action] with [context]'}"
-  steps:
-    - "{implementation details if user provided, otherwise empty}"
-  priority: 2  # 1=foundation, 2=core (default), 3=polish
-  created_at: YYYY-MM-DD
+epic: "{epic}"
+status: pending
+title: "{concise title}"
+description: "{action-oriented: 'User can [action] with [context]'}"
+steps:
+  - "{implementation details if user provided, otherwise empty}"
+priority: 2  # 1=foundation, 2=core (default), 3=polish
+created_at: YYYY-MM-DD
 ```
 
-Append:
+Register:
 ```bash
-$SKILLS_ROOT/_lib/features_yaml.sh create --json '{"id":"...","epic":"...","status":"pending","title":"...","description":"...","steps":[],"priority":2,"depends_on":[],"discovered_from":null,"plan_file":null,"references":[],"created_at":"YYYY-MM-DD"}'
+$SKILLS_ROOT/_lib/features_yaml.sh register --json '{"epic":"...","status":"pending","title":"...","description":"...","steps":[],"priority":2,"depends_on":[],"discovered_from":null,"plan_file":null,"references":[],"created_at":"YYYY-MM-DD"}'
 ```
 
-### 4. Report
+### 3. Report
 
 ```
 TICKET CREATED: {id}
@@ -60,4 +54,4 @@ Priority: {priority}
 
 ---
 
-**Do not write dow na plan or implement yet.** This command only registers work. Use `/plan-md` to plan and `/execute` to implement.
+**Do not write down a plan or implement yet.** This command only registers work. Use `/plan-md` to plan and `/execute` to implement.

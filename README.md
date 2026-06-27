@@ -78,9 +78,10 @@ Shared backlog operations live in `skills/_lib/features_yaml.py` and are invoked
 
 - Purpose: keep `agent-work/features.yaml` selection and mutation logic packaged with the repo
 - Runtime: `uv` manages the script-local PyYAML dependency
-- Contract: `epics`, `next-id`, `next`, `get`, `create`, `update`, `complete`, and `describe`
+- Contract: `epics`, `next-id`, `register`, `next`, `get`, `create`, `update`, `complete`, and `describe`
 - Direct lookup: `skills/_lib/features_yaml.sh get <feature-id> --output json`
-- Pipeline input: `create --json -` and `update <feature-id> --json -` read JSON objects from stdin
+- Ticket creation: `register --json '{"epic":"auth","title":"..."}'` generates the next ID and appends the feature in one mutation
+- Pipeline input: `register --json -`, `create --json -`, and `update <feature-id> --json -` read JSON objects from stdin
 - Retry behavior: repeated no-op `update` returns `changed:false` and does not rewrite the file
 
 ## CLI Tools

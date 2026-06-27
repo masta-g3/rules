@@ -19,6 +19,7 @@ Store plans in `agent-work/plans/`:
 - **If the request identifies a feature ID** (e.g., `auth-001`): use that ID → `agent-work/plans/auth-001.md`
 - **If `agent-work/features.yaml` exists** and input is not a tracked feature ID: create the ticket via `ticket-init` skill, then plan against the returned ID.
   Update `plan_file`: `$SKILLS_ROOT/_lib/features_yaml.sh update "<feature-id>" --json '{"plan_file":"agent-work/plans/<feature-id>.md"}'`
+- **Tracked work:** if `set_workflow_ticket` is available, call it with the resolved feature ID.
 - **Otherwise**: standalone mode → `agent-work/plans/FEATURE_NAME.md`
 
 ### Context Files

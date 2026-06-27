@@ -525,3 +525,20 @@
   - extensions/skill-thinking.ts
   created_at: '2026-06-19'
   completed_at: '2026-06-19'
+- id: skill-016
+  epic: skill
+  status: done
+  title: Atomic ticket registration helper
+  description: Agent can register a new tracked feature under an epic with the next
+    ticket ID generated at creation time.
+  steps:
+  - Add a register helper command that allocates the next ID and appends the ticket
+    in one mutation.
+  - Update ticket-init to use register instead of separate next-id and create steps.
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: agent-work/history/20260627_skill-016_atomic_register.md
+  references: []
+  created_at: '2026-06-26'
+  completed_at: '2026-06-27'

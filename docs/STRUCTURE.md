@@ -122,5 +122,5 @@ Modes:
 - **Pi runtime stays additive**: Pi-specific behavior belongs in `extensions/` or `pi/` instead of patching Pi core or overloading shared skills. `pi/skills/*` is for Pi-only skill overlays such as `long-execute`, while shared `skills/*` stays portable.
 - **Experimental prompts stay isolated**: autopilot lives under `experimental/autopilot/` and remains opt-in
 - **State in filenames**: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone
-- **Repo-local YAML helper**: `skills/_lib/features_yaml.sh` is the supported entrypoint for shared `agent-work/features.yaml` reads/writes, backed by `skills/_lib/features_yaml.py` via `uv`
+- **Repo-local YAML helper**: `skills/_lib/features_yaml.sh` is the supported entrypoint for shared `agent-work/features.yaml` reads/writes, backed by `skills/_lib/features_yaml.py` via `uv`; use `register` for ticket creation so ID allocation and append happen together
 - **Explicit migrations**: `skills/workflow-migrate` prepares legacy root/`docs/` workflow artifacts for planned migration into `agent-work/` without adding old-path fallback behavior

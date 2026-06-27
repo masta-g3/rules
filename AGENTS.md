@@ -96,7 +96,7 @@ Root-level sequence (not wrapped in a mapping):
 
 ### Mutating agent-work/features.yaml
 
-When `agent-work/features.yaml` exists, avoid reading the full file into context. Use `$SKILLS_ROOT/_lib/features_yaml.sh` for listing epics, generating IDs, selecting the next feature, inspecting a feature by ID (`get <feature-id> --output json`), appending entries, and updating status/plan fields. `describe` explains helper commands, not feature IDs. Only fall back to direct YAML edits for operations the helper does not yet cover.
+When `agent-work/features.yaml` exists, avoid reading the full file into context. Use `$SKILLS_ROOT/_lib/features_yaml.sh` for listing epics, registering new tickets (`register` generates the ID and appends in one mutation), selecting the next feature, inspecting a feature by ID (`get <feature-id> --output json`), and updating status/plan fields. `next-id` is for inspection; do not reserve IDs with it before ticket creation. `describe` explains helper commands, not feature IDs. Only fall back to direct YAML edits for operations the helper does not yet cover.
 
 ## Skill Helper Setup
 
