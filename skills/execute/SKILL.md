@@ -13,7 +13,9 @@ Run a minimal smoke test before starting — run existing tests or start the app
 
 ### Begin Implementation
 
-Iterate through each phase: implement, verify existing features still work, confirm tests pass, then move on. Mark completed steps with `[x]` and update the plan if scope or approach shifts. Consult the user only when blocked.
+Iterate through each phase: implement, verify existing features still work, confirm tests pass, then move on. Mark completed steps with `[x]` as you go.
+
+Execute the approved plan autonomously end-to-end unless the plan says otherwise. If it cannot be implemented as planned, try a clean minimal fix within the plan’s intent; stop and consult the user before hacks, ad-hoc patches, unreviewed rearchitecture, or significant deviations.
 
 **Tracked features (`{epic}-{nnn}.md`):** set status to `in_progress` before starting: `$SKILLS_ROOT/_lib/features_yaml.sh update "{feature-id}" --json '{"status":"in_progress"}'`
 
@@ -23,7 +25,11 @@ Iterate through each phase: implement, verify existing features still work, conf
 - Blocks current work → pause, report to user, handle it first
 - Parallelizable → add to backlog, continue
 
-Update the plan document with a "Discovered Work" section. Use `agent-work/tickets/<feature-id>/` sparingly: keep only artifacts needed for review, reproduction, or evidence; use `/tmp` or `mktemp -d` for throwaway experiments; consolidate text into `notes.md` or `validation.md`; delete obsolete files before handoff. Never silently absorb scope.
+Update the plan document with a "Discovered Work" section. Never silently absorb new scope into the current task.
+
+### Working Artifacts
+
+Use `agent-work/tickets/<feature-id>/` sparingly: prefer updating an existing artifact over creating a new one, and keep only files needed for review, reproduction, or evidence. Use `/tmp` or `mktemp -d` for throwaway experiments, consolidate notes into `notes.md` or `validation.md`, and delete obsolete files before handoff.
 
 ### Documentation
 
@@ -39,14 +45,14 @@ No fallback mechanisms, hidden defaults, or mock functionality — if something 
 
 ### Functional Testing (User-Facing Features Only)
 
-For user-facing features (UI flows, API endpoints, interactive elements), invoke a testing subagent:
-- UI: browser automation to walk through flows
+For user-facing features (UI flows, API endpoints, interactive elements), invoke a testing subagent and validate real behavior:
+- UI: Playwright or equivalent real-browser automation to walk through flows
 - API: call endpoints with realistic payloads
 - Data: query edge cases that could corrupt user data
 
 ### Session End
 
-Report status clearly. For successful execution, include a `Summary:` line with 1-2 sentences on what was implemented and verified before the handoff label.
+Report status clearly. For successful execution, include a `Summary:` line with 1-2 sentences on what was implemented, verified, and any minor plan adjustments before the handoff label.
 
 - **READY FOR REVIEW** — all phases done and ready for `/review`
 - **PENDING STEPS** — list remaining phases/tasks, indicate next action

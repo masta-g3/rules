@@ -8,19 +8,18 @@ metadata:
 
 Create a detailed Markdown implementation plan for the provided request. Avoid scope creep.
 
-If scope, approach, or dependencies are unclear, investigate repo-answerable questions first, then interview the user with the user ask tool before planning — walk through each decision branch one at a time. Don't carry unresolved assumptions forward.
+Before writing the plan, resolve uncertainty instead of carrying assumptions forward: investigate repo-answerable questions first, then use the user ask tool for as many rounds as needed, one decision branch at a time, until scope, approach, dependencies, product direction, domain concepts, boundaries, and tradeoffs are clear enough to plan.
 
-When the user asks to reason through a design, or the request is too broad or conceptually ambiguous to plan safely, enter design-interview mode before writing the plan: ask one question at a time, explain your recommended answer, and continue until the product direction, domain concepts, boundaries, and tradeoffs are resolved enough to plan.
+Use this interview mode especially when the user asks to reason through a design, or when the request is too broad or conceptually ambiguous to plan safely.
 
 ### Plan File Location & Naming
 
 Store plans in `agent-work/plans/`:
 
-- **If the request identifies a feature ID** (e.g., `auth-001`): use that ID → `agent-work/plans/auth-001.md`
-- **If `agent-work/features.yaml` exists** and input is not a tracked feature ID: create the ticket via `ticket-init` skill, then plan against the returned ID.
-  Update `plan_file`: `$SKILLS_ROOT/_lib/features_yaml.sh update "<feature-id>" --json '{"plan_file":"agent-work/plans/<feature-id>.md"}'`
-- **Tracked work:** if `set_workflow_ticket` is available, call it with the resolved feature ID.
-- **Otherwise**: standalone mode → `agent-work/plans/FEATURE_NAME.md`
+- If the request names a feature ID, use it. Otherwise create one with the `ticket-init` skill.
+- Write the plan to `agent-work/plans/<feature-id>.md`, update `plan_file`, and call `set_workflow_ticket` when available:
+  `$SKILLS_ROOT/_lib/features_yaml.sh update "<feature-id>" --json '{"plan_file":"agent-work/plans/<feature-id>.md"}'`
+- If `agent-work/features.yaml` does not exist, use `agent-work/plans/FEATURE_NAME.md`.
 
 ### Context Files
 
@@ -32,7 +31,9 @@ Include a context-files section:
 
 ### Create Plan
 
-1. Create markdown document with the determined name. Start with a one-liner: `**Feature:** {id} → {description}`
+1. Create markdown document with the determined name. Start with:
+   - `**Feature:** {id} → {description}`
+   - `**Session:** {harness session ID}`
 2. Brainstorm solution alternatives — prefer the approach with the smallest surface area and simplest implementation.
 3. Write a detailed implementation plan (code snippets, file paths, architecture layout with components, data flows, and dependencies). Scale depth to complexity:
    - Substantial features (rewrites, multi-service work): 200+ lines with pseudocode, diagrams, and breakdowns.
@@ -41,11 +42,11 @@ Include a context-files section:
 4. If UI work, include a design direction section. Use the **frontend design skill** if available; otherwise specify theme tokens, typography, and color choices centrally — no scattered magic values.
 
 5. Divide into incremental test-first phases (foundation → core → polish), each with its own `[ ]` checklist and verification step. For implementation phases, write/update the failing test first, make the smallest passing change, then refactor.
-   - **Bulk-change checklist:** for cross-cutting changes (20+ files), enumerate every affected file in a `[ ]` checklist grouped by directory or module.
+   - **Bulk-change checklist:** for cross-cutting changes (10+ files), enumerate every affected file in a `[ ]` checklist grouped by directory or module.
 
 6. Include a **verification strategy** for each phase:
    - Focus on outcomes: "Does it achieve the goal?" not "Does it import?"
-   - Side effects: test workflows end-to-end, keep operations read-only or ephemeral
+   - Side effects: test workflows end-to-end, with the smallest necessary impact area
    - Pure logic: test with realistic inputs and edge cases
 
 Don't execute on this plan yet; the user will provide feedback and approve.
@@ -60,7 +61,7 @@ Only plan doc updates when they are explicit deliverables; otherwise note likely
 
 ### Plan Review (Non-Trivial Plans Only)
 
-For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** subagent once. Skip for trivial edits. Fix only clear correctness, completeness, or simplicity issues; ignore nits, decontextualized suggestions, scope creep and proposals that don't fit project constraints. Re-run only after material plan changes.
+For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** subagent. Skip for trivial edits. Fix only clear correctness, completeness, or simplicity issues; ignore nits, decontextualized suggestions, scope creep and proposals that don't fit project constraints. Re-run only after material plan changes.
 
 ### Output
 

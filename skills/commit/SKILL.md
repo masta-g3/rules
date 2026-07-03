@@ -37,7 +37,7 @@ Example: `Refactor API endpoints for better error handling.` with bullets like `
 
 ### Multi-Repo Sessions
 
-If this session touched multiple repositories, ask the user whether to commit in each. If yes, commit independently per repo.
+If this session touched multiple repositories, commit all session work independently per repo.
 
 ### Output
 
