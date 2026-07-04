@@ -9,7 +9,7 @@
 
 ## Project Orientation
 
-- Read root `CONTEXT.md` when present to understand the project's purpose, target user, operating assumptions, and terminology.
+- Read root `CONTEXT.md` when present to understand the project's purpose, target user, stage, operating assumptions, and terminology.
 - Check `docs/STRUCTURE.md` to understand project organization; if missing, continue without it.
 - Keep `docs/STRUCTURE.md` current as an onboarding guide for new developers: project purpose, architecture, directory layout, key files/modules, design patterns, and how to run/build. Describe components and areas, not every file — it is a practical guide, not a full file index.
 - Before adding code, inspect existing structure and place new code in the matching purpose-aligned module, following the repo's conventions.

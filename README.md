@@ -31,6 +31,7 @@ Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, a
 | Skill | Purpose |
 |---------|---------|
 | `skills/project-init` | Initialize project with agent-work/features.yaml |
+| `skills/context-md` | Create or refresh root CONTEXT.md |
 | `skills/workflow-migrate` | Prepare explicit old-layout to agent-work migration plans |
 | `skills/epic-init` | Initialize new epic with features |
 | `skills/ticket-init` | Canonical ticket creation for agent-work/features.yaml |

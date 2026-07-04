@@ -14,6 +14,7 @@ LONG_EXECUTE_EXTENSION = REPO_ROOT / "extensions" / "long-execute.ts"
 SYNC_PROMPTS = REPO_ROOT / "sync-prompts.sh"
 EXPECTED_SKILL_THINKING = {
     "commit": "low",
+    "context-md": "high",
     "docs-health": "high",
     "epic-init": "high",
     "execute": "medium",

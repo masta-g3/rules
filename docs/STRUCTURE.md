@@ -17,6 +17,7 @@ rules/
 ├── skills/             # Canonical workflow skills
 │   ├── _lib/           # Shared deterministic shell helpers
 │   ├── commit/
+│   ├── context-md/
 │   ├── docs-health/
 │   ├── epic-init/
 │   ├── execute/
@@ -50,7 +51,7 @@ rules/
 │   └── STRUCTURE.md    # Durable architecture/onboarding guide
 │
 ├── pytest.ini          # Pytest collection config (scopes default runs to tests/)
-├── CONTEXT.md          # Project purpose, audience, assumptions, and terminology
+├── CONTEXT.md          # Project purpose, audience, stage, assumptions, and terminology
 ├── AGENTS.md           # Coding style & behavioral guidelines
 ├── README.md           # Usage documentation
 └── sync-prompts.sh     # Leave Codex unprompted; deploy workflow skills to Claude/Cursor/Pi; deploy AGENTS.md/subagents/extensions to supported harnesses
@@ -68,7 +69,7 @@ Projects track work in `agent-work/features.yaml`:
 Agent-produced workflow artifacts live under `agent-work/`, including repo-specific planning/scratchpad areas when needed. Keep `agent-work/tickets/` sparse: use it only for ticket-local evidence or reproduction assets that should survive the turn. Durable project context, architecture, onboarding, and reference documentation stays in root docs or `docs/`.
 
 Durable documentation boundaries:
-- `CONTEXT.md`: project purpose, target user, operating assumptions, and shared terminology
+- `CONTEXT.md`: project purpose, target user, stage, operating assumptions, and shared terminology
 - `AGENTS.md`: agent behavior rules and repo-specific working instructions
 - `docs/STRUCTURE.md`: architecture, directory layout, implementation patterns, and onboarding
 - `README.md`: usage documentation
@@ -109,7 +110,7 @@ Modes:
 |------|---------|
 | `agent-work/features.yaml` | Feature backlog (sequence of feature objects) |
 | `pytest.ini` | Pytest collection scope for repo tests |
-| `CONTEXT.md` | Project purpose, target user, operating assumptions, and shared terminology |
+| `CONTEXT.md` | Project purpose, target user, stage, operating assumptions, and shared terminology |
 | `AGENTS.md` | Agent behavior rules, copied to project roots |
 | `sync-prompts.sh` | Leaves Codex unprompted and prunes repo-managed Codex assets, deploys workflow skills/subagents to Claude/Cursor/Pi, overlays Pi-only skills/subagents/extensions into Pi, and configures Pi to load its local skill root |
 

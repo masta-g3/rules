@@ -21,13 +21,14 @@ Before creating `CONTEXT.md`, ask enough focused questions to capture project co
 3. What does success look like?
 4. Who is the primary target user?
 5. What kind of project is this: production product, internal tool, personal utility, experimental PoC, library, prompt/workflow repo, etc.?
-6. What is explicitly out of scope?
-7. What constraints or operating assumptions matter?
-8. Which terms have project-specific meaning?
-9. Which synonyms should agents avoid?
-10. What should not be documented even if it appears in the codebase?
+6. What stage is it in: solo prototype, active development, internal users, beta, commercial production, etc.?
+7. What is explicitly out of scope?
+8. What constraints or operating assumptions matter?
+9. Which terms have project-specific meaning?
+10. Which synonyms should agents avoid?
+11. What should not be documented even if it appears in the codebase?
 
-Use the answers to write a concise root `CONTEXT.md`. Do not infer project purpose, audience, or terminology from code alone when the user has not provided it.
+Use the answers to write a concise root `CONTEXT.md`. Do not infer project purpose, audience, stage, or terminology from code alone when the user has not provided it.
 
 ### 1. Create Project Structure
 
@@ -47,6 +48,7 @@ Create root `CONTEXT.md` as the project context document. Include:
 - **Purpose**: why the project exists and what success looks like
 - **Target user**: who the project primarily serves
 - **Project type**: production product, internal tool, personal utility, experimental PoC, library, prompt/workflow repo, etc.
+- **Project stage**: current maturity and usage context, e.g. solo prototype, active development, internal users, beta, commercial production
 - **Operating assumptions**: durable constraints or principles that shape decisions
 - **Language**: project-specific terms with tight definitions and `_Avoid_:` synonyms when useful
 
@@ -69,7 +71,7 @@ Commit the scaffolding with a message like:
 ```
 Initialize project structure
 
-- CONTEXT.md: project purpose, audience, and terminology
+- CONTEXT.md: project purpose, audience, stage, and terminology
 - docs/STRUCTURE.md: architecture and onboarding
 - Empty agent-work/features.yaml for backlog tracking
 - [Stack/framework] scaffold
