@@ -126,6 +126,26 @@ sync_overlay_dir() {
   done <<< "$rsync_out"
 }
 
+sync_claude_subagents() {
+  local src="$1" dst="$2"
+  local tmp
+  tmp=$(mktemp -d)
+
+  for f in "$src"*; do
+    [[ -e "$f" ]] || continue
+    local base
+    base=$(basename "$f")
+    if [[ -f "$f" ]]; then
+      awk '!/^model:[[:space:]]*openai-codex\// && !/^thinking:[[:space:]]*/' "$f" > "${tmp}/${base}"
+    elif [[ -d "$f" ]]; then
+      cp -R "$f" "${tmp}/${base}"
+    fi
+  done
+
+  sync_dir "${tmp}/" "$dst" "subagents"
+  rm -rf "$tmp"
+}
+
 remove_repo_entries() {
   local src="$1" dst="$2" category="$3"
   [[ -d "$dst" ]] || return 0
@@ -208,7 +228,7 @@ sync_dir "${repo_root}/skills/" "${claude_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${cursor_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${pi_root}/skills/" "skills"
 
-sync_dir "${repo_root}/agents/" "${claude_root}/agents/" "subagents"
+sync_claude_subagents "${repo_root}/agents/" "${claude_root}/agents/"
 sync_dir "${repo_root}/agents/" "${cursor_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
 sync_overlay_dir "${repo_root}/pi/agents/" "${pi_root}/agents/" "pi_subagents"
