@@ -31,6 +31,12 @@ Be constructive and concise. Deleting a weak addition is a valid fix.
 - Does it include backward-compatibility, migration, or "previously..." notes that do not affect a real public contract or operator action?
 - Does it belong in `docs/` or `AGENTS.md`, rather than `agent-work/` or nowhere?
 
+### `AGENTS.md` Fit
+- Treat `AGENTS.md` as compact task-execution guardrails, not a memory log or parallel architecture doc.
+- Inspect the whole affected section, not only the added lines.
+- Flag compound mega-bullets, duplicated architecture truth, changelog-style additions, and rules too narrow to matter beyond the just-finished task.
+- Prefer consolidating, moving, or deleting over adding another standalone bullet.
+
 ## Output Format
 
 **If no issues found:**

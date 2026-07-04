@@ -35,6 +35,7 @@ Check for problems that affect future behavior:
 - **Duplicated truth**: repeated guidance that can drift or already conflicts
 - **Terminology drift**: terms that conflict with `CONTEXT.md` or surrounding docs
 - **Over-documentation**: low-signal sections, implementation history, exhaustive lists, or docs that restate obvious code
+- **Agent guidance bloat**: for project-local `AGENTS.md`, check whether the file can be shorter while preserving behavior-changing guardrails; prefer sectioning, merging, deletion, and moving durable architecture truth to `docs/STRUCTURE.md` over adding more guidance
 - **Links and paths**: broken or suspicious internal references when practical to verify
 
 Prefer deletion, tightening, or moving content before adding new documentation.
