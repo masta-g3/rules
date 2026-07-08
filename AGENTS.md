@@ -79,6 +79,8 @@ Use `agent-work/tickets/<feature-id>/` sparingly:
 User-driven skill workflow (do not advance automatically; stay within the current step):
 `next-feature` → `prime` → `plan-md` → `execute` → `review` → `reflect` → `commit`
 
+The critic subagents (`plan-critic`, `code-critic`, `docs-critic`) target Codex/Pi bridges; invoked from a Claude Code session they may run zero tools and return empty or fabricated findings. Confirm a critic result reflects the real files (or rerun the critique via a general-purpose agent with the criteria inlined) before trusting it.
+
 ### agent-work/features.yaml schema
 
 Root-level sequence (not wrapped in a mapping):

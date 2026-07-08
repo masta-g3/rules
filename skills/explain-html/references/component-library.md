@@ -1,6 +1,8 @@
 # Component Library
 
-Copy these slide sections into `assets/explain-deck-template.html` by replacing `{{SLIDES}}`. Keep each section focused on one idea. Replace inline placeholder text and hard-code flow numbers as `01`, `02`, etc.
+Proven section shapes for common explanation content. Use them in any format — deck slides, article sections, or panels within a single canvas — and adapt markup, class names, and styling to the file you are building. The examples use the bundled deck template's classes (`slide`, `slide__inner`, `panel`, …); map them to whatever container your chosen format uses. When building on the bundled template, paste sections in place of `{{SLIDES}}`.
+
+Keep each section focused on one idea. Replace inline placeholder text and hard-code flow numbers as `01`, `02`, etc.
 
 ## Title
 
@@ -16,7 +18,7 @@ Copy these slide sections into `assets/explain-deck-template.html` by replacing 
 
 ## Proposal Canvas
 
-Use this as the default one-slide shape for team discussion.
+Use this as the default single-view shape for team discussion.
 
 ```html
 <section class="slide" aria-labelledby="proposal">

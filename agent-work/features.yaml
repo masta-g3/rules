@@ -542,3 +542,14 @@
   references: []
   created_at: '2026-06-26'
   completed_at: '2026-06-27'
+- epic: skill
+  title: Loosen explain-html skill rigidity
+  description: Reduce explain-html skill format rigidity (deck-only default, mandatory
+    template/theme presets), simplify and shorten SKILL.md while keeping key delivery
+    guidance, and reframe reference templates as adaptable patterns.
+  priority: 2
+  id: skill-017
+  status: done
+  created_at: '2026-07-07'
+  plan_file: agent-work/history/20260707_skill-017_loosen_explain_html.md
+  completed_at: '2026-07-07'
