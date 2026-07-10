@@ -47,4 +47,4 @@ Rules:
 
 ### Output
 
-When an actionable feature is recommended, end with `READY FOR PRIME`. If nothing is actionable, report the blocked/no-ready state instead.
+When an actionable feature is recommended, end with `READY FOR PLAN`. If nothing is actionable, report the blocked/no-ready state instead.

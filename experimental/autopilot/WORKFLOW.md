@@ -8,7 +8,7 @@ Use it only when explicitly running the autopilot flow or another prompt that li
 If a Stop hook blocks with a reason starting with `AUTOPILOT:`, execute the slash command specified.
 
 Example:
-`AUTOPILOT: Run /prime auth-001` -> immediately run `/prime auth-001`
+`AUTOPILOT: Run /plan-md auth-001` -> immediately run `/plan-md auth-001`
 
 ## Autopilot State Transition
 
@@ -20,13 +20,13 @@ Each skill advances the workflow to the next command after completing successful
 
 | Skill | Next command | Condition | Abort trigger |
 |-------|-------------|-----------|---------------|
-| prime | `/plan-md` | workflow.json exists | — |
 | plan-md | `/execute` | workflow.json exists | ambiguous requirements |
 | execute | `/review` | workflow.json exists AND plan complete | baseline/tests/build fail |
-| review | `/commit` | workflow.json exists AND review ready | `REVIEW ISSUES` |
+| review | `/reflect` | workflow.json exists AND review ready | `REVIEW ISSUES` |
+| reflect | `/commit` | workflow.json exists AND reflection ready | `REFLECTION BLOCKED` |
 | commit | *(see below)* | workflow.json exists | git conflicts |
 
-For **prime**, **plan-md**, **execute**, and **review**, advance with:
+For **plan-md**, **execute**, **review**, and **reflect**, advance with:
 ```bash
 ~/.claude/skills/autopilot/lib/workflow_state.sh <next-command>
 ```
@@ -62,7 +62,7 @@ if [[ "$MODE" == "continuous" ]]; then
 
   if [[ -n "$NEXT_FEATURE" ]]; then
     # Loop back
-    jq --arg f "$NEXT_FEATURE" '.feature = $f | .next = "/prime"' .claude/workflow.json > tmp.$$ && mv tmp.$$ .claude/workflow.json
+    jq --arg f "$NEXT_FEATURE" '.feature = $f | .next = "/plan-md"' .claude/workflow.json > tmp.$$ && mv tmp.$$ .claude/workflow.json
   else
     # Epic complete
     rm -f .claude/workflow.json

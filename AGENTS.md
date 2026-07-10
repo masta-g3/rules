@@ -77,7 +77,9 @@ Use `agent-work/tickets/<feature-id>/` sparingly:
 - Before handoff or commit, delete obsolete ticket artifacts or state why the remaining artifacts are worth keeping.
 
 User-driven skill workflow (do not advance automatically; stay within the current step):
-`next-feature` → `prime` → `plan-md` → `execute` → `review` → `reflect` → `commit`
+`next-feature` → `plan-md` → `execute` → `review` → `reflect` → `commit`
+
+`prime` is an optional repository-orientation utility for unfamiliar, resumed, or cross-cutting work. It is not a required workflow stage.
 
 The critic subagents (`plan-critic`, `code-critic`, `docs-critic`) target Codex/Pi bridges; invoked from a Claude Code session they may run zero tools and return empty or fabricated findings. Confirm a critic result reflects the real files (or rerun the critique via a general-purpose agent with the criteria inlined) before trusting it.
 

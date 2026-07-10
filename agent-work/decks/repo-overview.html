@@ -323,7 +323,7 @@ code { font-family: var(--font-mono); }
     <h2 id="skill-chain">Skill chain</h2>
     <svg class="diagram" viewBox="0 0 1080 410" role="img" aria-labelledby="skill-chain-title skill-chain-desc">
       <title id="skill-chain-title">Feature-driven workflow skill chain</title>
-      <desc id="skill-chain-desc">A left-to-right loop from next-feature through prime, plan-md, execute, review, reflect, commit, and back to next-feature. Review and reflect are highlighted as checkpoints.</desc>
+      <desc id="skill-chain-desc">A left-to-right loop from next-feature through plan-md, execute, review, reflect, commit, and back to next-feature. Review and reflect are highlighted as checkpoints.</desc>
       <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
           <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"></path>
@@ -334,10 +334,6 @@ code { font-family: var(--font-mono); }
         <g>
           <rect x="68" y="126" width="124" height="66" rx="14" fill="var(--raise)" stroke="var(--line)"></rect>
           <foreignObject x="68" y="126" width="124" height="66"><div class="svg-label">next-feature</div></foreignObject>
-        </g>
-        <g>
-          <rect x="221" y="126" width="92" height="66" rx="14" fill="var(--raise)" stroke="var(--line)"></rect>
-          <text x="267" y="166" fill="currentColor">prime</text>
         </g>
         <g>
           <rect x="342" y="126" width="106" height="66" rx="14" fill="var(--raise)" stroke="var(--line)"></rect>
@@ -363,8 +359,7 @@ code { font-family: var(--font-mono); }
         </g>
       </g>
       <g stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#arrow)">
-        <path d="M 193 159 L 211 159"></path>
-        <path d="M 314 159 L 332 159"></path>
+        <path d="M 193 159 L 332 159"></path>
         <path d="M 449 159 L 467 159"></path>
         <path d="M 582 159 L 600 159"></path>
         <path d="M 719 159 L 737 159"></path>
@@ -376,7 +371,7 @@ code { font-family: var(--font-mono); }
         <text x="68" y="354">workflow-orchestrator and autopilot exist as explicit opt-in exceptions, not the default path.</text>
       </g>
     </svg>
-    <p class="note">The core loop makes human decisions visible: choose work, prepare context, plan, implement, inspect, update durable knowledge, then commit cleanly.</p>
+    <p class="note">The core loop makes human decisions visible: choose work, plan, implement, inspect, update durable knowledge, then commit cleanly. <code>prime</code> remains available as optional deep orientation before planning.</p>
   </div>
 </section>
 
@@ -388,13 +383,13 @@ code { font-family: var(--font-mono); }
       <article class="panel">
         <p class="kicker muted">Standalone</p>
         <h3>Ad-hoc task</h3>
-        <p><code>prime → plan-md → execute → review → reflect → commit</code></p>
+        <p><code>plan-md → execute → review → reflect → commit</code></p>
         <p>Useful for quick work without backlog state. The user invokes each checkpoint directly, and plan names are descriptive, such as <code>DARK_MODE.md</code>.</p>
       </article>
       <article class="panel panel--accent">
         <p class="kicker">Feature-driven</p>
         <h3>Multi-session tracked task</h3>
-        <p><code>next-feature → prime → plan-md → execute → review → reflect → commit</code></p>
+        <p><code>next-feature → plan-md → execute → review → reflect → commit</code></p>
         <p><code>next-feature</code> chooses ready backlog work; <code>features.yaml</code> tracks status: <code>pending → in_progress → done</code>. Plan names carry ticket IDs, such as <code>auth-001.md</code>.</p>
       </article>
     </div>
@@ -429,7 +424,7 @@ code { font-family: var(--font-mono); }
     <h2 id="skill-map">Skills cluster by workflow responsibility</h2>
     <ol class="flow-list">
       <li><span class="num">01</span><span><strong>Start and select work</strong><br><code>project-init</code>, <code>epic-init</code>, <code>ticket-init</code>, and <code>next-feature</code> create or choose tracked work without guessing scope.</span></li>
-      <li><span class="num">02</span><span><strong>Prepare, plan, and implement</strong><br><code>prime</code>, <code>plan-md</code>, and <code>execute</code> turn selected work into focused edits with baseline verification.</span></li>
+      <li><span class="num">02</span><span><strong>Plan and implement</strong><br><code>plan-md</code> and <code>execute</code> turn selected work into focused edits with baseline verification; <code>prime</code> is optional for deeper repository orientation.</span></li>
       <li><span class="num">03</span><span><strong>Inspect, preserve, and finish</strong><br><code>review</code>, <code>reflect</code>, and <code>commit</code> inspect completed work, update durable docs, archive plans, and finalize tracked state.</span></li>
       <li><span class="num">04</span><span><strong>Support and opt-in automation</strong><br><code>docs-health</code>, <code>test-coverage</code>, <code>workflow-migrate</code>, <code>workflow-orchestrator</code>, and <code>explain-html</code> handle specialized analysis or explicit automation.</span></li>
     </ol>

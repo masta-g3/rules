@@ -14,13 +14,15 @@ Minimal skills for AI agents in developer IDEs.
 
 For quick tasks without multi-session tracking:
 
-`prime` → `plan-md` → `execute` → `review` → `reflect` → `commit`
+`plan-md` → `execute` → `review` → `reflect` → `commit`
 
 ### Feature-Driven (Multi-Session Projects)
 
 For projects with backlog tracking via `agent-work/features.yaml`:
 
-`project-init` → `next-feature` → `prime` → `plan-md` → `execute` → `review` → `reflect` → `commit`
+`project-init` → `next-feature` → `plan-md` → `execute` → `review` → `reflect` → `commit`
+
+`prime` remains available as an optional orientation utility before planning when a task is unfamiliar, resumed, or cross-cutting; it is not required for routine work.
 
 Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone. Creating a plan keeps tracked work `pending`; `execute` moves it to `in_progress`; `commit` moves it to `done` after `reflect` handles durable documentation updates.
 
@@ -36,7 +38,7 @@ Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, a
 | `skills/epic-init` | Initialize new epic with features |
 | `skills/ticket-init` | Canonical ticket creation for agent-work/features.yaml |
 | `skills/next-feature` | Select next ready feature |
-| `skills/prime` | Context prime: structure docs, git history |
+| `skills/prime` | Optional deep repository orientation for unfamiliar, resumed, or cross-cutting work |
 | `skills/plan-md` | Create implementation plan |
 | `skills/execute` | Implement with baseline verification |
 | `skills/explain-html` | Create self-contained HTML technical explainers |
@@ -67,11 +69,11 @@ Pi-only skills live in `pi/skills/` and overlay into `~/.pi/agent/skills/` after
 
 Current Pi-specific extension work also includes a minimalist workflow rail that highlights the active tracked-work skill step inside Pi:
 
-`next-feature → prime → plan-md → execute → review → reflect → commit`
+`next-feature → plan-md → execute → review → reflect → commit`
 
 This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the most recently invoked workflow step, not authoritative feature completion state.
 
-If you invoke a workflow skill with an explicit ticket immediately after the skill name, such as `/skill:prime engine-003`, the rail remembers that ticket, shows it beside the active step, and injects `Active workflow ticket: engine-003` into later turns until cleared. Use `/wf-ticket <ticket-id>` to set or override the active ticket manually; this also activates the same ticket context even before a workflow step is visible in the rail. Use `/wf-clear` to clear both the rail and the active ticket. Double-press `ctrl+shift+right` within the Pi TUI to run the next workflow skill, including the active ticket when one is set; when the rail is already on `commit`, the same double-press clears the workflow indicator instead. The shortcut is ignored while Pi is busy or the editor contains unsent text. Forking a session clears the workflow indicator and ticket context in the fork.
+If you invoke a workflow skill with an explicit ticket immediately after the skill name, such as `/skill:plan-md engine-003`, the rail remembers that ticket, shows it beside the active step, and injects `Active workflow ticket: engine-003` into later turns until cleared. Use `/wf-ticket <ticket-id>` to set or override the active ticket manually; this also activates the same ticket context even before a workflow step is visible in the rail. Use `/wf-clear` to clear both the rail and the active ticket. Double-press `ctrl+shift+right` within the Pi TUI to run the next workflow skill, including the active ticket when one is set; when the rail is already on `commit`, the same double-press clears the workflow indicator instead. The shortcut is ignored while Pi is busy or the editor contains unsent text. Forking a session clears the workflow indicator and ticket context in the fork.
 
 ## Shared Helper Tooling
 

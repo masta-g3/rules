@@ -34,7 +34,7 @@ plan-md → execute → review → reflect → commit
 
 After each child response, the parent inspects the output, changed files, git status, and handoff label before deciding the next phase.
 
-Skip `prime` by default for automation. Use `prime` only when the ticket is unusually unclear and the parent needs context before planning.
+`prime` is an optional repository-orientation utility, not an automated workflow phase. Invoke it separately only when the user requests orientation or an unusually unclear, resumed, or cross-cutting ticket needs a dedicated research pass before planning.
 
 ## Modes
 

@@ -17,7 +17,7 @@ if [[ "$MODE" == "single" ]]; then
       echo "AUTOPILOT EXCEPTION: no_ready_features" >&2; exit 2
     }
   fi
-  jq -n --arg mode "single" --arg feature "$FEATURE" --arg next "/prime" \
+  jq -n --arg mode "single" --arg feature "$FEATURE" --arg next "/plan-md" \
     '{mode:$mode, feature:$feature, next:$next}' > "$WORKFLOW_FILE"
   echo "$FEATURE"
   exit 0
@@ -35,6 +35,6 @@ FEATURE=$("$FEATURES_YAML" --file "$FEATURES_FILE" --output id next --epic "$EPI
   echo "AUTOPILOT EXCEPTION: no_ready_features in epic ${EPIC}" >&2; exit 2
 }
 
-jq -n --arg mode "continuous" --arg epic "$EPIC" --arg feature "$FEATURE" --arg next "/prime" \
+jq -n --arg mode "continuous" --arg epic "$EPIC" --arg feature "$FEATURE" --arg next "/plan-md" \
   '{mode:$mode, epic:$epic, feature:$feature, next:$next}' > "$WORKFLOW_FILE"
 echo "$FEATURE"

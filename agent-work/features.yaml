@@ -299,7 +299,7 @@
   title: Show workflow-step indicator in Pi
   description: User can see a minimalist workflow indicator in Pi that reflects the
     workflow skill sequence and highlights the active step when invoking next-feature,
-    prime, plan-md, execute, review, or commit.
+    plan-md, execute, review, reflect, or commit.
   steps: []
   priority: 2
   depends_on: []

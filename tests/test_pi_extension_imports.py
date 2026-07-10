@@ -11,6 +11,7 @@ EXTENSION = REPO_ROOT / "extensions" / "workflow-runtime" / "index.ts"
 SKILL_THINKING_EXTENSION = REPO_ROOT / "extensions" / "skill-thinking.ts"
 NOTIFY_EXTENSION = REPO_ROOT / "extensions" / "notify.ts"
 SYNC_PROMPTS = REPO_ROOT / "sync-prompts.sh"
+NEXT_FEATURE_SKILL = REPO_ROOT / "skills" / "next-feature" / "SKILL.md"
 EXPECTED_SKILL_THINKING = {
     "commit": "low",
     "context-md": "high",
@@ -49,6 +50,12 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn('from "./core.ts"', source)
         self.assertNotIn("@mariozechner/pi-coding-agent", source)
         self.assertNotIn("@mariozechner/pi-tui", source)
+
+    def test_next_feature_hands_off_directly_to_planning(self) -> None:
+        source = NEXT_FEATURE_SKILL.read_text()
+
+        self.assertIn("READY FOR PLAN", source)
+        self.assertNotIn("READY FOR PRIME", source)
 
     def test_workflow_runtime_exposes_ticket_tool(self) -> None:
         source = EXTENSION.read_text()

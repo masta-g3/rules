@@ -1,6 +1,6 @@
 # Experimental Autopilot
 
-Claude Code-only autopilot flow for running `prime -> plan-md -> execute -> review -> commit` through a hook-driven state file.
+Claude Code-only autopilot flow for running `plan-md -> execute -> review -> reflect -> commit` through a hook-driven state file.
 
 This flow is experimental:
 - it is not part of the default workflow

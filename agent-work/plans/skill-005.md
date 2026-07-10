@@ -4,7 +4,7 @@
 
 Design a new `workflow-mgmt` skill that gives users one entrypoint for the repo's feature workflow, while preserving the current atomic skills as the canonical implementation units.
 
-The goal is not to collapse `prime`, `plan-md`, `execute`, `commit`, `next-feature`, `ticket-init`, `epic-init`, and `project-init` into one giant prompt. The goal is to package them behind a thin orchestration layer that:
+The goal is not to collapse `plan-md`, `execute`, `commit`, `next-feature`, `ticket-init`, `epic-init`, and `project-init` into one giant prompt. The optional `prime` orientation utility also remains independently invokable. The goal is to package them behind a thin orchestration layer that:
 
 - routes the request to the right existing workflow unit
 - teaches the model the lifecycle at a glance
@@ -40,12 +40,12 @@ Users currently need to remember when to reach for:
 - `project-init`
 - `epic-init`
 - `next-feature`
-- `prime`
 - `plan-md`
 - `execute`
 - `commit`
 - `ticket-init`
 - `test-coverage`
+- optional deep orientation through `prime`
 
 The `skill-creator` guidance argues for concise, composable skills with progressive disclosure. The efficient packaging pattern here is therefore:
 
@@ -223,12 +223,12 @@ flowchart TD
   T -->|new epic| EI[epic-init]
   T -->|add ticket only| TI[ticket-init]
   T -->|what next?| NF[next-feature]
-  T -->|understand task first| PR[prime]
+  T -->|explicit deep orientation| PR[prime optional]
   T -->|make plan| PM[plan-md]
   T -->|implement approved plan| EX[execute]
   T -->|finalize work| CM[commit]
   T -->|coverage review| TC[test-coverage]
-  S -->|understand task first| PR
+  S -->|explicit deep orientation| PR
   S -->|make plan| PM
   S -->|implement approved plan| EX
   S -->|finalize work| CM
@@ -297,7 +297,7 @@ The orchestrator should follow these rules:
 1. Start by identifying whether the repo context is tracked-work or standalone-work.
 2. Then identify whether the user wants project setup, backlog creation, planning, execution, commit, or "what next?"
 3. If the request maps cleanly to one atomic skill, open `skills/<name>/SKILL.md` and follow it as the authoritative downstream contract.
-4. If the user explicitly asks for multiple phases, allow only explicit sequences such as `next-feature -> prime -> plan-md`, `ticket-init -> plan-md`, or `execute -> commit`.
+4. If the user explicitly asks for multiple phases, allow only explicit sequences such as `next-feature -> plan-md`, `ticket-init -> plan-md`, or `execute -> commit`; do not insert `prime` unless the user separately requests deep orientation.
 5. If the user asks for only one phase, do not broaden scope into adjacent phases.
 6. Treat the downstream skill as canonical when there is any conflict.
 7. Exclude `autopilot`, `skills/_lib/WORKFLOW.md`, and `skills/_lib/FILE_LOCK.md` from the default orchestrator unless the user explicitly opts into experimental flows.
@@ -318,7 +318,7 @@ The orchestrator should follow these rules:
 
 ### Files explicitly not changed in the first pass
 
-- atomic skill semantics in `skills/prime`, `skills/plan-md`, `skills/execute`, `skills/commit`, etc.
+- atomic skill semantics in `skills/plan-md`, `skills/execute`, `skills/commit`, etc.; `skills/prime` remains an optional utility
 - `skills/_lib/WORKFLOW.md`
 - `skills/_lib/FILE_LOCK.md`
 - `sync-prompts.sh` unless a packaging edge case is discovered
@@ -341,7 +341,7 @@ Classify the request:
 - New epic in tracked mode -> use `epic-init`
 - New ticket only in tracked mode -> use `ticket-init`
 - Next tracked item -> use `next-feature`
-- Understand task before planning -> use `prime`
+- Explicitly requested deep repository orientation -> use optional `prime`
 - Create or update a plan -> use `plan-md`
 - Implement an approved plan -> use `execute`
 - Finalize completed work -> use `commit`
@@ -350,7 +350,7 @@ Classify the request:
 After selecting the downstream skill, open `skills/<name>/SKILL.md` and follow it as authoritative.
 
 Only chain multiple downstream skills when the user explicitly asks for multiple phases, for example:
-- "pick the next feature and plan it" -> `next-feature -> prime -> plan-md`
+- "pick the next feature and plan it" -> `next-feature -> plan-md`
 - "add this ticket and plan it" -> `ticket-init -> plan-md`
 - "finish implementation and commit it" -> `execute -> commit`
 
@@ -474,7 +474,7 @@ Mitigation:
 
 ## Open Questions
 
-- Should `workflow-mgmt` be purely a routing skill, or should it also support "multi-step workflow packs" such as `next-feature -> prime -> plan-md` when the user explicitly asks for end-to-end guidance?
+- Should `workflow-mgmt` be purely a routing skill, or should it also support multi-step workflow packs such as `next-feature -> plan-md` when the user explicitly asks for end-to-end guidance?
 
 ## Recommended Initial Answer
 

@@ -1,10 +1,12 @@
 ---
 name: prime
-description: Context priming to prepare to execute a task.
+description: Optionally orient to an unfamiliar, resumed, or cross-cutting repository task before planning.
 argument-hint: "[task]"
 metadata:
   thinkingLevel: low
 ---
+
+Use this optional utility when the user explicitly wants repository orientation or when unfamiliar, resumed, or cross-cutting work merits a separate research pass. It is not part of the canonical workflow, and routine planning should rely on `plan-md`'s own investigation instead.
 
 Gather the context needed to work confidently on the task:
 
