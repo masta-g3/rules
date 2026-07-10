@@ -233,7 +233,13 @@ sync_dir "${repo_root}/agents/" "${cursor_root}/agents/" "subagents"
 sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
 sync_overlay_dir "${repo_root}/pi/agents/" "${pi_root}/agents/" "pi_subagents"
 sync_overlay_dir "${repo_root}/pi/skills/" "${pi_root}/skills/" "pi_skills"
-sync_dir "${repo_root}/extensions/" "${pi_root}/extensions/" "extensions"
+
+# Pi's extension directory may also contain user-managed extensions. Keep sync additive
+# even under --clean, while removing the two repo-managed files replaced by workflow-runtime.
+collect_files "${repo_root}/extensions/" "extensions"
+remove_file "${pi_root}/extensions/workflow-indicator.ts" "extensions" "workflow-indicator"
+remove_file "${pi_root}/extensions/long-execute.ts" "extensions" "long-execute"
+sync_overlay_dir "${repo_root}/extensions/" "${pi_root}/extensions/" "extensions"
 
 ensure_pi_package "npm:pi-tmux-subagents"
 ensure_pi_skill_path "~/.pi/agent/skills" "~/.claude/skills"

@@ -7,10 +7,9 @@ import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-EXTENSION = REPO_ROOT / "extensions" / "workflow-indicator.ts"
+EXTENSION = REPO_ROOT / "extensions" / "workflow-runtime" / "index.ts"
 SKILL_THINKING_EXTENSION = REPO_ROOT / "extensions" / "skill-thinking.ts"
 NOTIFY_EXTENSION = REPO_ROOT / "extensions" / "notify.ts"
-LONG_EXECUTE_EXTENSION = REPO_ROOT / "extensions" / "long-execute.ts"
 SYNC_PROMPTS = REPO_ROOT / "sync-prompts.sh"
 EXPECTED_SKILL_THINKING = {
     "commit": "low",
@@ -42,42 +41,53 @@ def read_skill_frontmatter(skill_name: str) -> dict:
 
 
 class PiExtensionImportsTest(unittest.TestCase):
-    def test_workflow_indicator_uses_current_pi_packages(self) -> None:
+    def test_workflow_runtime_uses_current_pi_packages(self) -> None:
         source = EXTENSION.read_text()
 
         self.assertIn('from "@earendil-works/pi-coding-agent"', source)
         self.assertIn('from "@earendil-works/pi-tui"', source)
+        self.assertIn('from "./core.ts"', source)
         self.assertNotIn("@mariozechner/pi-coding-agent", source)
         self.assertNotIn("@mariozechner/pi-tui", source)
 
-    def test_workflow_indicator_exposes_ticket_tool(self) -> None:
+    def test_workflow_runtime_exposes_ticket_tool(self) -> None:
         source = EXTENSION.read_text()
 
         self.assertIn('import { Type } from "typebox";', source)
         self.assertIn('pi.registerTool({', source)
         self.assertIn('name: "set_workflow_ticket"', source)
         self.assertIn('ticketId: Type.String', source)
-        self.assertIn('source?: "input" | "command" | "shortcut" | "tool";', source)
-        self.assertIn('source: "tool"', source)
 
-    def test_workflow_indicator_renders_long_execute_mode(self) -> None:
+    def test_workflow_runtime_owns_long_execute_mode(self) -> None:
         source = EXTENSION.read_text()
 
         self.assertIn('const LONG_EXECUTE_SKILL = "long-execute";', source)
-        self.assertIn('activeStep: "execute"', source)
-        self.assertIn('executionMode: "long"', source)
-        self.assertIn('return lexPulseOn ? "LEX ✦" : "LEX ✧";', source)
-        self.assertIn('activeTui?.requestRender()', source)
-        self.assertIn('const LEX_PULSE_MS = 700;', source)
-        self.assertIn('isLongExecuteContinuation(event.text)', source)
-        self.assertIn('event.source === "extension"', source)
-        self.assertIn('state.executionMode === "long" && !isLongExecuteContinuation(event.text)', source)
-        self.assertIn('source: "shortcut"', source)
+        self.assertIn('"LEX ✦"', source)
+        self.assertIn('"LEX ✧"', source)
         self.assertIn('pi.on("agent_end"', source)
-        self.assertIn('shouldClearLongMode(event.messages, state)', source)
-        self.assertIn('lines.some(isLongExecuteStopLabel)', source)
-        self.assertIn('lines.at(-1) !== LONG_EXECUTE_CONTINUE_LABEL', source)
         self.assertNotIn('{ id: "long-execute"', source)
+
+    def test_workflow_runtime_wires_compaction_and_active_contract(self) -> None:
+        source = EXTENSION.read_text()
+
+        self.assertIn('pi.on("session_compact"', source)
+        self.assertIn('reason: event.reason', source)
+        self.assertIn('pi.on("before_agent_start"', source)
+        self.assertIn('$SKILLS_ROOT/execute/SKILL.md', source)
+        self.assertIn('LONG EXECUTE CONTINUE', source)
+
+    def test_workflow_runtime_registers_compact_continuation_event(self) -> None:
+        source = EXTENSION.read_text()
+
+        self.assertIn('pi.registerMessageRenderer(EVENT_TYPE', source)
+        self.assertIn('keyHint("app.tools.expand"', source)
+        self.assertIn('customType: EVENT_TYPE', source)
+        self.assertIn('triggerTurn: true, deliverAs: "followUp"', source)
+        self.assertNotIn('sendUserMessage(CONTINUATION_PROMPT', source)
+
+    def test_legacy_workflow_extensions_are_removed(self) -> None:
+        self.assertFalse((REPO_ROOT / "extensions" / "workflow-indicator.ts").exists())
+        self.assertFalse((REPO_ROOT / "extensions" / "long-execute.ts").exists())
 
     def test_skill_thinking_uses_current_pi_packages(self) -> None:
         source = SKILL_THINKING_EXTENSION.read_text()
@@ -129,28 +139,6 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertNotIn('${claude_root}/skills/" "pi_skills"', source)
         self.assertNotIn('${cursor_root}/skills/" "pi_skills"', source)
         self.assertNotIn('${codex_root}/skills/" "pi_skills"', source)
-
-    def test_long_execute_extension_contract(self) -> None:
-        source = LONG_EXECUTE_EXTENSION.read_text()
-
-        self.assertIn('from "@earendil-works/pi-coding-agent"', source)
-        self.assertIn('pi.on("input"', source)
-        self.assertIn('pi.on("agent_end"', source)
-        self.assertIn('pi.sendUserMessage(CONTINUATION_PROMPT, { deliverAs: "followUp" })', source)
-        self.assertIn('LONG EXECUTE CONTINUE', source)
-        self.assertNotIn('registerCommand("long-execute-stop"', source)
-        self.assertNotIn('registerCommand("long-execute-status"', source)
-        self.assertIn('finalNonEmptyAssistantLine', source)
-        self.assertIn('trimmed === CONTINUE_LABEL', source)
-        self.assertNotIn('.includes(CONTINUE_LABEL)', source)
-        self.assertIn('hasStopLabel(event.messages)', source)
-        self.assertIn('!isContinueLabel(label)', source)
-        self.assertLess(source.index('hasStopLabel(event.messages)'), source.index('!isContinueLabel(label)'))
-        self.assertIn('state.turnCount + 1 >= state.maxTurns', source)
-        self.assertIn('Long-execute stopped: max turns reached.', source)
-        self.assertIn('Manual input clears active long-execute state.', source)
-        self.assertIn('Do not use \\`PENDING STEPS\\` when safe implementation work remains.', source)
-        self.assertIn('The continue marker must be the entire final line exactly:', source)
 
     def test_long_execute_skill_overrides_pending_steps(self) -> None:
         source = (REPO_ROOT / "pi" / "skills" / "long-execute" / "SKILL.md").read_text()

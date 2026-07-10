@@ -553,3 +553,29 @@
   created_at: '2026-07-07'
   plan_file: agent-work/history/20260707_skill-017_loosen_explain_html.md
   completed_at: '2026-07-07'
+- epic: long-execute
+  status: done
+  title: Consolidate robust long-execute workflow runtime
+  description: User can run long-execute through a single clean workflow runtime that
+    survives compaction, prevents duplicate continuations, and stops safely at session
+    boundaries.
+  steps:
+  - Rename workflow-indicator.ts to workflow-runtime.ts and make it the sole workflow/long-execute
+    state owner.
+  - Move continuation control into the workflow runtime and remove long-execute.ts.
+  - Keep the long-execute skill as model-facing policy.
+  - Add continuation deduplication, compaction-safe behavior, concise per-turn contract
+    injection, safe lifecycle stops, compact continuation events, and behavioral lifecycle
+    tests.
+  - Retain the bounded six-turn limit and defer goal tools and token budgets.
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: agent-work/history/20260710_long-execute-002_workflow_runtime.md
+  references:
+  - pi/skills/long-execute/SKILL.md
+  - extensions/workflow-indicator.ts
+  - extensions/long-execute.ts
+  created_at: '2026-07-09'
+  id: long-execute-002
+  completed_at: '2026-07-10'
