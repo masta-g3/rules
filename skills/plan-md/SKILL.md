@@ -8,9 +8,7 @@ metadata:
 
 Create a detailed Markdown implementation plan for the provided request. Avoid scope creep.
 
-Before writing the plan, resolve uncertainty instead of carrying assumptions forward: investigate repo-answerable questions first, then use the user ask tool for as many rounds as needed, one decision branch at a time, until scope, approach, dependencies, product direction, domain concepts, boundaries, and tradeoffs are clear enough to plan.
-
-Use this interview mode especially when the user asks to reason through a design, or when the request is too broad or conceptually ambiguous to plan safely.
+Before writing the plan, investigate the codebase to resolve discoverable facts, then interview the user about the decisions that remain. Ask one decision question at a time, include your recommended answer and rationale, and wait for feedback before continuing. Resolve dependent decisions in order until scope, approach, dependencies, product direction, domain concepts, boundaries, and trade-offs are mutually understood. Do not batch questions or carry unresolved assumptions into the plan. Write the plan only after the user confirms shared understanding; never implement it during this skill.
 
 ### Plan File Location & Naming
 
