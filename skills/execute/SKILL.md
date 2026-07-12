@@ -27,21 +27,15 @@ Execute the approved plan autonomously end-to-end unless the plan says otherwise
 
 Update the plan document with a "Discovered Work" section. Never silently absorb new scope into the current task.
 
-### Working Artifacts
-
-Use `agent-work/tickets/<feature-id>/` sparingly: prefer updating an existing artifact over creating a new one, and keep only files needed for review, reproduction, or evidence. Use `/tmp` or `mktemp -d` for throwaway experiments, consolidate notes into `notes.md` or `validation.md`, and delete obsolete files before handoff.
-
 ### Documentation
 
-Only update docs during execution when they are explicit deliverables or runtime/build/testable artifacts; otherwise note `Reflection Candidates` for `/reflect`.
+Only update docs during execution when they are explicit deliverables; otherwise note `Reflection Candidates` for `/reflect`.
 
 ### Code Quality
 
-Prefer the smallest change that fully solves the task — keep it clean, modular, and pattern-aligned. Reuse existing patterns; avoid widening the impact surface unless clearly required.
+Before implementing, identify the existing code that owns the behavior and make the smallest, simplest change there that fully solves the task. Prefer fundamental fixes in that path over localized patches or parallel solutions — replace obsolete code rather than leaving both versions. Reuse existing patterns, keep changes clean and modular, and don't widen the impact surface unless clearly required.
 
-At the end of each phase, ensure clean, reviewable state — no half-implemented features, no commented-out debug code, no broken imports.
-
-No fallback mechanisms, hidden defaults, or mock functionality — if something doesn't work, surface it. Tests must validate actual behavior — no dummy assertions or placeholder tests. If UI/UX work, use the frontend design skill.
+No fallback mechanisms, inferred defaults, or mock functionality — if something doesn't work, surface it. Tests must validate actual behavior — no dummy assertions or placeholder tests. For UI/UX work, invoke the `frontend-designer` subagent if available.
 
 ### Functional Testing (User-Facing Features Only)
 
@@ -52,7 +46,10 @@ For user-facing features (UI flows, API endpoints, interactive elements), invoke
 
 ### Session End
 
-Report status clearly. For successful execution, include a `Summary:` line with 1-2 sentences on what was implemented, verified, and any minor plan adjustments before the handoff label.
+At the end of each phase, ensure clean, reviewable state — no half-implemented features, no commented-out debug code.
 
+For successful execution, include a `Summary:` line with 1-2 sentences on what was implemented, verified, and any minor plan adjustments before the handoff label.
 - **READY FOR REVIEW** — all phases done and ready for `/review`
-- **PENDING STEPS** — list remaining phases/tasks, indicate next action
+
+Otherwise:
+- **BLOCKED / PENDING STEPS** — explain the blocker, list remaining phases/tasks, indicate next action

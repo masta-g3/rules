@@ -1,18 +1,17 @@
 ## Communication Style
 
-**Lead with the answer.** No preamble, no filler, no apologies.
-- One-liners for simple replies; expand only when complexity demands it.
-- On failure or uncertainty: state what happened and what's needed.
-- For complex ideas, prefer tables, lists, or ASCII diagrams over prose.
-- When a request is ambiguous, use the ask-user tool instead of guessing.
-- The user may be using speech-to-text; infer obvious transcription errors from context, and ask only when the intended meaning is unclear.
+**Lead with the answer and its central caveat.** No preamble, filler, restatement, or apologies.
+- Answer exactly what was asked, at the length it deserves—err short. Cut anything that doesn't change what the reader does next; don't compress grammar.
+- Use flowing, conversational technical prose that connects claims to mechanisms and consequences. Keep causal reasoning in paragraphs; use lists, tables, or ASCII diagrams when the structure benefits.
+- Avoid dramatic phrasing, canned setups, staccato fragments, and formulaic conclusions.
+- When a request is ambiguous, use the ask-user tool instead of guessing. Infer obvious speech-to-text errors, and ask only when the meaning remains unclear.
 
 ## Project Orientation
 
 - Read root `CONTEXT.md` when present to understand the project's purpose, target user, stage, operating assumptions, and terminology.
 - Check `docs/STRUCTURE.md` to understand project organization; if missing, continue without it.
 - Keep `docs/STRUCTURE.md` current as an onboarding guide for new developers: project purpose, architecture, directory layout, key files/modules, design patterns, and how to run/build. Describe components and areas, not every file — it is a practical guide, not a full file index.
-- Before adding code, inspect existing structure and place new code in the matching purpose-aligned module, following the repo's conventions.
+- Before adding code, inspect the existing structure and similar solutions.
 - When working with Python, always use the `uv` tool for dependency management and virtual environments.
 
 ## Collaboration and Codebase Workflow
@@ -23,20 +22,16 @@
 ## Implementation Principles
 
 We are working at a lean startup, not a large corporation. Code accordingly:
-- Prioritize minimalism and clarity. Removing is better than adding, **simple better than complex**.
-- Unless the repo style dictates it, prefer a minimalistic functional programing approach over complex over-abstracted OOP.
-- Avoid enterprise bloat, boilerplate, thin wrappers, unnecessary abstractions, ad-hoc patches, and hacky solutions.
+- Prefer the simplest fundamental solution for the current context over the quickest local patch. Replace obsolete code or text instead of appending parallel versions.
+- Unless the repo style dictates it, prefer a minimalistic functional programming approach over complex over-abstracted OOP.
+- Avoid enterprise bloat, boilerplate, thin wrappers, and unnecessary abstractions.
 - If an approach is not working, report and brainstorm with the user instead of forcing a brittle implementation.
 - Do not introduce new patterns or technologies unless strictly needed.
-- Study existing functions and patterns first; make minimal, non-disruptive changes that simplify the codebase.
-- Check for existing similar code to avoid duplication.
-- Keep components modular and reusable, but do not over-abstract.
 - Keep function names direct and simple; avoid names like `enhanced` or `new`.
 - Comment only non-obvious logic; avoid changelog-style comments.
-- Centralize imports at the top of the script where that is best practice (e.g., Python).
 - Skip redundant validations unless failure has real consequences.
 - Let errors surface naturally. Avoid blanket `try/except`, especially `pass`.
-- Avoid fallback mechanisms, mock data, default values, or backward compatibility layers unless explicitly requested.
+- Avoid fallback mechanisms, mock data, inferred defaults, or backward compatibility layers unless explicitly requested.
 
 ## Generating Documentation
 
@@ -44,10 +39,8 @@ We are working at a lean startup, not a large corporation. Code accordingly:
   - Leverage Markdown elements and visual diagrams, preferably Mermaid.
   - Document why decisions were made, including trade-offs, constraints, and strategic context.
   - Include real code snippets, usage patterns, and concrete examples.
-  - Keep examples realistic and working.
   - Write for maintainers six months later.
   - Place docs close to the code and maintain consistent terminology.
-  - Document major features, complex algorithms, integration points, and performance-critical paths.
 
 ## Testing
 
@@ -104,7 +97,7 @@ When `agent-work/features.yaml` exists, avoid reading the full file into context
 
 ## Skill Helper Setup
 
-Before running skill helper commands, set `SKILLS_ROOT` once per shell/session from the active harness install path:
+Before running skill helper commands, set `SKILLS_ROOT` once per shell/session from the active harness install path; re-set it only when missing or when the harness context changes:
 
 - Codex: `export SKILLS_ROOT="$HOME/.codex/skills"`
 - Claude: `export SKILLS_ROOT="$HOME/.claude/skills"`
@@ -112,5 +105,4 @@ Before running skill helper commands, set `SKILLS_ROOT` once per shell/session f
 - Pi: `export SKILLS_ROOT="$HOME/.pi/agent/skills"`
 
 Skills may be added, removed, or updated during a session. When the user asks to use a specific skill, check the active `$SKILLS_ROOT/<skill-name>/SKILL.md` before assuming it is unavailable or relying on an earlier skill list.
-- Do not re-export `SKILLS_ROOT` before every command; set it only when missing or when the harness context changes.
 - If the user pastes a complete skill block, use it directly; only re-read the skill file when the block is incomplete, stale-sensitive, or references external files/scripts.

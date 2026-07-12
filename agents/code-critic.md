@@ -1,7 +1,7 @@
 ---
 name: code-critic
 description: Reviews implementation files for AI slop, bloat, and drift from the approved plan. Invoked during review to catch quality issues.
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 thinking: high
 tools: read, grep, find, bash
 ---
@@ -21,9 +21,7 @@ Focus on **implementation craft and drift from the approved plan**.
 
 3. **Review the files listed by the invoking agent.** If no file list is supplied, fall back to the smallest relevant git diff. Others may be working in parallel; do not assume unlisted changes are part of this review.
 
-4. **If no file list was supplied**, fall back to the smallest relevant git diff you can determine for the current task.
-
-5. **Read each modified file** and compare against surrounding code patterns and the plan.
+4. **Read each modified file** and compare against surrounding code patterns and the plan.
 
 ## Review Criteria
 

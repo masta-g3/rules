@@ -8,6 +8,8 @@ metadata:
 
 Create a detailed Markdown implementation plan for the provided request. Avoid scope creep.
 
+### Pre-Work & User Interview
+
 Before writing the plan, investigate the codebase to resolve discoverable facts, then interview the user about the decisions that remain. Ask one decision question at a time, include your recommended answer and rationale, and wait for feedback before continuing. Resolve dependent decisions in order until scope, approach, dependencies, product direction, domain concepts, boundaries, and trade-offs are mutually understood. Do not batch questions or carry unresolved assumptions into the plan. Write the plan only after the user confirms shared understanding; never implement it during this skill.
 
 ### Plan File Location & Naming
@@ -24,24 +26,22 @@ Store plans in `agent-work/plans/`:
 Include a context-files section:
 
 - **Core**: files directly modified or extended
-- **Reference**: existing patterns to follow, related utilities
-- **Config**: relevant settings, types, schemas
+- **Reference**: existing patterns to follow, related utilities or documents
 
 ### Create Plan
 
 1. Create markdown document with the determined name. Start with:
    - `**Feature:** {id} → {description}`
    - `**Session:** {harness session ID}`
+
 2. Brainstorm solution alternatives — prefer the approach with the smallest surface area and simplest implementation.
-3. Write a detailed implementation plan (code snippets, file paths, architecture layout with components, data flows, and dependencies). Scale depth to complexity:
-   - Substantial features (rewrites, multi-service work): 200+ lines with pseudocode, diagrams, and breakdowns.
-   - Minor edits or narrow fixes: as concise as the change warrants.
 
-4. If UI work, include a design direction section. Use the **frontend design skill** if available; otherwise specify theme tokens, typography, and color choices centrally — no scattered magic values.
+3. Write a detailed implementation plan (code snippets, file paths, architecture layout with components, data flows, and dependencies). Scale depth to complexity; use pseudocode, diagrams, and breakdowns as needed.
 
-5. Divide into incremental test-first phases (foundation → core → polish), each with its own `[ ]` checklist and verification step. For implementation phases, write/update the failing test first, make the smallest passing change, then refactor.
-   - **Bulk-change checklist:** for cross-cutting changes (10+ files), enumerate every affected file in a `[ ]` checklist grouped by directory or module.
+4. If UI work, include a design direction section. Brainstorm with the `frontend designer` subagent if available. Specify theme tokens, typography, and color choices centrally — no scattered magic values.
 
+5. Divide into incremental test-first phases (foundation → core → polish), each with its own list of `[ ]` checklists and final verification step. For implementation phases, write/update the failing test first, make the smallest passing change, then refactor.
+ 
 6. Include a **verification strategy** for each phase:
    - Focus on outcomes: "Does it achieve the goal?" not "Does it import?"
    - Side effects: test workflows end-to-end, with the smallest necessary impact area
@@ -49,9 +49,7 @@ Include a context-files section:
 
 Don't execute on this plan yet; the user will provide feedback and approve.
 
-### Documentation
-
-Only plan doc updates when they are explicit deliverables; otherwise note likely doc impacts as `Reflection Candidates` for `/reflect`.
+7. Note likely doc impacts as `Reflection Candidates` for `/reflect`.
 
 ### Preserve Pending Status
 
@@ -59,7 +57,7 @@ Only plan doc updates when they are explicit deliverables; otherwise note likely
 
 ### Plan Review (Non-Trivial Plans Only)
 
-For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** subagent. Skip for trivial edits. Fix only clear correctness, completeness, or simplicity issues; ignore nits, decontextualized suggestions, scope creep and proposals that don't fit project constraints. Re-run only after material plan changes.
+For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** subagent. Fix only clear correctness, completeness, or simplicity issues; ignore nits, decontextualized suggestions, scope creep and proposals that don't fit project constraints. Re-run only after material plan changes.
 
 ### Output
 

@@ -1,7 +1,7 @@
 ---
 name: docs-critic
 description: Reviews durable documentation edits for clarity, usefulness, and fit. Invoked during reflect after non-trivial doc or agent-guidance changes.
-model: openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-sol
 thinking: medium
 tools: read, grep, find, bash
 ---
