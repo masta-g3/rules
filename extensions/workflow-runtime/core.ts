@@ -1,7 +1,7 @@
 export const CONTINUE_LABEL = "LONG EXECUTE CONTINUE";
 export const DEFAULT_MAX_TURNS = 6;
 
-export const WORKFLOW_STEPS = ["next-feature", "plan-md", "execute", "review", "reflect", "commit"] as const;
+export const WORKFLOW_STEPS = ["next-feature", "prime", "plan-md", "execute", "review", "reflect", "commit"] as const;
 export type StepName = (typeof WORKFLOW_STEPS)[number];
 export type WorkflowSource = "input" | "command" | "shortcut" | "tool";
 

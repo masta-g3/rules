@@ -9,9 +9,10 @@ import {
 
 const CONTINUE_MARKER = "LONG EXECUTE CONTINUE";
 
-test("canonical workflow moves directly from selection to planning", () => {
+test("canonical workflow includes the optional prime step", () => {
   assert.deepEqual(WORKFLOW_STEPS, [
     "next-feature",
+    "prime",
     "plan-md",
     "execute",
     "review",
