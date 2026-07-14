@@ -21,7 +21,7 @@ The deliverable is a single self-contained `.html` file that reads like a concis
    Start with one strong view; add more only when progressive detail genuinely helps.
 4. **Build the file.** `assets/explain-deck-template.html` is a known-good scaffold for the deck format — reuse or adapt its mechanics (theme tokens, keyboard nav, print CSS) freely, but take the visual direction from the design pass, not from the preset swaps. `references/component-library.md` offers proven content shapes for any layout; `references/explanation-patterns.md` covers narrative structure. Inline all CSS/JS, escape code snippets, keep the file offline-safe.
 5. **Validate.** Confirm the file opens as valid HTML and meets the quality floor below.
-6. **Run reader validation.** Ask a fresh subagent to view the rendered artifact as an audience member — not to inspect the source. What did it understand, is that correct, what felt confusing? Fix clear communication failures; if reader validation is unavailable, report a warning that it was skipped.
+6. **Run reader validation.** Ask a fresh subagent to view the rendered artifact as an audience member — not to inspect the source. What did it understand, is that correct, which terms or visuals felt confusing? Fix unclear language and communication failures; if reader validation is unavailable, report a warning that it was skipped.
 
 ## Quality Floor
 
@@ -31,6 +31,8 @@ The deliverable is a single self-contained `.html` file that reads like a concis
 - All color/space/type values derive from a consistent token system — no scattered magic values.
 - Technical titles that name the subject directly (`Workflow indicator lifecycle`, not `The Journey of State`).
 - Scope and intended discussion clear early; why before how.
+- Match the audience's technical level. Prefer plain words; when technical terms are needed, use terminology established in `CONTEXT.md` (when present) or the source material, and define it briefly.
+- Make each visual understandable on its own with a takeaway title, clear labels, and a short caption or legend when needed. Do not rely on unexplained symbols, abbreviations, or color alone.
 - System shape shown visually — flow, compare, cards, key/value specs, or annotated code — instead of prose walls; 3–5 bullets max per section.
 - Boundaries, tradeoffs, and consequences surfaced; no implementation checklists or step-by-step coding instructions.
 - Ends with memorable takeaways or decisions.
