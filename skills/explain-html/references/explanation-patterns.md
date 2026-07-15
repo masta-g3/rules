@@ -11,7 +11,6 @@ Use these patterns to turn project knowledge or proposed work into a clear visua
 - **Use progressive depth only when needed.** Start with purpose and mental model; add anatomy, flow, tradeoffs, and takeaways only when they support discussion.
 - **Keep density controlled.** Use 3-5 bullets max per section. Prefer one elegant SVG diagram, visualization, or annotated snippet over multiple text-heavy sections.
 - **Explain consequences.** Include boundaries, tradeoffs, risks, or operational implications when they help future decisions.
-- **No planning residue.** Do not include implementation phases, checklists, estimates, or task assignments unless explicitly requested.
 
 ## Recommended Shape
 

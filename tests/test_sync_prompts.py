@@ -32,9 +32,10 @@ class SyncPromptsTest(unittest.TestCase):
             claude_agent = Path(home) / ".claude" / "agents" / "code-critic.md"
             pi_agent = Path(home) / ".pi" / "agent" / "agents" / "code-critic.md"
 
-            self.assertNotIn("openai-codex/gpt-5.5", claude_agent.read_text())
+            self.assertNotIn("openai-codex/gpt-5.6-sol", claude_agent.read_text())
             self.assertNotIn("thinking: high", claude_agent.read_text())
-            self.assertIn("openai-codex/gpt-5.5", pi_agent.read_text())
+            self.assertIn("openai-codex/gpt-5.6-sol", pi_agent.read_text())
+            self.assertNotIn("openai-codex/gpt-5.5", pi_agent.read_text())
             self.assertIn("thinking: high", pi_agent.read_text())
 
     def test_extension_sync_migrates_legacy_runtime_without_deleting_user_extensions(self) -> None:
