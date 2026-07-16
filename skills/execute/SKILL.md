@@ -22,20 +22,23 @@ Execute the approved plan autonomously end-to-end unless the plan says otherwise
 ### Discovered Work
 
 **Tracked features:** check if the work exists in `agent-work/features.yaml` first — if not, register it via `ticket-init` skill with `discovered_from` set to the parent feature ID.
-- Blocks current work → pause, report to user, handle it first
+- Blocks current work → handle it first if small and low-risk; otherwise pause and report to the user
 - Parallelizable → add to backlog, continue
 
 Update the plan document with a "Discovered Work" section. Never silently absorb new scope into the current task.
 
 ### Documentation
 
-Only update docs during execution when they are explicit deliverables; otherwise note `Reflection Candidates` for `/reflect`.
+Update docs during execution only when the approved plan lists them as explicit deliverables. Otherwise, capture documentation gaps or lessons discovered during implementation under `Reflection Candidates` in the plan for `/reflect`.
 
 ### Code Quality
 
-Before implementing, identify the existing code that owns the behavior and make the smallest, simplest change there that fully solves the task. Prefer fundamental fixes in that path over localized patches or parallel solutions — replace obsolete code rather than leaving both versions. Reuse existing patterns, keep changes clean and modular, and don't widen the impact surface unless clearly required.
-
-No fallback mechanisms, inferred defaults, or mock functionality — if something doesn't work, surface it. Tests must validate actual behavior — no dummy assertions or placeholder tests. For UI/UX work, invoke the `frontend-designer` subagent if available.
+- Before implementing, identify the existing code that owns the behavior.
+- Make the smallest, simplest change that fully solves the task. Prefer fundamental fixes over localized patches or parallel solutions, and replace obsolete code.
+- Reuse existing patterns; keep changes modular and avoid widening the impact without clear need.
+- Do not add fallbacks, inferred defaults, mock functionality, or blanket exception handling. Let errors surface unless recovery is specific and intentional.
+- Tests must validate actual behavior — no dummy assertions or placeholders.
+- For UI/UX work, invoke the `frontend-designer` subagent if available.
 
 ### Functional Testing (User-Facing Features Only)
 

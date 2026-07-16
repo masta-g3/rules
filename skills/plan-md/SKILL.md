@@ -34,7 +34,7 @@ Include a context-files section:
    - `**Feature:** {id} → {description}`
    - `**Session:** {harness session ID}`
 
-2. Brainstorm solution alternatives — prefer the approach with the smallest surface area and simplest implementation.
+2. Identify the existing code that owns the behavior, brainstorm solution alternatives, and prefer the fundamental approach with the smallest surface area and simplest implementation.
 
 3. Write a detailed implementation plan (code snippets, file paths, architecture layout with components, data flows, and dependencies). Scale depth to complexity; use pseudocode, diagrams, and breakdowns as needed.
 

@@ -9,7 +9,7 @@ Review the active task after implementation and before `/reflect`.
 
 ### Review Process
 
-Verify: correctness (does it solve the task?), minimal surface area, no scope creep, no unnecessary abstractions, no one-use wrappers/classes that should be inlined, no broad exception handling or silent fallbacks, no backward compatibility layers unless explicitly requested, no AI bloat.
+Verify correctness, minimal surface area, and reuse of existing patterns. Flag scope creep, unnecessary abstractions or one-use wrappers/classes, broad exception handling or silent fallbacks, unrequested compatibility layers, and other AI bloat.
 
 1. Identify the files changed during implementation. Exclude commit-step artifacts (plan archival and `agent-work/features.yaml` completion updates), but include explicitly planned documentation deliverables.
 2. Read them and verify against the task: does the change solve it, did the plan's verification steps actually run and pass, and did scope stay within the plan? Ask whether the same task could have been solved with a simpler, smaller change — flag scope creep, plan overreach, or edits that widen the impact surface.
