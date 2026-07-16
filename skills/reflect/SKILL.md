@@ -16,6 +16,7 @@ Update durable documentation and agent guidance after implementation has passed 
    - human developers learning architecture/layout/core patterns → `docs/STRUCTURE.md`
    - product/API/design truth → the relevant domain doc
    - recurring agent mistakes, user corrections, review findings, or counterintuitive workflow pitfalls → the project-local `AGENTS.md`
+   - repeatable project workflows already encoded in project-local skills or agent configuration → update the owning file; do not create new skills or modify user-global configuration unless explicitly requested
 3. If a learning fits both a domain doc and `AGENTS.md`, put the full truth in the domain doc and only add a short `AGENTS.md` pointer/pitfall if agents are likely to miss it.
 4. Do not duplicate existing docs. Add only the delta: new truth, stale truth correction, or a sharper operational rule agents are likely to miss.
 5. Keep updates concise and factual. Prefer editing, replacing, or deleting stale text over appending; do not grow docs unless the new guidance will change future behavior.
