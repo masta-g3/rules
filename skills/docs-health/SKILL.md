@@ -79,7 +79,7 @@ Once the user confirms:
 - Preserve current-state documentation; do not add change history unless it affects a public contract or operator action.
 - Prefer small replacements over appending new sections.
 - Keep examples realistic and remove stale duplicates instead of creating parallel explanations.
-- For non-trivial durable documentation edits, invoke the `docs-critic` subagent once after editing. Fix only clear issues; deletion is acceptable when the critique shows an edit is not worth keeping.
+- For non-trivial durable documentation edits, invoke the `docs-critic` subagent once after editing. Act on its feedback per the AGENTS.md critic rule; deleting an edit is acceptable when the critique shows it is not worth keeping.
 - Run relevant validation: path/link checks with `rg` or `find`, existing tests when docs affect tested inventories, and a final residue check for unfinished markers or prompt artifacts.
 
 Do not audit for completeness as an end in itself. The goal is healthier durable documentation with less noise.
