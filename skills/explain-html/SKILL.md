@@ -25,6 +25,7 @@ Create a polished, grounded visual explanation—not an implementation plan or a
 - Self-contained and offline-safe: inline CSS/JS, no network requests.
 - Keyboard usable, visible focus, reduced motion, WCAG AA contrast; readable without JS and in print/PDF.
 - All color/space/type values derive from a consistent token system — no scattered magic values.
+- Follow the system color preference by default: define light and dark CSS tokens, declare `color-scheme: light dark`, and apply dark tokens with `@media (prefers-color-scheme: dark)`. Do not add theme JavaScript, a manual toggle, or persisted theme state unless requested.
 - Direct titles that name the subject (`Workflow indicator lifecycle`, not `The Journey of State`).
 - Scope and intended understanding clear early; why before how.
 - Match the audience's technical level; follow the terminology guidance in `references/explanation-patterns.md`.
