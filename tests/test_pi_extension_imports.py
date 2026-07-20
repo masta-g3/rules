@@ -8,6 +8,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXTENSION = REPO_ROOT / "extensions" / "workflow-runtime" / "index.ts"
+RUNTIME_CORE = REPO_ROOT / "extensions" / "workflow-runtime" / "core.ts"
 SKILL_THINKING_EXTENSION = REPO_ROOT / "extensions" / "skill-thinking.ts"
 NOTIFY_EXTENSION = REPO_ROOT / "extensions" / "notify.ts"
 SYNC_PROMPTS = REPO_ROOT / "sync-prompts.sh"
@@ -65,32 +66,47 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn('name: "set_workflow_ticket"', source)
         self.assertIn('ticketId: Type.String', source)
 
-    def test_workflow_runtime_owns_long_execute_mode(self) -> None:
+    def test_workflow_runtime_owns_focus_mode(self) -> None:
         source = EXTENSION.read_text()
 
-        self.assertIn('const LONG_EXECUTE_SKILL = "long-execute";', source)
-        self.assertIn('"LEX ✦"', source)
-        self.assertIn('"LEX ✧"', source)
+        self.assertIn('const FOCUS_SKILL = "focus";', source)
+        self.assertIn('"FOC ✦"', source)
+        self.assertIn('"FOC ✧"', source)
         self.assertIn('pi.on("agent_end"', source)
-        self.assertNotIn('{ id: "long-execute"', source)
+        self.assertNotIn("LONG EXECUTE CONTINUE", source)
+        self.assertNotIn("maxTurns", source)
 
-    def test_workflow_runtime_wires_compaction_and_active_contract(self) -> None:
+    def test_workflow_runtime_wires_compaction_and_focus_contract(self) -> None:
         source = EXTENSION.read_text()
+        core = RUNTIME_CORE.read_text()
 
         self.assertIn('pi.on("session_compact"', source)
         self.assertIn('reason: event.reason', source)
         self.assertIn('pi.on("before_agent_start"', source)
-        self.assertIn('$SKILLS_ROOT/execute/SKILL.md', source)
-        self.assertIn('LONG EXECUTE CONTINUE', source)
+        self.assertIn("focusContract(state)", source)
+        self.assertIn('$SKILLS_ROOT/execute/SKILL.md', core)
+        self.assertIn("active plan document if one exists", core)
+        self.assertIn("feature or task the user provided", core)
+
+    def test_workflow_runtime_registers_focus_exit_tool(self) -> None:
+        source = EXTENSION.read_text()
+
+        self.assertIn('name: "end_focus"', source)
+        self.assertIn('Type.Literal("completed")', source)
+        self.assertIn('Type.Literal("blocked")', source)
+        self.assertIn('summary: Type.String', source)
+        self.assertIn('{ type: "end-focus" }', source)
 
     def test_workflow_runtime_registers_compact_continuation_event(self) -> None:
         source = EXTENSION.read_text()
+        core = RUNTIME_CORE.read_text()
 
         self.assertIn('pi.registerMessageRenderer(EVENT_TYPE', source)
         self.assertIn('keyHint("app.tools.expand"', source)
         self.assertIn('customType: EVENT_TYPE', source)
         self.assertIn('triggerTurn: true, deliverAs: "followUp"', source)
-        self.assertNotIn('sendUserMessage(CONTINUATION_PROMPT', source)
+        self.assertIn("When all requested work is implemented and verified, call", core)
+        self.assertIn("end_focus", core)
 
     def test_legacy_workflow_extensions_are_removed(self) -> None:
         self.assertFalse((REPO_ROOT / "extensions" / "workflow-indicator.ts").exists())
@@ -147,12 +163,14 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertNotIn('${cursor_root}/skills/" "pi_skills"', source)
         self.assertNotIn('${codex_root}/skills/" "pi_skills"', source)
 
-    def test_long_execute_skill_overrides_pending_steps(self) -> None:
-        source = (REPO_ROOT / "pi" / "skills" / "long-execute" / "SKILL.md").read_text()
+    def test_focus_skill_delegates_execution_and_requires_explicit_exit(self) -> None:
+        source = (REPO_ROOT / "pi" / "skills" / "focus" / "SKILL.md").read_text()
 
-        self.assertIn("End labels override `execute` session-end labels", source)
-        self.assertIn("Do not use `PENDING STEPS` when safe implementation work remains.", source)
-        self.assertIn("The continue marker must be the entire final line exactly: `LONG EXECUTE CONTINUE`.", source)
+        self.assertIn("$SKILLS_ROOT/execute/SKILL.md", source)
+        self.assertIn("active plan document when one exists", source)
+        self.assertIn("`end_focus`", source)
+        self.assertNotIn("LONG EXECUTE CONTINUE", source)
+        self.assertFalse((REPO_ROOT / "pi" / "skills" / "long-execute").exists())
 
     def test_workflow_skills_define_expected_thinking_levels(self) -> None:
         skill_names = {path.parent.name for path in (REPO_ROOT / "skills").glob("*/SKILL.md")}

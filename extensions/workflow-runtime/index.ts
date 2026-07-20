@@ -1,11 +1,11 @@
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
 import { keyHint, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Box, Spacer, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
+	continuationContent,
 	createContinuationQueue,
+	focusContract,
 	transition,
 	WORKFLOW_STEPS,
 	type RuntimeEffect,
@@ -16,10 +16,10 @@ import {
 const ENTRY_TYPE = "workflow-runtime";
 const EVENT_TYPE = "workflow-runtime-event";
 const SKILL_PREFIX = /^\/skill:([a-z0-9-]+)(?:\s|$)/;
-const LONG_EXECUTE_SKILL = "long-execute";
+const FOCUS_SKILL = "focus";
 const TICKET_PATTERN = /\b([a-z][a-z0-9-]*-\d{3})\b/i;
 const TICKET_ARG_PATTERN = /^([a-z][a-z0-9-]*-\d{3})$/i;
-const LEX_PULSE_MS = 700;
+const FOCUS_PULSE_MS = 700;
 const ADVANCE_SHORTCUT = "ctrl+shift+right";
 const ADVANCE_DOUBLE_PRESS_MS = 800;
 
@@ -32,7 +32,6 @@ const TOKENS = {
 } as const;
 
 const STEP_SHORT: Record<StepName, string> = {
-	"next-feature": "NX",
 	prime: "PR",
 	"plan-md": "PL",
 	execute: "EX",
@@ -44,12 +43,8 @@ const STEP_SHORT: Record<StepName, string> = {
 const WORKFLOW = WORKFLOW_STEPS.map((id) => ({ id, short: STEP_SHORT[id] }));
 
 const STOP_NOTICES: Record<Exclude<RuntimeEffect, { kind: "continue" }>["reason"], string> = {
-	ready: "Long-execute stopped: ready for review.",
-	blocked: "Long-execute stopped: blocked or user input is required.",
-	"missing-marker": "Long-execute stopped: no continuation marker.",
-	limit: "Long-execute stopped: six-turn limit reached.",
-	"user-interruption": "Manual input clears active long-execute state.",
-	"session-boundary": "Long-execute stopped at a session boundary. Reinvoke /skill:long-execute to continue.",
+	"user-interruption": "Manual input ended focus mode.",
+	"session-boundary": "Focus mode stopped at a session boundary. Reinvoke /skill:focus to continue.",
 };
 
 type CustomEntry = {
@@ -64,22 +59,22 @@ type RuntimeEventDetails = {
 };
 
 let activeTui: TUI | undefined;
-let lexPulseOn = true;
-let lexPulseTimer: ReturnType<typeof setInterval> | undefined;
+let focusPulseOn = true;
+let focusPulseTimer: ReturnType<typeof setInterval> | undefined;
 
-function syncLexPulse(active: boolean): void {
+function syncFocusPulse(active: boolean): void {
 	if (!active) {
-		if (lexPulseTimer) clearInterval(lexPulseTimer);
-		lexPulseTimer = undefined;
-		lexPulseOn = true;
+		if (focusPulseTimer) clearInterval(focusPulseTimer);
+		focusPulseTimer = undefined;
+		focusPulseOn = true;
 		return;
 	}
 
-	if (lexPulseTimer) return;
-	lexPulseTimer = setInterval(() => {
-		lexPulseOn = !lexPulseOn;
+	if (focusPulseTimer) return;
+	focusPulseTimer = setInterval(() => {
+		focusPulseOn = !focusPulseOn;
 		activeTui?.requestRender();
-	}, LEX_PULSE_MS);
+	}, FOCUS_PULSE_MS);
 }
 
 function isStepName(value: string): value is StepName {
@@ -157,7 +152,7 @@ function renderTicket(theme: ExtensionContext["ui"]["theme"], ticketId?: string)
 }
 
 function renderStepShort(step: (typeof WORKFLOW)[number], state: WorkflowState): string {
-	if (step.id === "execute" && state.execution?.mode === "long") return lexPulseOn ? "LEX ✦" : "LEX ✧";
+	if (step.id === "execute" && state.execution?.mode === "focus") return focusPulseOn ? "FOC ✦" : "FOC ✧";
 	return step.short;
 }
 
@@ -201,7 +196,7 @@ function renderIndicator(width: number, state: WorkflowState, theme: ExtensionCo
 }
 
 function applyWidget(ctx: ExtensionContext, state: WorkflowState): void {
-	syncLexPulse(state.execution?.mode === "long");
+	syncFocusPulse(state.execution?.mode === "focus");
 	if (!state.activeStep) {
 		ctx.ui.setWidget(ENTRY_TYPE, undefined);
 		return;
@@ -217,50 +212,6 @@ function applyWidget(ctx: ExtensionContext, state: WorkflowState): void {
 			invalidate(): void {},
 		};
 	});
-}
-
-function isAssistantMessage(message: AgentMessage): message is AssistantMessage {
-	return message.role === "assistant" && Array.isArray(message.content);
-}
-
-function assistantText(message: AssistantMessage): string {
-	return message.content
-		.filter((block): block is TextContent => block.type === "text")
-		.map((block) => block.text)
-		.join("\n");
-}
-
-function finalAssistantLines(messages: AgentMessage[]): string[] {
-	const lastAssistant = [...messages].reverse().find(isAssistantMessage);
-	if (!lastAssistant) return [];
-	return assistantText(lastAssistant)
-		.split(/\r?\n/)
-		.map((line) => line.trim())
-		.filter(Boolean);
-}
-
-function longExecuteContract(state: WorkflowState): string {
-	const execution = state.execution;
-	if (!execution) return "";
-	const ticket = state.ticketId ? ` for ticket ${state.ticketId}` : "";
-	return `Long-execute is active${ticket}, with ${execution.turnsCompleted}/${execution.maxTurns} turns completed. Follow \`$SKILLS_ROOT/execute/SKILL.md\` and the current plan. End with \`READY FOR REVIEW\`, \`BLOCKED — <reason>\`, or exact final-line \`LONG EXECUTE CONTINUE\`. Do not use \`PENDING STEPS\` while safe implementation work remains.`;
-}
-
-function continuationContent(state: WorkflowState): string {
-	const execution = state.execution;
-	if (!execution) return "";
-	const ticket = state.ticketId ? `\nActive ticket: ${state.ticketId}` : "";
-	return `Continue long-execute for the same plan.${ticket}
-Turns completed: ${execution.turnsCompleted}/${execution.maxTurns}
-
-Re-read \`$SKILLS_ROOT/execute/SKILL.md\` and the current plan checklist, then take the next safe implementation or verification step. Verify completed items against the repository and run relevant checks before declaring completion.
-
-Use one terminal label:
-- \`READY FOR REVIEW\`
-- \`BLOCKED — <reason>\`
-- \`LONG EXECUTE CONTINUE\`
-
-Do not use \`PENDING STEPS\` while safe work remains. The continue marker must be the entire final line exactly: \`LONG EXECUTE CONTINUE\`.`;
 }
 
 function emitContinuation(pi: ExtensionAPI, state: WorkflowState): void {
@@ -304,10 +255,10 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		const details = message.details as RuntimeEventDetails | undefined;
 		const eventState = details?.state;
 		const execution = eventState?.execution;
-		const progress = execution ? ` · next turn ${execution.turnsCompleted + 1}/${execution.maxTurns}` : "";
+		const progress = execution ? ` · next turn ${execution.turnsCompleted + 1}` : "";
 		if (!expanded) {
 			return new Text(
-				`${theme.fg("customMessageLabel", theme.bold("Workflow"))}${theme.fg("dim", " · ")}${theme.fg("customMessageText", `Long execute continuing${progress}`)} ${theme.fg("dim", `(${keyHint("app.tools.expand", "to expand")})`)}`,
+				`${theme.fg("customMessageLabel", theme.bold("Workflow"))}${theme.fg("dim", " · ")}${theme.fg("customMessageText", `Focus continuing${progress}`)} ${theme.fg("dim", `(${keyHint("app.tools.expand", "to expand")})`)}`,
 				0,
 				0,
 			);
@@ -364,6 +315,36 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		},
 	});
 
+	pi.registerTool({
+		name: "end_focus",
+		label: "End Focus",
+		description: "End active focus mode after the work is completed or blocked.",
+		promptSnippet: "End focus mode with an outcome and concise summary",
+		promptGuidelines: [
+			"When focus mode is active, call end_focus only after the requested work is implemented and verified, or when progress requires user input or an external dependency.",
+			"Do not call end_focus merely to report progress while actionable work remains.",
+		],
+		parameters: Type.Object({
+			outcome: Type.Union([Type.Literal("completed"), Type.Literal("blocked")]),
+			summary: Type.String({ minLength: 1, description: "Concise completion summary or blocker explanation" }),
+		}),
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+			if (!state.execution) throw new Error("Focus mode is not active.");
+			const result = transition(state, { type: "end-focus" });
+			state = setState(pi, ctx, result.state);
+			ctx.ui.notify(`Focus mode ended: ${params.outcome}.`, "info");
+			return {
+				content: [
+					{
+						type: "text",
+						text: `Focus mode ended with outcome ${params.outcome}. Give the user a final response now. Summary: ${params.summary}`,
+					},
+				],
+				details: { outcome: params.outcome, summary: params.summary },
+			};
+		},
+	});
+
 	pi.registerShortcut(ADVANCE_SHORTCUT, {
 		description: "Run the next workflow skill, or clear after commit, on double press",
 		handler: async (ctx) => {
@@ -413,26 +394,29 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		if (event.source === "extension") return { action: "continue" };
 
 		const skillName = extractSkill(event.text);
-		if (skillName === LONG_EXECUTE_SKILL) {
+		if (skillName === FOCUS_SKILL) {
 			const result = transition(state, {
-				type: "activate-long",
+				type: "activate-focus",
 				ticketId: extractSkillTicket(event.text) ?? ticketIdFrom(event.text),
 				runId: newRunId(),
 			});
 			state = setState(pi, ctx, { ...result.state, source: "input" });
-			ctx.ui.notify("Long-execute enabled.", "info");
+			ctx.ui.notify("Focus mode enabled.", "info");
 			return { action: "continue" };
 		}
 
 		const stepName = extractStep(event.text);
 		if (stepName) {
+			const interrupted = state.execution
+				? transition(state, { type: "ordinary-input" })
+				: { state, effects: [] as RuntimeEffect[] };
 			state = setState(pi, ctx, {
-				...state,
+				...interrupted.state,
 				activeStep: stepName,
 				ticketId: extractSkillTicket(event.text) ?? state.ticketId,
-				execution: undefined,
 				source: "input",
 			});
+			applyEffects(pi, ctx, () => state, interrupted.effects, continuationQueue);
 			return { action: "continue" };
 		}
 
@@ -444,19 +428,16 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		return { action: "continue" };
 	});
 
-	pi.on("agent_end", async (event, ctx) => {
+	pi.on("agent_end", async (_event, ctx) => {
 		if (!state.execution) return;
-		const result = transition(state, {
-			type: "agent-end",
-			finalAssistantLines: finalAssistantLines(event.messages),
-		});
+		const result = transition(state, { type: "agent-end" });
 		state = setState(pi, ctx, result.state);
 		applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
 	});
 
 	pi.on("before_agent_start", async (event) => {
 		let addition: string | undefined;
-		if (state.execution) addition = longExecuteContract(state);
+		if (state.execution) addition = focusContract(state);
 		else if (state.ticketId) addition = `Active workflow ticket: ${state.ticketId}`;
 		if (!addition) return;
 		return { systemPrompt: `${event.systemPrompt}\n\n${addition}` };
@@ -482,7 +463,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_shutdown", async () => {
-		syncLexPulse(false);
+		syncFocusPulse(false);
 		activeTui = undefined;
 	});
 }

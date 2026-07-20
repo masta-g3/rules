@@ -61,7 +61,7 @@ Pi-only subagents live in `pi/agents/` and overlay into `~/.pi/agent/agents/` af
 
 Pi-only skills live in `pi/skills/` and overlay into `~/.pi/agent/skills/` after the shared `skills/` sync. Use this only for skills that depend on Pi runtime behavior and should not appear in Claude, Cursor, or Codex skill roots.
 
-`pi/skills/long-execute` provides `/skill:long-execute <ticket-id>` for approved implementation plans that may need multiple bounded turns. It delegates implementation behavior to `execute`, while `extensions/workflow-runtime/` owns workflow state, the pulsing `LEX ✦` / `LEX ✧` rail, and guarded continuation delivery. An exact final-line `LONG EXECUTE CONTINUE` produces a compact, expandable continuation event; review readiness, blockers, missing markers, manual user input, or the six-turn limit stop the run. Compaction preserves an active run, but reload, restart/resume, new session, and fork require explicit reinvocation.
+`pi/skills/focus` provides `/skill:focus <ticket-id>` for autonomous work on an approved plan, feature, or task. It delegates implementation behavior to `execute`, while `extensions/workflow-runtime/` owns workflow state, the pulsing `FOC ✦` / `FOC ✧` rail, and guarded continuation delivery. Every completed turn automatically produces a compact, expandable continuation event reminding the agent to re-read the active plan when one exists and keep working; there is no turn limit or response marker. The agent ends the loop by calling `end_focus` with a `completed` or `blocked` outcome and summary. Manual user input also stops focus mode, compaction preserves it, and reload, restart/resume, new session, or fork requires explicit reinvocation.
 
 `extensions/skill-thinking.ts` reads `metadata.thinkingLevel` from workflow skill frontmatter for typed `/skill:<name>` commands, sets Pi's thinking level for that turn, and restores the previous level when the turn ends. Without the extension installed, the metadata is inert; non-Pi harnesses ignore it.
 
@@ -69,7 +69,7 @@ Pi-only skills live in `pi/skills/` and overlay into `~/.pi/agent/skills/` after
 
 Current Pi-specific extension work also includes a minimalist workflow rail that highlights the active tracked-work skill step inside Pi:
 
-`next-feature → plan-md → execute → review → reflect → commit`
+`prime → plan-md → execute → review → reflect → commit`
 
 This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the most recently invoked workflow step, not authoritative feature completion state.
 

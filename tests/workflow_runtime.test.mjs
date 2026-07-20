@@ -2,16 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  continuationContent,
   createContinuationQueue,
+  focusContract,
   transition,
   WORKFLOW_STEPS,
 } from "../extensions/workflow-runtime/core.ts";
 
-const CONTINUE_MARKER = "LONG EXECUTE CONTINUE";
-
-test("canonical workflow includes the optional prime step", () => {
+test("the progress rail excludes ticket selection but keeps optional prime", () => {
   assert.deepEqual(WORKFLOW_STEPS, [
-    "next-feature",
     "prime",
     "plan-md",
     "execute",
@@ -23,64 +22,66 @@ test("canonical workflow includes the optional prime step", () => {
 
 const activeState = (overrides = {}) => ({
   activeStep: "execute",
-  ticketId: "long-execute-002",
+  ticketId: "focus-001",
   execution: {
-    mode: "long",
+    mode: "focus",
     runId: "run-1",
     turnsCompleted: 0,
-    maxTurns: 6,
     ...overrides,
   },
 });
 
-test("activates long execution with one workflow state", () => {
+test("activates focus mode with one workflow state", () => {
   const result = transition(
     { activeStep: "plan-md", ticketId: "existing-001" },
-    { type: "activate-long", ticketId: "long-execute-002", runId: "run-1" },
+    { type: "activate-focus", ticketId: "focus-001", runId: "run-1" },
   );
 
   assert.deepEqual(result.effects, []);
   assert.deepEqual(result.state, activeState());
 });
 
-test("continues only when the marker is the final non-empty line", () => {
-  const result = transition(activeState(), {
-    type: "agent-end",
-    finalAssistantLines: ["Summary: phase complete", CONTINUE_MARKER],
-  });
+test("focus reminders preserve the plan, task, ticket, and exit contract", () => {
+  const state = activeState({ turnsCompleted: 4 });
+
+  for (const content of [focusContract(state), continuationContent(state)]) {
+    assert.match(content, /active plan document if one exists/);
+    assert.match(content, /feature or task the user provided/);
+    assert.match(content, /end_focus/);
+    assert.match(content, /completed/);
+    assert.match(content, /blocked/);
+  }
+
+  assert.match(focusContract(state), /ticket focus-001/);
+  assert.match(continuationContent(state), /Active ticket: focus-001/);
+  assert.match(continuationContent(state), /Turns completed: 4/);
+});
+
+test("every completed focus turn continues automatically", () => {
+  const result = transition(activeState(), { type: "agent-end" });
 
   assert.equal(result.state.execution.turnsCompleted, 1);
   assert.deepEqual(result.effects, [{ kind: "continue", runId: "run-1" }]);
-
-  const missing = transition(activeState(), {
-    type: "agent-end",
-    finalAssistantLines: [CONTINUE_MARKER, "extra text"],
-  });
-  assert.equal(missing.state.execution, undefined);
-  assert.deepEqual(missing.effects, [{ kind: "notify-stop", reason: "missing-marker" }]);
 });
 
-test("stop labels override a later continuation marker", () => {
-  for (const label of ["READY FOR REVIEW", "NEEDS USER", "PENDING STEPS", "BLOCKED — credentials required"]) {
-    const result = transition(activeState(), {
-      type: "agent-end",
-      finalAssistantLines: [label, CONTINUE_MARKER],
-    });
+test("focus mode has no turn limit", () => {
+  let state = activeState();
 
-    assert.equal(result.state.execution, undefined, label);
-    assert.equal(result.effects[0].kind, "notify-stop", label);
-    assert.equal(result.effects[0].reason, label === "READY FOR REVIEW" ? "ready" : "blocked", label);
+  for (let turn = 1; turn <= 100; turn += 1) {
+    const result = transition(state, { type: "agent-end" });
+    assert.equal(result.state.execution.turnsCompleted, turn);
+    assert.deepEqual(result.effects, [{ kind: "continue", runId: "run-1" }]);
+    state = result.state;
   }
 });
 
-test("the sixth completed turn stops without queueing a seventh", () => {
-  const result = transition(activeState({ turnsCompleted: 5 }), {
-    type: "agent-end",
-    finalAssistantLines: [CONTINUE_MARKER],
-  });
+test("the explicit focus exit preserves workflow context", () => {
+  const result = transition(activeState({ turnsCompleted: 3 }), { type: "end-focus" });
 
-  assert.equal(result.state.execution, undefined);
-  assert.deepEqual(result.effects, [{ kind: "notify-stop", reason: "limit" }]);
+  assert.deepEqual(result, {
+    state: { activeStep: "execute", ticketId: "focus-001" },
+    effects: [],
+  });
 });
 
 test("all compaction reasons preserve state and produce no effects", () => {
@@ -91,12 +92,12 @@ test("all compaction reasons preserve state and produce no effects", () => {
   }
 });
 
-test("ordinary input stops execution but preserves workflow context", () => {
+test("ordinary input stops focus mode but preserves workflow context", () => {
   const result = transition(activeState({ turnsCompleted: 2 }), { type: "ordinary-input" });
 
   assert.deepEqual(result.state, {
     activeStep: "execute",
-    ticketId: "long-execute-002",
+    ticketId: "focus-001",
   });
   assert.deepEqual(result.effects, [{ kind: "notify-stop", reason: "user-interruption" }]);
 });
@@ -105,7 +106,7 @@ test("session boundaries never restore an active dormant run", () => {
   for (const reason of ["startup", "reload", "resume"]) {
     const result = transition(activeState({ turnsCompleted: 2 }), { type: "session-boundary", reason });
     assert.equal(result.state.execution, undefined, reason);
-    assert.equal(result.state.ticketId, "long-execute-002", reason);
+    assert.equal(result.state.ticketId, "focus-001", reason);
     assert.deepEqual(result.effects, [{ kind: "notify-stop", reason: "session-boundary" }], reason);
   }
 
@@ -115,10 +116,10 @@ test("session boundaries never restore an active dormant run", () => {
     assert.deepEqual(result.effects, [{ kind: "notify-stop", reason: "session-boundary" }], reason);
 
     const inactive = transition(
-      { activeStep: "review", ticketId: "long-execute-002" },
+      { activeStep: "review", ticketId: "focus-001" },
       { type: "session-boundary", reason },
     );
-    assert.deepEqual(inactive, { state: {}, effects: [] }, `${reason} without active execution`);
+    assert.deepEqual(inactive, { state: {}, effects: [] }, `${reason} without active focus mode`);
   }
 });
 

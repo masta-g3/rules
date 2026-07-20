@@ -44,11 +44,15 @@ class SyncPromptsTest(unittest.TestCase):
 
         for clean_arg in ([], ["--clean"]):
             with self.subTest(mode="clean" if clean_arg else "default"), tempfile.TemporaryDirectory() as home:
-                extensions = Path(home) / ".pi" / "agent" / "extensions"
+                pi_root = Path(home) / ".pi" / "agent"
+                extensions = pi_root / "extensions"
                 extensions.mkdir(parents=True)
                 (extensions / "workflow-indicator.ts").write_text("legacy indicator")
                 (extensions / "long-execute.ts").write_text("legacy controller")
                 (extensions / "user-extension.ts").write_text("keep me")
+                old_skill = pi_root / "skills" / "long-execute"
+                old_skill.mkdir(parents=True)
+                (old_skill / "SKILL.md").write_text("legacy skill")
 
                 env = {**os.environ, "HOME": home}
                 subprocess.run(
@@ -63,6 +67,8 @@ class SyncPromptsTest(unittest.TestCase):
                 self.assertFalse((extensions / "workflow-indicator.ts").exists())
                 self.assertFalse((extensions / "long-execute.ts").exists())
                 self.assertEqual((extensions / "user-extension.ts").read_text(), "keep me")
+                self.assertTrue((pi_root / "skills" / "focus" / "SKILL.md").is_file())
+                self.assertFalse(old_skill.exists())
 
 
 if __name__ == "__main__":
