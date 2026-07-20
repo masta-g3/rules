@@ -22,7 +22,7 @@ Update durable documentation and agent guidance after implementation has passed 
 5. Keep updates concise and factual. Prefer editing, replacing, or deleting stale text over appending; do not grow docs unless the new guidance will change future behavior.
 6. Update `CONTEXT.md` only when project meaning, audience, stage, assumptions, or terminology changes; do not add implementation summaries, change history, or general programming terms.
 7. Docs should describe the current state of the product/system, not the history of how it changed; avoid backward-compatibility, migration, or "previously..." notes unless they affect a real public contract or operator action.
-8. For non-trivial durable doc/guidance edits, invoke the `docs-critic` subagent once to check clarity, fit, and whether the additions are truly durable. Skip when there are no edits or only tiny mechanical fixes such as typos, links, paths, or formatting. Fix only clear issues; deletion is acceptable when the critique shows the update is not worth keeping.
+8. For non-trivial durable doc/guidance edits, invoke the `docs-critic` subagent once to check clarity, fit, and whether the additions are truly durable. Skip when there are no edits or only tiny mechanical fixes such as typos, links, paths, or formatting. Deletion is acceptable when the critique shows the update is not worth keeping.
 9. Treat project-local `AGENTS.md` as compact task-execution guardrails, not an append-only memory log: before adding a rule, edit, merge, tighten, move to `docs/STRUCTURE.md`, or delete existing guidance first. Add a new short actionable bullet only when no existing rule can carry guidance whose absence would cause dead ends or repeated mistakes.
 10. If no durable update is needed, make no edits.
 

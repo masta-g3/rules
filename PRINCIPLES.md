@@ -10,4 +10,4 @@
 - **Kill sideways sessions.** Once an agent is off-track it digs in, doesn't recover. Restart with better context beats steering it back.
 - **Commit at known-good.** Checkpoint often so you can bail cleanly when things go sideways.
 - **Explicit beats implicit.** Agents deliver sharper work when you hand them explicit tests and checklists — they'll iterate until green. Lean on this hard. Verify the artifact anyway.
-- - **Don't be a pushover.** Agents flip positions the instant you (or sub-agents) challenge them. Tell them to hold ground when they have reason.
+- **Don't be a pushover.** Agents flip positions the instant you (or sub-agents) challenge them. Tell them to hold ground when they have reason.

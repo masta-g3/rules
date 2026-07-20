@@ -13,9 +13,8 @@ Verify correctness, minimal surface area, and reuse of existing patterns. Flag s
 
 1. Identify the files changed during implementation. Exclude commit-step artifacts (plan archival and `agent-work/features.yaml` completion updates), but include explicitly planned documentation deliverables.
 2. Read them and verify against the task: does the change solve it, did the plan's verification steps actually run and pass, and did scope stay within the plan? Ask whether the same task could have been solved with a simpler, smaller change — flag scope creep, plan overreach, or edits that widen the impact surface.
-3. Check session and `agent-work` hygiene: temporary test scripts, generated outputs, scratch files, and `agent-work` artifacts that are not needed for active plans, review, reproduction, evidence, requested decks, or archived history.
+3. Check session and `agent-work` hygiene per the AGENTS.md artifact retention rules.
 4. For non-trivial changes, invoke the `code-critic` reviewer subagent once with the assembled file list and the plan path. Craft review (bloat, unnecessary abstractions, broad `try/except`, silent fallbacks, pattern drift, debug residue, scaffold tests) is primarily its lane — do a light pass yourself rather than duplicating it. For trivial changes where the critic is skipped, cover those craft checks yourself.
-5. Fix only clear, high-impact issues reported by the subagent. Ignore low-confidence or out-of-scope feedback; re-run only after material changes.
 
 ### Boundaries
 

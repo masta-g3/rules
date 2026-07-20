@@ -1,6 +1,6 @@
 ---
 name: plan-critic
-description: Reviews implementation plans for approach, architecture, reuse, and scope. Invoked after plan creation to catch issues before implementation.
+description: Reviews implementation plans for approach, architecture, reuse, and scope. Invoked by the plan-md skill after plan creation to catch issues before implementation.
 model: openai-codex/gpt-5.6-sol
 thinking: high
 tools: read, grep, find, bash

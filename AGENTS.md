@@ -3,6 +3,7 @@
 Write for a reader who skims: assume they read the first line, glance at the structure, and little else. The first line carries the answer — or, when the answer is an action, the action itself (command, path, snippet); context after, if at all. No preamble, filler, restatement, apologies, or closing pleasantries.
 - Err short. Cut anything that doesn't change what the reader does next. A few sentences of causal reasoning at most, unless explicitly asked to explain — then go long, with headers to skim back by.
 - Full sentences, matter-of-fact tone. No dramatic phrasing, canned setups, or formulaic conclusions. Errors: cause, then fix.
+- Write for a reader who didn't watch the work happen: no session dialect — invented codenames, subagent nicknames, or shorthand coined mid-session ("Fixer 4 is home"). Spell out what changed in plain project terms.
 - Number multi-step work as bounded single actions. Restate position each turn ("step 3 of 5 done; next: backfill"). If anything is left open, end with one concrete next action.
 - One topic at a time: finish the current issue; offer tangents as a separate follow-up question. Cap lists at 5 — past that, split into now vs. later.
 - Estimate effort in concrete units ("~15 min", "an afternoon"), never vaguely. Report completed work concretely, with how to see it working.
@@ -14,6 +15,7 @@ Write for a reader who skims: assume they read the first line, glance at the str
 - Check `docs/STRUCTURE.md` to understand project organization; if missing, continue without it.
 - Keep `docs/STRUCTURE.md` current as an onboarding guide for new developers: project purpose, architecture, directory layout, key files/modules, design patterns, and how to run/build. Describe components and areas, not every file — it is a practical guide, not a full file index.
 - Before adding code, inspect the existing structure and similar solutions.
+- For unfamiliar or resumed work, also check recent git history and `agent-work/history` before planning; scout cross-cutting tasks with parallel read-only subagents.
 - When working with Python, always use the `uv` tool for dependency management and virtual environments.
 
 ## Collaboration and Codebase Workflow
@@ -71,12 +73,11 @@ Use `agent-work/tickets/<feature-id>/` sparingly:
 - Persist only artifacts needed after the turn for review, reproduction, or evidence. Consolidate text into a single `notes.md` or `validation.md` instead of many small files.
 - Before handoff or commit, delete obsolete ticket artifacts or state why the remaining artifacts are worth keeping.
 
-User-driven skill workflow (do not advance automatically; stay within the current step):
-`next-feature` → `plan-md` → `execute` → `review` → `reflect` → `commit`
+User-driven skill workflow: `next-feature` → `plan-md` → `execute` → `review` → `reflect` → `commit`
 
-`prime` is an optional repository-orientation utility for unfamiliar, resumed, or cross-cutting work. It is not a required workflow stage.
+Each workflow step ends your turn: finish the invoked step, report, and stop for user feedback. Never invoke the next workflow skill or do its work uninvoked — `READY FOR <STEP>` labels tell the user what to invoke next, not you. Chain steps only when the user explicitly asked for it in their request (e.g., "plan and execute this").
 
-The critic subagents (`plan-critic`, `code-critic`, `docs-critic`) target Codex/Pi bridges; invoked from a Claude Code session they may run zero tools and return empty or fabricated findings. Confirm a critic result reflects the real files (or rerun the critique via a general-purpose agent with the criteria inlined) before trusting it.
+When acting on critic feedback (`plan-critic`, `code-critic`, `docs-critic`): fix only clear, high-impact issues; ignore nits, low-confidence, or out-of-scope suggestions; re-run only after material changes. Discard any critic result that clearly did not read the real files.
 
 ### agent-work/features.yaml schema
 

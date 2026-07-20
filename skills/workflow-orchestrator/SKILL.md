@@ -1,6 +1,6 @@
 ---
 name: workflow-orchestrator
-description: Parent-controlled ticket workflow automation using persistent subagents, with single-ticket, backlog/epic sweep, and parallel isolated-worktree modes.
+description: Parent-controlled ticket workflow automation using persistent subagents, one ticket at a time or in parallel isolated worktrees.
 metadata:
   thinkingLevel: medium
 ---
@@ -21,7 +21,6 @@ The parent agent remains the orchestrator. Subagents execute exactly one workflo
   - optional allowlisted nested specialist launches from the child, when the phase skill or parent prompt explicitly calls for them;
   - stopping the child when the ticket is complete or blocked.
 - A clean or understood git worktree before starting each ticket.
-- For parallel ticket execution, isolated git worktrees and one branch per ticket.
 - `$SKILLS_ROOT` set for helper commands, e.g. Pi: `export SKILLS_ROOT="$HOME/.pi/agent/skills"`.
 
 ## Core rule
@@ -34,11 +33,7 @@ plan-md → execute → review → reflect → commit
 
 After each child response, the parent inspects the output, changed files, git status, and handoff label before deciding the next phase.
 
-`prime` is an optional repository-orientation utility, not an automated workflow phase. Invoke it separately only when the user requests orientation or an unusually unclear, resumed, or cross-cutting ticket needs a dedicated research pass before planning.
-
-## Modes
-
-### Mode A — One ticket
+## Ticket flow
 
 Use when the user names a ticket or asks to try the automation on the next ticket.
 
@@ -56,56 +51,11 @@ Use when the user names a ticket or asks to try the automation on the next ticke
 5. Stop the child after completion or blockage.
 6. Report only the final outcome unless the user asked for live updates or a stop condition occurs.
 
-### Mode B — Sweep epic or backlog
+To process several tickets, repeat this mode per next actionable feature (new child per ticket) within the boundary the user set — epic prefix, ticket count, or stop-on-first-failure — then summarize completed, blocked, and remaining work.
 
-Use when the user asks to process an epic or all actionable work.
+## Parallel tickets
 
-1. Confirm or infer the sweep boundary:
-   - specific epic prefix, e.g. `ux`;
-   - all currently actionable features;
-   - maximum ticket count;
-   - time/cost limit;
-   - stop after first failure.
-2. Repeatedly select the next feature with the helper. Respect dependencies and in-progress work.
-3. For each selected ticket, run Mode A from planning through commit with a new persistent child.
-4. Do not provide progress updates between tickets unless requested. Continue until:
-   - the requested ticket/epic/backlog boundary is complete;
-   - no actionable features remain;
-   - the ticket/time/cost limit is reached;
-   - a stop condition occurs.
-5. At the stopping point, summarize tickets completed, commits, skipped/blocked tickets, and the next recommended action.
-
-### Mode C — Parallel tickets with isolated worktrees
-
-Use when the user explicitly asks to try parallel ticket work or to maximize throughput across independent actionable tickets.
-
-Never run two writable ticket agents in the same checkout. Parallel execution requires one git worktree, one branch, and one persistent child per ticket.
-
-1. Choose tickets that are currently actionable and do not depend on each other. Do not pull blocked or dependent tickets forward just to hit a requested concurrency count.
-2. If fewer independent tickets are ready than the requested parallel count, either run the smaller ticket set or use the spare slot for a read-only advisory/design/research subagent whose output is fed into relevant ticket phases.
-3. Verify the main worktree is safe. Known ignored/untracked local artifacts are acceptable; unrelated tracked changes are a stop condition unless the user approves them.
-4. Create isolated worktrees from the same base commit:
-   ```text
-   git worktree add -b agent/<ticket-id> <repo>.worktrees/<ticket-id> HEAD
-   ```
-5. Launch one persistent child per worktree with `cwd` set to that worktree and `autoStopOnComplete: false`. Enable nested specialists only with a narrow allowlist appropriate for the ticket/phase.
-6. Include a worktree boundary in every child prompt:
-   - work only in `<repo>.worktrees/<ticket-id>` on branch `agent/<ticket-id>`;
-   - do not touch the main checkout or sibling worktrees;
-   - commit locally on the ticket branch only;
-   - do not push, merge, or clean up worktrees.
-7. Advance each child through the normal phase gates independently. Parallelize waits/sends when possible, but inspect each completed phase before advancing that ticket.
-8. If advisory/design output is required, launch it read-only from the parent and pass its result path into the affected ticket execute/review prompts.
-9. After all selected tickets reach `WORKFLOW COMPLETE`, stop the children.
-10. Merge back sequentially under parent control:
-   - fast-forward or merge the first completed branch into main;
-   - rebase each remaining ticket branch onto updated main in its own worktree;
-   - if rebase/merge conflicts are mechanical and within scope, resolve and validate; otherwise stop for the user;
-   - merge each rebased branch into main;
-   - run full validation from main.
-11. Remove worktrees and delete merged ticket branches only after main validation passes.
-
-Expected conflicts are usually in `agent-work/features.yaml`, shared docs, tests, exports, and content indexes. Worktree isolation prevents runtime races, but the parent still owns merge order and conflict resolution.
+Only when the user explicitly asks to run independent tickets in parallel, follow `references/parallel-worktrees.md` in this skill directory: worktree isolation, prompt boundaries, extra inspection gates, and the merge-back procedure.
 
 ## Preferred `tmux_subagent` control path
 
@@ -145,8 +95,6 @@ Each phase prompt to the child must include:
 - required final label;
 - whether nested specialist subagents are allowed for this phase, the allowed agent names, and the requirement to report nested agent used/skipped, job ID/result path, and feedback accepted/rejected.
 
-For Mode C, also include the exact worktree path, branch name, and instruction not to touch the main checkout or sibling worktrees.
-
 Example phase boundary:
 
 ```text
@@ -166,8 +114,7 @@ Before advancing, the parent checks:
 - `git status --short` has only expected files plus known ignored/local artifacts;
 - validation evidence is adequate for the phase;
 - hardware/domain claims follow project rules;
-- commit phase produced a commit hash and left no staged ticket files;
-- in Mode C, the commit landed only on the child ticket branch and was not pushed or merged by the child.
+- commit phase produced a commit hash and left no staged ticket files.
 
 If the label is missing or inconsistent, inspect the child transcript/result before proceeding.
 
@@ -182,7 +129,7 @@ Stop the workflow and notify the user when:
 - parent inspection suggests the work rests on unresolved product/design ambiguity or no longer matches the approved plan/user intent;
 - the child drifts outside the requested phase;
 - a persistent subagent cannot be launched, resumed, inspected, or stopped reliably;
-- the sweep boundary or user-defined limit is reached.
+- the requested ticket boundary or user-defined limit is reached.
 
 Do not stop just to provide routine progress updates.
 
@@ -196,7 +143,6 @@ Do not require every child to report availability for unrelated tools. Ask about
 
 - Use one persistent child per ticket.
 - Reuse that child for every phase of that ticket via `send(..., wait: true)` when available.
-- In Mode C, bind each child to its worktree with the `cwd` launch parameter and repeat the worktree boundary in every follow-up prompt.
 - Kill/stop the child after `WORKFLOW COMPLETE`, `BLOCKED`, `FAILED`, or unsafe drift.
 - Do not let children orchestrate tickets or workflow phases through nested subagents.
 - Children may launch only explicitly allowed nested specialist agents for the current phase. Nested agents must not stage, commit, merge, push, or modify files unless the phase prompt explicitly allows it.
@@ -204,7 +150,7 @@ Do not require every child to report availability for unrelated tools. Ask about
 
 ## Final output
 
-For one-ticket mode, report:
+Report:
 
 - ticket ID;
 - final status;
@@ -212,17 +158,4 @@ For one-ticket mode, report:
 - validation summary;
 - blocked question or follow-up if any.
 
-For sweep mode, report:
-
-- completed ticket IDs and commit hashes;
-- stopped/skipped/blocked tickets and reasons;
-- remaining actionable count or next recommended ticket;
-- whether the stop was normal boundary completion or needs user input.
-
-For parallel worktree mode, also report:
-
-- worktree paths and branch names used;
-- per-ticket child/job IDs if useful for inspection;
-- per-branch commit hashes before merge and final main commit hashes after merge/rebase;
-- merge/rebase conflicts, resolutions, and final validation;
-- whether worktrees/branches were cleaned up.
+For multi-ticket runs, also report completed ticket IDs with commit hashes, blocked/skipped tickets with reasons, and the next recommended ticket.

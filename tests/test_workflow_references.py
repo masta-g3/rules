@@ -9,11 +9,10 @@ AUTOPILOT = REPO_ROOT / "experimental" / "autopilot"
 
 
 class WorkflowReferencesTest(unittest.TestCase):
-    def test_autopilot_starts_at_planning_without_prime(self) -> None:
+    def test_autopilot_starts_at_planning(self) -> None:
         source = (AUTOPILOT / "scripts" / "start_workflow.sh").read_text()
 
         self.assertIn('--arg next "/plan-md"', source)
-        self.assertNotIn('--arg next "/prime"', source)
 
     def test_autopilot_routes_reflection_before_commit(self) -> None:
         reference = (AUTOPILOT / "WORKFLOW.md").read_text()

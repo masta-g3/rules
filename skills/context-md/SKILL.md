@@ -25,6 +25,8 @@ Build a concise understanding of what the repo appears to be, who it serves, its
 
 Do not treat code-inferred purpose, audience, or stage as final truth.
 
+For a brand-new project with no code to investigate (e.g. invoked from `project-init`), skip repo exploration and build the hypothesis from the user's project description and session context.
+
 ### 2. Present Context Hypothesis
 
 Before interviewing, summarize:
@@ -43,7 +45,7 @@ Label uncertain claims as assumptions.
 
 ### 3. Alignment Checkpoint
 
-Use the user ask tool to ask whether the hypothesis is broadly right before continuing:
+Use the ask-user tool to ask whether the hypothesis is broadly right before continuing:
 
 - **Mostly right** → run a gap-filling interview focused on missing, uncertain, or high-impact details.
 - **Partly wrong** → ask the user to correct the core misunderstanding first, then continue with a targeted interview.
@@ -53,25 +55,9 @@ Do not proceed to write `CONTEXT.md` until the user confirms the working framing
 
 ### 4. Context Interview
 
-Use the user ask tool to confirm assumptions and fill gaps. Ask as many rounds as needed, but avoid one giant questionnaire; prefer focused batches of 3-4 questions. For unclear projects, expect a substantial interview, but stop when the durable context is clear.
+Interview as in `plan-md`: one decision question at a time, each with your recommended answer based on repo evidence and a one-line rationale; wait for feedback before the next. Resolve dependent topics in order — purpose → target user → project type/stage → success criteria → out of scope → operating assumptions → terminology (including synonyms agents should avoid and what should not be documented even if visible in code).
 
-Cover:
-
-1. What the project is
-2. Why it exists
-3. What success looks like
-4. Primary and secondary users
-5. Project type
-6. Project stage / maturity / usage context
-7. What is explicitly out of scope
-8. Durable constraints and operating assumptions
-9. Domain concepts and relationships
-10. Project-specific terminology
-11. Synonyms or framings agents should avoid
-12. What should not be documented even if visible in code
-13. Strategic or product truths not inferable from the repo
-
-When useful, include the recommended answer based on repo evidence and ask the user to confirm or correct it.
+Ask only what the repo and the alignment checkpoint could not resolve; skip topics the user already confirmed. Stop when durable context is clear, not when the topic chain is exhausted.
 
 Do not write `CONTEXT.md` until project meaning, audience, type, stage, assumptions, and terminology are clear enough.
 

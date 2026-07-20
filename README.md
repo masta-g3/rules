@@ -22,8 +22,6 @@ For projects with backlog tracking via `agent-work/features.yaml`:
 
 `project-init` → `next-feature` → `plan-md` → `execute` → `review` → `reflect` → `commit`
 
-`prime` remains available as an optional orientation utility before planning when a task is unfamiliar, resumed, or cross-cutting; it is not required for routine work.
-
 Plan file naming indicates tracked vs standalone work: `auth-001.md` = tracked feature, `DARK_MODE.md` = standalone. Creating a plan keeps tracked work `pending`; `execute` moves it to `in_progress`; `commit` moves it to `done` after `reflect` handles durable documentation updates.
 
 Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, active plans in `plans/`, archives in `history/`, generated HTML explainers in `decks/`, sparse ticket-local evidence or reproduction assets in `tickets/`, and repo-specific planning or scratchpad areas when needed. Durable documentation remains in `docs/`.
@@ -34,18 +32,17 @@ Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, a
 |---------|---------|
 | `skills/project-init` | Initialize project with agent-work/features.yaml |
 | `skills/context-md` | Create or refresh root CONTEXT.md |
-| `skills/workflow-migrate` | Prepare explicit old-layout to agent-work migration plans |
 | `skills/epic-init` | Initialize new epic with features |
 | `skills/ticket-init` | Canonical ticket creation for agent-work/features.yaml |
 | `skills/next-feature` | Select next ready feature |
-| `skills/prime` | Optional deep repository orientation for unfamiliar, resumed, or cross-cutting work |
 | `skills/plan-md` | Create implementation plan |
 | `skills/execute` | Implement with baseline verification |
 | `skills/explain-html` | Create self-contained HTML technical explainers |
+| `skills/answer-style` | Reshape a response to the AGENTS.md communication style |
 | `skills/review` | Review finished work before reflection and commit |
 | `skills/reflect` | Update durable docs and agent guidance after review |
 | `skills/commit` | Archive plan, finalize tracked work, commit |
-| `skills/workflow-orchestrator` | Parent-gated persistent-subagent automation for one ticket or epic/backlog sweeps |
+| `skills/workflow-orchestrator` | Parent-gated persistent-subagent automation, per ticket or in parallel worktrees |
 | `skills/test-coverage` | Analyze test coverage |
 | `skills/docs-health` | Assess durable documentation health |
 
@@ -69,11 +66,16 @@ Pi-only skills live in `pi/skills/` and overlay into `~/.pi/agent/skills/` after
 
 Current Pi-specific extension work also includes a minimalist workflow rail that highlights the active tracked-work skill step inside Pi:
 
-`prime → plan-md → execute → review → reflect → commit`
+`plan-md → execute → review → reflect → commit`
 
 This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the most recently invoked workflow step, not authoritative feature completion state.
 
-If you invoke a workflow skill with an explicit ticket immediately after the skill name, such as `/skill:plan-md engine-003`, the rail remembers that ticket, shows it beside the active step, and injects `Active workflow ticket: engine-003` into later turns until cleared. Use `/wf-ticket <ticket-id>` to set or override the active ticket manually; this also activates the same ticket context even before a workflow step is visible in the rail. Use `/wf-clear` to clear both the rail and the active ticket. Double-press `ctrl+shift+right` within the Pi TUI to run the next workflow skill, including the active ticket when one is set; when the rail is already on `commit`, the same double-press clears the workflow indicator instead. The shortcut is ignored while Pi is busy or the editor contains unsent text. Forking a session clears the workflow indicator and ticket context in the fork.
+Ticket context and shortcuts:
+
+- Invoking a workflow skill with an explicit ticket (`/skill:plan-md engine-003`) makes the rail remember that ticket, show it beside the active step, and inject `Active workflow ticket: engine-003` into later turns until cleared.
+- `/wf-ticket <ticket-id>` sets or overrides the active ticket manually, even before a workflow step is visible in the rail. `/wf-clear` clears both the rail and the active ticket.
+- Double-press `ctrl+shift+right` to run the next workflow skill (with the active ticket when set); on `commit`, the same double-press clears the indicator instead. Ignored while Pi is busy or the editor contains unsent text.
+- Forking a session clears the workflow indicator and ticket context in the fork.
 
 ## Shared Helper Tooling
 
@@ -180,9 +182,10 @@ Pytest is scoped to `tests/` via `pytest.ini`.
 
 ```bash
 ./sync-prompts.sh            # leaves Codex unprompted; copies workflow skills/subagents to Claude, Cursor, and Pi; overlays Pi-only skills/subagents/extensions into ~/.pi/agent
-./sync-prompts.sh --clean    # also removes stale synced files from synced target directories
 ./sync-prompts.sh --silent   # suppresses the sync summary
 ```
+
+Sync records what it deploys in per-directory `.rules-manifest-*` files and prunes repo-managed assets that were later deleted from the repo; user-installed skills, subagents, and extensions are never touched.
 
 Codex receives no `AGENTS.md`, skills, or subagents. Sync prunes repo-managed Codex prompt/workflow assets so Codex stays suitable for chat, browser-style research, and ad hoc tasks rather than tracked project workflow.
 
@@ -191,4 +194,5 @@ Sync also ensures `npm:pi-tmux-subagents` and `~/.pi/agent/skills` are listed in
 If `~/.claude/settings.json` exists, sync also refreshes the Claude statusline command.
 
 See `AGENTS.md` for coding style and behavioral guidelines.
+See `PRINCIPLES.md` for distilled principles on working with coding agents.
 See `docs/STRUCTURE.md` for project architecture.

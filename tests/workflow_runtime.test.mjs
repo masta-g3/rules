@@ -9,9 +9,8 @@ import {
   WORKFLOW_STEPS,
 } from "../extensions/workflow-runtime/core.ts";
 
-test("the progress rail excludes ticket selection but keeps optional prime", () => {
+test("the progress rail covers plan through commit", () => {
   assert.deepEqual(WORKFLOW_STEPS, [
-    "prime",
     "plan-md",
     "execute",
     "review",

@@ -1,4 +1,4 @@
-export const WORKFLOW_STEPS = ["prime", "plan-md", "execute", "review", "reflect", "commit"] as const;
+export const WORKFLOW_STEPS = ["plan-md", "execute", "review", "reflect", "commit"] as const;
 export type StepName = (typeof WORKFLOW_STEPS)[number];
 export type WorkflowSource = "input" | "command" | "shortcut" | "tool";
 

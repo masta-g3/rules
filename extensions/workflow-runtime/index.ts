@@ -32,7 +32,6 @@ const TOKENS = {
 } as const;
 
 const STEP_SHORT: Record<StepName, string> = {
-	prime: "PR",
 	"plan-md": "PL",
 	execute: "EX",
 	review: "RV",

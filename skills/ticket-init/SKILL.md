@@ -52,6 +52,4 @@ Title: {title}
 Priority: {priority}
 ```
 
----
-
-**Do not write down a plan or implement yet.** This command only registers work. Use `/plan-md` to plan and `/execute` to implement.
+**Boundary:** this command only registers work.

@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DELETE_FLAG=""
 SILENT=false
 
 for arg in "$@"; do
   case "$arg" in
-    --clean) DELETE_FLAG="--delete" ;;
     --silent|-q) SILENT=true ;;
   esac
 done
@@ -80,32 +78,6 @@ sync_dir() {
   collect_files "$src" "$category"
 
   local rsync_out
-  rsync_out=$(rsync -a --itemize-changes $DELETE_FLAG "$src" "$dst") || true
-
-  while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    local change_type="${line:0:1}"
-    local file=$(echo "$line" | awk '{print $2}')
-    local name=$(echo "$file" | cut -d/ -f1)
-    name=$(strip_ext "$name")
-    [[ "$name" == .* || "$name" == _* ]] && continue
-
-    if [[ "$change_type" == ">" ]]; then
-      if [[ "${line:1:1}" == "f" && "${line:3:1}" == "+" ]]; then
-        add_unique added_files[$category] "$name"
-      else
-        add_unique updated_files[$category] "$name"
-      fi
-    fi
-  done <<< "$rsync_out"
-}
-
-sync_overlay_dir() {
-  local src="$1" dst="$2" category="$3"
-  mkdir -p "$dst"
-  collect_files "$src" "$category"
-
-  local rsync_out
   rsync_out=$(rsync -a --itemize-changes "$src" "$dst") || true
 
   while IFS= read -r line; do
@@ -126,7 +98,53 @@ sync_overlay_dir() {
   done <<< "$rsync_out"
 }
 
-sync_claude_subagents() {
+# Record what this repo deploys into a target directory and prune previously
+# deployed entries that no longer exist in the repo. User-installed files are
+# never in the manifest, so they are never touched. Manifests are per-category
+# so overlaid directories (e.g. shared + Pi-only skills) coexist. Extra seed
+# args cover repo assets removed before manifests existed.
+prune_and_record() {
+  local src="$1" dst="$2" category="$3"
+  shift 3
+  local seed=("$@")
+  local manifest="${dst}.rules-manifest-${category}"
+  mkdir -p "$dst"
+
+  local current=() f base
+  for f in "$src"*; do
+    [[ -e "$f" ]] || continue
+    current+=("$(basename "$f")")
+  done
+
+  local known=("${seed[@]}")
+  if [[ -f "$manifest" ]]; then
+    while IFS= read -r base; do
+      [[ -n "$base" ]] && known+=("$base")
+    done < "$manifest"
+  fi
+
+  for base in "${known[@]}"; do
+    local stale=true
+    for f in "${current[@]}"; do
+      if [[ "$f" == "$base" ]]; then
+        stale=false
+        break
+      fi
+    done
+    if [[ "$stale" == true && -e "${dst}${base}" ]]; then
+      rm -rf "${dst:?}${base}"
+      add_unique all_files[$category] "$(strip_ext "$base")"
+      add_unique removed_files[$category] "$(strip_ext "$base")"
+    fi
+  done
+
+  : > "$manifest"
+  if (( ${#current[@]} > 0 )); then
+    printf '%s\n' "${current[@]}" > "$manifest"
+  fi
+}
+
+sync_sanitized_subagents() {
   local src="$1" dst="$2"
   local tmp
   tmp=$(mktemp -d)
@@ -136,7 +154,29 @@ sync_claude_subagents() {
     local base
     base=$(basename "$f")
     if [[ -f "$f" ]]; then
-      awk '!/^model:[[:space:]]*openai-codex\// && !/^thinking:[[:space:]]*/' "$f" > "${tmp}/${base}"
+      awk '
+        /^model:[[:space:]]*openai-codex\// { next }
+        /^thinking:[[:space:]]*/ { next }
+        /^tools:[[:space:]]*/ {
+          sub(/^tools:[[:space:]]*/, "")
+          n = split($0, raw, ",")
+          out = ""
+          for (i = 1; i <= n; i++) {
+            t = raw[i]
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", t)
+            if (t == "read") t = "Read"
+            else if (t == "grep") t = "Grep"
+            else if (t == "find") t = "Glob"
+            else if (t == "bash") t = "Bash"
+            else if (t == "edit") t = "Edit"
+            else if (t == "write") t = "Write"
+            out = out (i > 1 ? ", " : "") t
+          }
+          print "tools: " out
+          next
+        }
+        { print }
+      ' "$f" > "${tmp}/${base}"
     elif [[ -d "$f" ]]; then
       cp -R "$f" "${tmp}/${base}"
     fi
@@ -224,27 +264,32 @@ sync_file "${repo_root}/AGENTS.md" "${pi_root}/AGENTS.md" "agents_md"
 remove_repo_entries "${repo_root}/skills/" "${codex_root}/skills/" "codex_pruned"
 remove_repo_entries "${repo_root}/agents/" "${codex_root}/agents/" "codex_pruned"
 
+prune_and_record "${repo_root}/skills/" "${claude_root}/skills/" "skills" autopilot workflow-migrate prime
+prune_and_record "${repo_root}/skills/" "${cursor_root}/skills/" "skills" autopilot workflow-migrate prime
+prune_and_record "${repo_root}/skills/" "${pi_root}/skills/" "skills" autopilot workflow-migrate prime
 sync_dir "${repo_root}/skills/" "${claude_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${cursor_root}/skills/" "skills"
 sync_dir "${repo_root}/skills/" "${pi_root}/skills/" "skills"
 
-sync_claude_subagents "${repo_root}/agents/" "${claude_root}/agents/"
-sync_dir "${repo_root}/agents/" "${cursor_root}/agents/" "subagents"
+prune_and_record "${repo_root}/agents/" "${claude_root}/agents/" "subagents"
+prune_and_record "${repo_root}/agents/" "${cursor_root}/agents/" "subagents"
+prune_and_record "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
+sync_sanitized_subagents "${repo_root}/agents/" "${claude_root}/agents/"
+sync_sanitized_subagents "${repo_root}/agents/" "${cursor_root}/agents/"
 sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
-sync_overlay_dir "${repo_root}/pi/agents/" "${pi_root}/agents/" "pi_subagents"
-remove_path "${pi_root}/skills/long-execute" "pi_skills" "long-execute"
-sync_overlay_dir "${repo_root}/pi/skills/" "${pi_root}/skills/" "pi_skills"
 
-# Pi's extension directory may also contain user-managed extensions. Keep sync additive
-# even under --clean, while removing the two repo-managed files replaced by workflow-runtime.
-collect_files "${repo_root}/extensions/" "extensions"
-remove_path "${pi_root}/extensions/workflow-indicator.ts" "extensions" "workflow-indicator"
-remove_path "${pi_root}/extensions/long-execute.ts" "extensions" "long-execute"
-sync_overlay_dir "${repo_root}/extensions/" "${pi_root}/extensions/" "extensions"
+prune_and_record "${repo_root}/pi/agents/" "${pi_root}/agents/" "pi_subagents"
+sync_dir "${repo_root}/pi/agents/" "${pi_root}/agents/" "pi_subagents"
+prune_and_record "${repo_root}/pi/skills/" "${pi_root}/skills/" "pi_skills" long-execute
+sync_dir "${repo_root}/pi/skills/" "${pi_root}/skills/" "pi_skills"
+
+prune_and_record "${repo_root}/extensions/" "${pi_root}/extensions/" "extensions" long-execute.ts workflow-indicator.ts
+sync_dir "${repo_root}/extensions/" "${pi_root}/extensions/" "extensions"
 
 ensure_pi_package "npm:pi-tmux-subagents"
 ensure_pi_skill_path "~/.pi/agent/skills" "~/.claude/skills"
 
+prune_and_record "${repo_root}/statusline/" "${claude_root}/statusline/" "statusline"
 sync_dir "${repo_root}/statusline/" "${claude_root}/statusline/" "statusline"
 
 if [[ -f "${claude_root}/settings.json" ]]; then
@@ -306,7 +351,7 @@ if [[ "$SILENT" == false ]]; then
   }
 
   echo ""
-  echo -e "${BOLD}sync-prompts${RESET}$(if [[ -n "$DELETE_FLAG" ]]; then echo -e " ${DIM}--clean${RESET}"; fi)"
+  echo -e "${BOLD}sync-prompts${RESET}"
   echo ""
 
   print_row_if_present "codex pruned assets" "codex_pruned" "codex"

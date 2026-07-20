@@ -8,7 +8,7 @@ metadata:
 
 Given the provided epic description, break it down into trackable sub-features for multi-session development.
 
-If scope or boundaries are unclear, ask the user wit hthe user ask tool before proceeding.
+If scope or boundaries are unclear, ask the user before proceeding.
 
 ### 1. Decompose Epic
 

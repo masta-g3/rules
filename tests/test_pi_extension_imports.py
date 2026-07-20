@@ -19,16 +19,15 @@ EXPECTED_SKILL_THINKING = {
     "docs-health": "high",
     "epic-init": "high",
     "execute": "medium",
+    "answer-style": "minimal",
     "explain-html": "high",
     "next-feature": "minimal",
     "plan-md": "high",
-    "prime": "low",
     "project-init": "high",
     "reflect": "medium",
     "review": "high",
     "test-coverage": "high",
     "ticket-init": "medium",
-    "workflow-migrate": "medium",
     "workflow-orchestrator": "medium",
 }
 VALID_THINKING_LEVELS = {"off", "minimal", "low", "medium", "high", "xhigh"}

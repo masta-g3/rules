@@ -5,8 +5,6 @@ metadata:
   thinkingLevel: minimal
 ---
 
-Assume `SKILLS_ROOT` is set per `AGENTS.md` before running helper commands.
-
 ### 1. Review State
 
 - Run `git log --oneline -10` to understand recent work

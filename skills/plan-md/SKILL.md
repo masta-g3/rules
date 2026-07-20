@@ -20,6 +20,7 @@ Store plans in `agent-work/plans/`:
 - Write the plan to `agent-work/plans/<feature-id>.md`, update `plan_file`, and call `set_workflow_ticket` when available:
   `$SKILLS_ROOT/_lib/features_yaml.sh update "<feature-id>" --json '{"plan_file":"agent-work/plans/<feature-id>.md"}'`
 - If `agent-work/features.yaml` does not exist, use `agent-work/plans/FEATURE_NAME.md`.
+- Tracked features keep `status: pending`; `execute` owns the `pending` → `in_progress` transition.
 
 ### Context Files
 
@@ -38,7 +39,7 @@ Include a context-files section:
 
 3. Write a detailed implementation plan (code snippets, file paths, architecture layout with components, data flows, and dependencies). Scale depth to complexity; use pseudocode, diagrams, and breakdowns as needed.
 
-4. If UI work, include a design direction section. Brainstorm with the `frontend designer` subagent if available. Specify theme tokens, typography, and color choices centrally — no scattered magic values.
+4. If UI work, include a design direction section. Brainstorm with the `frontend-designer` subagent if available. Specify theme tokens, typography, and color choices centrally — no scattered magic values.
 
 5. Divide into incremental test-first phases (foundation → core → polish), each with its own list of `[ ]` checklists and final verification step. For implementation phases, write/update the failing test first, make the smallest passing change, then refactor.
  
@@ -47,17 +48,11 @@ Include a context-files section:
    - Side effects: test workflows end-to-end, with the smallest necessary impact area
    - Pure logic: test with realistic inputs and edge cases
 
-Don't execute on this plan yet; the user will provide feedback and approve.
-
 7. Note likely doc impacts as `Reflection Candidates` for `/reflect`.
-
-### Preserve Pending Status
-
-**If plan file is named `{epic}-{nnn}.md` (tracked feature):** keep its `status` as `"pending"`. Planning prepares implementation but does not activate the work; `execute` owns the `pending` → `in_progress` transition.
 
 ### Plan Review (Non-Trivial Plans Only)
 
-For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** subagent. Fix only clear correctness, completeness, or simplicity issues; ignore nits, decontextualized suggestions, scope creep and proposals that don't fit project constraints. Re-run only after material plan changes.
+For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** subagent and act on its feedback per the AGENTS.md critic rule.
 
 ### Output
 
