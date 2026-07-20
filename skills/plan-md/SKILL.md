@@ -41,8 +41,8 @@ Include a context-files section:
 
 4. If UI work, include a design direction section. Brainstorm with the `frontend-designer` subagent if available. Specify theme tokens, typography, and color choices centrally — no scattered magic values.
 
-5. Divide into incremental test-first phases (foundation → core → polish), each with its own list of `[ ]` checklists and final verification step. For implementation phases, write/update the failing test first, make the smallest passing change, then refactor.
- 
+5. Under `## Implementation Phases`, divide work into incremental test-first phases (foundation → core → polish). Use `### Phase <number>: <short title>` headings, with actionable `[ ]` checkboxes directly under each phase, including its final verification. Write/update the failing test first, make the smallest passing change, then refactor. The `execute` skill marks completed actions with `[x]`. Move deferred work to `Discovered Work` or rewrite it as a plain note; do not leave it as an unchecked actionable item.
+
 6. Include a **verification strategy** for each phase:
    - Focus on outcomes: "Does it achieve the goal?" not "Does it import?"
    - Side effects: test workflows end-to-end, with the smallest necessary impact area
