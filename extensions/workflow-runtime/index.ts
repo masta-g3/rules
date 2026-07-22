@@ -315,6 +315,38 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 	});
 
 	pi.registerTool({
+		name: "start_focus",
+		label: "Start Focus",
+		description: "Enable autonomous focus mode for long-running execute work.",
+		promptSnippet: "Enable focus mode when execute work should continue autonomously across turns",
+		promptGuidelines: [
+			"Use start_focus during execute when approved in-scope work is likely to require multiple turns and can proceed without immediate user input.",
+			"Do not use start_focus during planning, review, reflection, or commit, or when a user decision or external dependency is already needed.",
+		],
+		parameters: Type.Object({}),
+		async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+			if (state.execution) throw new Error("Focus mode is already active.");
+			if (state.activeStep !== "execute") throw new Error("Focus mode can only start during execute.");
+			const result = transition(state, {
+				type: "activate-focus",
+				ticketId: state.ticketId,
+				runId: newRunId(),
+			});
+			state = setState(pi, ctx, { ...result.state, source: "tool" });
+			ctx.ui.notify("Focus mode enabled.", "info");
+			return {
+				content: [
+					{
+						type: "text",
+						text: "Focus mode is active. Continue the current execute work until it is complete or blocked, then call end_focus.",
+					},
+				],
+				details: { ticketId: state.ticketId },
+			};
+		},
+	});
+
+	pi.registerTool({
 		name: "end_focus",
 		label: "End Focus",
 		description: "End active focus mode after the work is completed or blocked.",

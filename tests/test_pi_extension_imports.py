@@ -87,9 +87,12 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn("active plan document if one exists", core)
         self.assertIn("feature or task the user provided", core)
 
-    def test_workflow_runtime_registers_focus_exit_tool(self) -> None:
+    def test_workflow_runtime_registers_focus_tools(self) -> None:
         source = EXTENSION.read_text()
 
+        self.assertIn('name: "start_focus"', source)
+        self.assertIn('state.activeStep !== "execute"', source)
+        self.assertIn('type: "activate-focus"', source)
         self.assertIn('name: "end_focus"', source)
         self.assertIn('Type.Literal("completed")', source)
         self.assertIn('Type.Literal("blocked")', source)

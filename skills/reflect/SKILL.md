@@ -10,7 +10,7 @@ Update durable documentation and agent guidance after implementation has passed 
 ### Process
 
 1. Inspect the active plan, review output, the conversation with the user, `git status --short`, and changed files.
-2. Identify durable documentation needs by asking: who would act differently because of this?
+2. Identify the highest-value durable documentation gaps by asking: what missing context could cause future users, maintainers, or agents to make wrong decisions, and who would act differently if it were documented?
    - project purpose, target user, project type, project stage, operating assumptions, or shared terminology → `CONTEXT.md`
    - users/operators → `README.md`
    - human developers learning architecture/layout/core patterns → `docs/STRUCTURE.md`
@@ -18,9 +18,9 @@ Update durable documentation and agent guidance after implementation has passed 
    - recurring agent mistakes, user corrections, review findings, or counterintuitive workflow pitfalls → the project-local `AGENTS.md`
    - repeatable project workflows already encoded in project-local skills or agent configuration → update the owning file; do not create new skills or modify user-global configuration unless explicitly requested
 3. If a learning fits both a domain doc and `AGENTS.md`, put the full truth in the domain doc and only add a short `AGENTS.md` pointer/pitfall if agents are likely to miss it.
-4. Do not duplicate existing docs. Add only the delta: new truth, stale truth correction, or a sharper operational rule agents are likely to miss.
+4. Do not duplicate existing docs. Prioritize missing purpose, constraints, assumptions, invariants, terminology, and workflow expectations over minor polish or incidental implementation details. Add only the delta likely to change future behavior.
 5. Keep updates concise and factual. Prefer editing, replacing, or deleting stale text over appending; do not grow docs unless the new guidance will change future behavior.
-6. Update `CONTEXT.md` only when project meaning, audience, stage, assumptions, or terminology changes; do not add implementation summaries, change history, or general programming terms.
+6. Update `CONTEXT.md` only when project meaning, audience, stage, assumptions, or terminology changes; do not add implementation summaries, change history, or general programming terms. Before non-mechanical edits to `CONTEXT.md` or the project-local `AGENTS.md`, batch the proposed changes into one confirmation unless the user explicitly requested them in the current conversation. Prefer the harness's structured question tool; ask with a concise message only when the tool is unavailable or nuanced feedback is needed.
 7. Docs should describe the current state of the product/system, not the history of how it changed; avoid backward-compatibility, migration, or "previously..." notes unless they affect a real public contract or operator action.
 8. For non-trivial durable doc/guidance edits, invoke the `docs-critic` subagent once to check clarity, fit, and whether the additions are truly durable. Skip when there are no edits or only tiny mechanical fixes such as typos, links, paths, or formatting. Act on its feedback per the AGENTS.md critic rule; deleting the update is acceptable when the critique shows it is not worth keeping.
 9. Treat project-local `AGENTS.md` as compact task-execution guardrails, not an append-only memory log: before adding a rule, edit, merge, tighten, move to `docs/STRUCTURE.md`, or delete existing guidance first. Add a new short actionable bullet only when no existing rule can carry guidance whose absence would cause dead ends or repeated mistakes.

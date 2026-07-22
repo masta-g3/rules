@@ -1,11 +1,11 @@
 ---
 name: focus
-description: Autonomous execution mode that continues working until completion or a real blocker.
+description: Autonomous mode for long-running execution that follows execute across turns until completion or a real blocker.
 metadata:
   thinkingLevel: high
 ---
 
-Autonomous wrapper around `execute`.
+Autonomous wrapper around `execute`. During an active execute step, the agent may enter this mode with `start_focus` when approved in-scope work is likely to require multiple turns and can proceed without immediate user input.
 
 First read and follow the installed `execute` skill as authoritative:
 `$SKILLS_ROOT/execute/SKILL.md`
