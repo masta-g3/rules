@@ -42,7 +42,6 @@ const STEP_SHORT: Record<StepName, string> = {
 const WORKFLOW = WORKFLOW_STEPS.map((id) => ({ id, short: STEP_SHORT[id] }));
 
 const STOP_NOTICES: Record<Exclude<RuntimeEffect, { kind: "continue" }>["reason"], string> = {
-	"user-interruption": "Manual input ended focus mode.",
 	"session-boundary": "Focus mode stopped at a session boundary. Reinvoke /skill:focus to continue.",
 };
 
@@ -439,7 +438,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		const stepName = extractStep(event.text);
 		if (stepName) {
 			const interrupted = state.execution
-				? transition(state, { type: "ordinary-input" })
+				? transition(state, { type: "end-focus" })
 				: { state, effects: [] as RuntimeEffect[] };
 			state = setState(pi, ctx, {
 				...interrupted.state,

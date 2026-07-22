@@ -51,6 +51,7 @@ test("focus reminders preserve the plan, task, ticket, and exit contract", () =>
     assert.match(content, /blocked/);
   }
 
+  assert.match(focusContract(state), /Ordinary user input does not end focus mode/);
   assert.match(focusContract(state), /ticket focus-001/);
   assert.match(continuationContent(state), /Active ticket: focus-001/);
   assert.match(continuationContent(state), /Turns completed: 4/);
@@ -91,14 +92,11 @@ test("all compaction reasons preserve state and produce no effects", () => {
   }
 });
 
-test("ordinary input stops focus mode but preserves workflow context", () => {
-  const result = transition(activeState({ turnsCompleted: 2 }), { type: "ordinary-input" });
+test("ordinary input keeps focus mode active", () => {
+  const state = activeState({ turnsCompleted: 2 });
+  const result = transition(state, { type: "ordinary-input" });
 
-  assert.deepEqual(result.state, {
-    activeStep: "execute",
-    ticketId: "focus-001",
-  });
-  assert.deepEqual(result.effects, [{ kind: "notify-stop", reason: "user-interruption" }]);
+  assert.deepEqual(result, { state, effects: [] });
 });
 
 test("session boundaries never restore an active dormant run", () => {

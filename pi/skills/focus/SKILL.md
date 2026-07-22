@@ -21,6 +21,7 @@ Rules:
 - Keep changes minimal and phase-based. Do not broaden scope.
 - Do not stop merely to report progress while actionable work remains.
 - Continue implementing and verifying until the requested work is complete or further progress requires user input or an external dependency.
+- Treat ordinary user messages as additional instructions within the active run; they do not end focus mode.
 
 Focus mode has no turn limit. End it explicitly with the `end_focus` tool:
 

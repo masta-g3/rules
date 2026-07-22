@@ -16,7 +16,7 @@ export type WorkflowState = {
 	updatedAt?: number;
 };
 
-export type StopReason = "user-interruption" | "session-boundary";
+export type StopReason = "session-boundary";
 
 export type RuntimeEffect =
 	| { kind: "continue"; runId: string }
@@ -44,7 +44,7 @@ export function focusContract(state: WorkflowState): string {
 	const execution = state.execution;
 	if (!execution) return "";
 	const ticket = state.ticketId ? ` for ticket ${state.ticketId}` : "";
-	return `Focus mode is active${ticket}; ${execution.turnsCompleted} turns are complete and there is no turn limit. Continue working autonomously instead of stopping at a progress report. Follow \`$SKILLS_ROOT/execute/SKILL.md\`, re-read the active plan document if one exists, and verify its checklist against the repository. If there is no plan, continue the feature or task the user provided. When the work is implemented and verified, or when further progress requires user input, call \`end_focus\` with outcome \`completed\` or \`blocked\` and a concise summary. Only \`end_focus\`, manual user input, or a session boundary ends focus mode.`;
+	return `Focus mode is active${ticket}; ${execution.turnsCompleted} turns are complete and there is no turn limit. Continue working autonomously instead of stopping at a progress report. Follow \`$SKILLS_ROOT/execute/SKILL.md\`, re-read the active plan document if one exists, and verify its checklist against the repository. If there is no plan, continue the feature or task the user provided. When the work is implemented and verified, or when further progress requires user input, call \`end_focus\` with outcome \`completed\` or \`blocked\` and a concise summary. Ordinary user input does not end focus mode. Only \`end_focus\`, changing workflow steps, or a session boundary ends it.`;
 }
 
 export function continuationContent(state: WorkflowState): string {
@@ -90,12 +90,7 @@ export function transition(state: WorkflowState, event: RuntimeEvent): Transitio
 
 	if (event.type === "end-focus") return { state: withoutExecution(state), effects: [] };
 
-	if (event.type === "ordinary-input") {
-		return {
-			state: withoutExecution(state),
-			effects: [{ kind: "notify-stop", reason: "user-interruption" }],
-		};
-	}
+	if (event.type === "ordinary-input") return { state, effects: [] };
 
 	return {
 		state: {
