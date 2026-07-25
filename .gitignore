@@ -1,4 +1,5 @@
 .obsidian/
+agent-work/worktrees/
 .claude/workflow.json
 *.pyc
 .DS_Store

@@ -24,7 +24,7 @@ Assume `/reflect` handled durable documentation updates. Do not make broad docum
 
 ### Commit
 
-1. Inspect `git status --short`. If unrelated staged paths are present, ask the user whether to unstage them. Then `git add` only session files.
+1. Inspect `git status --short`. If unrelated staged paths are present, ask the user whether to unstage them. If a worktree path appears as untracked, stop and add `agent-work/worktrees/` to `.gitignore` before staging — never commit a nested checkout. Then `git add` only session files.
 2. `git commit -m` format:
    - First line: sentence describing the high-level objective.
    - 2-5 bullets grouping changes by topic (omit if single cohesive change).
@@ -37,6 +37,20 @@ Example: `Refactor API endpoints for better error handling.` with bullets like `
 
 If this session touched multiple repositories, commit all session work independently per repo.
 
+### Worktree Closeout
+
+If the plan names a worktree, the commit above went to its branch. Close it out per repo:
+
+1. Confirm the archived plan and the `agent-work/features.yaml` completion are part of that commit — the PR carries the ticket's full story, not just its code.
+2. Push the branch and open a PR against the repo's default branch with `gh pr create`. Summarize the ticket and link the archived plan path. Report the PR URL; do not merge it.
+3. Copy back anything worth keeping that the PR does not carry — `agent-work/tickets/<feature-id>/` evidence, decks, logs — into the top-level checkout, after the cleanup rules above have already pruned it.
+4. Remove the worktree with `git worktree remove`, then delete its now-empty parent under `agent-work/worktrees/`.
+
+Removing the worktree does not touch the branch. If review asks for changes, `git worktree add agent-work/worktrees/<feature-id>/<repo-name> <feature-id>` restores it.
+
 ### Output
 
-After a successful commit, include a `Summary:` line with 1-2 sentences on what was committed, then end with `WORKFLOW COMPLETE` and include the commit hash.
+Include a `Summary:` line with 1-2 sentences on what was committed, then end with one of:
+
+- `WORKFLOW COMPLETE` — no worktree; include the commit hash
+- `WORKFLOW COMPLETE — PENDING PR MERGE` — include the commit hash and PR URL. The worktree is removed and the ticket is done on its branch; the top-level checkout needs a `git pull` once the PR merges.

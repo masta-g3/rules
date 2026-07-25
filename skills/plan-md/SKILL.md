@@ -10,7 +10,19 @@ Create a detailed Markdown implementation plan for the provided request.
 
 ### Pre-Work & User Interview
 
-Before writing the plan, investigate the codebase to resolve discoverable facts, then interview the user about the decisions that remain. Ask one decision question at a time, include your recommended answer and rationale, and wait for feedback before continuing. Resolve dependent decisions in order until scope, approach, dependencies, product direction, domain concepts, boundaries, and trade-offs are mutually understood. Do not batch questions or carry unresolved assumptions into the plan. Write the plan only after the user confirms shared understanding; never implement it during this skill.
+Open the interview by asking whether to isolate this work in a git worktree; the answer shapes where every later step runs. Then investigate the codebase to resolve discoverable facts, and interview the user about the decisions that remain. Ask one decision question at a time, include your recommended answer and rationale, and wait for feedback before continuing. Resolve dependent decisions in order until scope, approach, dependencies, product direction, domain concepts, boundaries, and trade-offs are mutually understood. Do not batch questions or carry unresolved assumptions into the plan. Write the plan only after the user confirms shared understanding; never implement it during this skill.
+
+### Worktree (Only If The User Approved One)
+
+Create one worktree per repository the plan will touch, under `agent-work/worktrees/<feature-id>/<repo-name>/`, branched as `<feature-id>`:
+
+```bash
+git worktree add agent-work/worktrees/<feature-id>/<repo-name> -b <feature-id>
+```
+
+- Ensure `agent-work/worktrees/` is gitignored in each affected repo before creating anything; a nested checkout must never be committed.
+- Copy untracked local config the build needs — `.env*` and equivalents — from the top-level checkout into the worktree.
+- Keep `agent-work/worktrees/` flat and predictable: nothing but these per-feature directories, and no leftovers from finished work.
 
 ### Plan File Location & Naming
 
@@ -34,6 +46,7 @@ Include a context-files section:
 1. Create markdown document with the determined name. Start with:
    - `**Feature:** {id} → {description}`
    - `**Session:** {harness session ID}`
+   - `**Worktree:** {path(s) and branch, or `none`}` — later steps run wherever this points
 
 2. Inventory what already exists before designing: the code that owns this behavior, plus the architecture, libraries, utilities, and conventions the codebase already uses for this class of problem. Default to composing existing pieces, then brainstorm alternatives and pick the fundamental approach with the smallest surface area.
 
