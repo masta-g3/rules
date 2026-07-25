@@ -7,9 +7,12 @@ import {
 	continuationContent,
 	createContinuationQueue,
 	finalAssistantStopReason,
+	FOCUS_MODE_DISPLAY,
 	recoverFocus,
+	shouldNormalizeWorkflowDefinition,
 	transition,
-	WORKFLOW_STEPS,
+	withWorkflowDefinition,
+	WORKFLOW_DEFINITION,
 	type RuntimeEffect,
 	type StepName,
 	type WorkflowState,
@@ -33,15 +36,7 @@ const TOKENS = {
 	ticket: "dim",
 } as const;
 
-const STEP_SHORT: Record<StepName, string> = {
-	"plan-md": "PL",
-	execute: "EX",
-	review: "RV",
-	reflect: "RF",
-	commit: "CM",
-};
-
-const WORKFLOW = WORKFLOW_STEPS.map((id) => ({ id, short: STEP_SHORT[id] }));
+const WORKFLOW = WORKFLOW_DEFINITION;
 
 const STOP_NOTICES: Record<Exclude<RuntimeEffect, { kind: "continue" }>["reason"], string> = {
 	"session-boundary": "Focus mode stopped at a session boundary. Reinvoke /skill:focus to continue.",
@@ -50,7 +45,12 @@ const STOP_NOTICES: Record<Exclude<RuntimeEffect, { kind: "continue" }>["reason"
 type CustomEntry = {
 	type: string;
 	customType?: string;
-	data?: WorkflowState;
+	data?: WorkflowState & { steps?: unknown; activeMode?: unknown };
+};
+
+type RestoredState = {
+	state: WorkflowState;
+	steps?: unknown;
 };
 
 type RuntimeEventDetails = {
@@ -124,16 +124,19 @@ function newRunId(): string {
 	return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function findLatestState(entries: unknown[]): WorkflowState {
+function findLatestState(entries: unknown[]): RestoredState {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i] as CustomEntry;
-		if (entry?.type === "custom" && entry.customType === ENTRY_TYPE && entry.data) return entry.data;
+		if (entry?.type === "custom" && entry.customType === ENTRY_TYPE && entry.data) {
+			const { steps, activeMode: _activeMode, ...state } = entry.data;
+			return { state, steps };
+		}
 	}
-	return {};
+	return { state: {} };
 }
 
 function persistState(pi: ExtensionAPI, state: WorkflowState): void {
-	pi.appendEntry(ENTRY_TYPE, state);
+	pi.appendEntry(ENTRY_TYPE, withWorkflowDefinition(state));
 }
 
 function setState(pi: ExtensionAPI, ctx: ExtensionContext, nextState: WorkflowState): WorkflowState {
@@ -152,7 +155,9 @@ function renderTicket(theme: ExtensionContext["ui"]["theme"], ticketId?: string)
 }
 
 function renderStepShort(step: (typeof WORKFLOW)[number], state: WorkflowState): string {
-	if (step.id === "execute" && state.execution?.mode === "focus") return focusPulseOn ? "FOC ✦" : "FOC ✧";
+	if (step.id === "execute" && state.execution?.mode === "focus") {
+		return `${FOCUS_MODE_DISPLAY.short} ${focusPulseOn ? "✦" : "✧"}`;
+	}
 	return step.short;
 }
 
@@ -521,9 +526,13 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 
 	pi.on("session_start", async (event, ctx) => {
 		recoveryPending = false;
-		const restored = event.reason === "new" ? {} : findLatestState(ctx.sessionManager.getBranch());
-		const result = transition(restored, { type: "session-boundary", reason: event.reason });
-		if (event.reason === "fork" || result.effects.length) {
+		const restored = event.reason === "new" ? { state: {} } : findLatestState(ctx.sessionManager.getBranch());
+		const result = transition(restored.state, { type: "session-boundary", reason: event.reason });
+		const normalizeDefinition = shouldNormalizeWorkflowDefinition(
+			{ ...restored.state, steps: restored.steps },
+			event.reason,
+		);
+		if (event.reason === "fork" || result.effects.length || normalizeDefinition) {
 			state = setState(pi, ctx, result.state);
 			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
 			return;

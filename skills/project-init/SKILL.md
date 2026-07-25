@@ -51,7 +51,7 @@ Initialize project structure
 - [Stack/framework] scaffold
 ```
 
-### 4. Report to User
+### Output
 
 Summarize what was created and recommend next step:
 

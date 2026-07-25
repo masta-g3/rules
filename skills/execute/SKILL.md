@@ -7,9 +7,9 @@ metadata:
 
 Work directly from the active plan or task we have been discussing.
 
-### Baseline Verification (First Task Only)
+### Baseline Verification
 
-Run a minimal smoke test before starting — run existing tests or start the app and confirm basic functionality. If broken, stop and report.
+If not done before, run a minimal smoke test before starting — run existing tests or start the app and confirm basic functionality. If broken, stop and report.
 
 ### Begin Implementation
 
@@ -33,12 +33,11 @@ Update docs during execution only when the approved plan lists them as explicit 
 
 ### Code Quality
 
-- Before implementing, identify the existing code that owns the behavior.
 - Make the smallest, simplest change that fully solves the task. Prefer fundamental fixes over localized patches or parallel solutions, and replace obsolete code.
 - Reuse existing patterns; keep changes modular and avoid widening the impact without clear need.
+- Do not add conditional branches to special-case around an existing pattern. If code does not fit the convention, fix the code or the pattern — do not route around it with `if/else`.
 - Do not add fallbacks, inferred defaults, mock functionality, or blanket exception handling. Let errors surface unless recovery is specific and intentional.
 - Tests must validate actual behavior — no dummy assertions or placeholders.
-- For UI/UX work, invoke the `frontend-designer` subagent if available.
 
 ### Functional Testing (User-Facing Features Only)
 
@@ -51,7 +50,9 @@ For user-facing features (UI flows, API endpoints, interactive elements), invoke
 
 At the end of each phase, ensure clean, reviewable state — no half-implemented features, no commented-out debug code.
 
-For successful execution, include a `Summary:` line with 1-2 sentences on what was implemented, verified, and any minor plan adjustments before the handoff label.
+### Output
+
+For successful execution, include a `Summary:` line with 1-2 sentences or a bullet list of what was done, and any minor plan adjustments before the handoff label.
 - **READY FOR REVIEW** — all phases done and ready for `/review`
 
 Otherwise:

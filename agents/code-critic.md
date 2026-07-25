@@ -53,7 +53,8 @@ Focus on **implementation craft and drift from the approved plan**.
 ### Drift from Plan
 - Code lands at the wrong layer or module relative to the approved plan or `docs/STRUCTURE.md`
 - Implementation bypasses an established flow the plan said to use
-- A utility the plan said to reuse was duplicated or rewritten instead
+- A component the plan's `## Reuse` section listed was duplicated or rewritten instead of used
+- New machinery appears that the plan did not justify against an existing option
 
 ### Style Misalignment
 - Code that looks out of place with surrounding file conventions

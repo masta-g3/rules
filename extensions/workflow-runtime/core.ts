@@ -1,6 +1,33 @@
-export const WORKFLOW_STEPS = ["plan-md", "execute", "review", "reflect", "commit"] as const;
-export type StepName = (typeof WORKFLOW_STEPS)[number];
+export type WorkflowStepDefinition = {
+	id: string;
+	short: string;
+	label?: string;
+};
+
+export type WorkflowModeDisplay = {
+	id: string;
+	short: string;
+	label?: string;
+	detail?: string;
+};
+
+export const FOCUS_MODE_DISPLAY = {
+	id: "focus",
+	short: "FOC",
+	label: "Focus",
+} as const satisfies WorkflowModeDisplay;
+
+export const WORKFLOW_DEFINITION = [
+	{ id: "plan-md", short: "PL", label: "Plan" },
+	{ id: "execute", short: "EX", label: "Execute" },
+	{ id: "review", short: "RV", label: "Review" },
+	{ id: "reflect", short: "RF", label: "Reflect" },
+	{ id: "commit", short: "CM", label: "Commit" },
+] as const satisfies readonly WorkflowStepDefinition[];
+
+export type StepName = (typeof WORKFLOW_DEFINITION)[number]["id"];
 export type WorkflowSource = "input" | "command" | "shortcut" | "tool";
+export type SessionBoundaryReason = "startup" | "reload" | "new" | "resume" | "fork";
 export type AgentStopReason = "stop" | "length" | "toolUse" | "error" | "aborted";
 
 export type FocusExecution = {
@@ -17,6 +44,51 @@ export type WorkflowState = {
 	updatedAt?: number;
 };
 
+export type WorkflowRuntimeEntryData = WorkflowState & {
+	steps: WorkflowStepDefinition[];
+	activeMode?: WorkflowModeDisplay;
+};
+
+type RestoredWorkflowState = WorkflowState & {
+	steps?: unknown;
+};
+
+export function withWorkflowDefinition(state: WorkflowState): WorkflowRuntimeEntryData {
+	const activeMode = state.execution?.mode === "focus"
+		? { ...FOCUS_MODE_DISPLAY, detail: `turn ${state.execution.turnsCompleted}` }
+		: undefined;
+	return {
+		...state,
+		steps: WORKFLOW_DEFINITION.map((step) => ({ ...step })),
+		...(activeMode ? { activeMode } : {}),
+	};
+}
+
+function hasCurrentWorkflowDefinition(steps: unknown): boolean {
+	if (!Array.isArray(steps) || steps.length !== WORKFLOW_DEFINITION.length) return false;
+	return WORKFLOW_DEFINITION.every((expected, index) => {
+		const actual = steps[index];
+		return (
+			typeof actual === "object" &&
+			actual !== null &&
+			"id" in actual &&
+			actual.id === expected.id &&
+			"short" in actual &&
+			actual.short === expected.short &&
+			"label" in actual &&
+			actual.label === expected.label
+		);
+	});
+}
+
+export function shouldNormalizeWorkflowDefinition(
+	state: RestoredWorkflowState,
+	reason: SessionBoundaryReason,
+): boolean {
+	if (reason === "new" || reason === "fork" || !state.activeStep) return false;
+	return !hasCurrentWorkflowDefinition(state.steps);
+}
+
 export type StopReason = "session-boundary";
 
 export type RuntimeEffect =
@@ -29,7 +101,7 @@ export type RuntimeEvent =
 	| { type: "end-focus" }
 	| { type: "ordinary-input" }
 	| { type: "session-compact"; reason: "manual" | "threshold" | "overflow" }
-	| { type: "session-boundary"; reason: "startup" | "reload" | "new" | "resume" | "fork" };
+	| { type: "session-boundary"; reason: SessionBoundaryReason };
 
 export type TransitionResult = {
 	state: WorkflowState;

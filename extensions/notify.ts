@@ -1,11 +1,9 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import { basename } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const READY = "Ready for input";
 const TEST = "Notification test";
-const SOUND_PATH = "/System/Library/Sounds/Glass.aiff";
 
 function run(command: string, args: string[]): void {
 	const child = spawn(command, args, { detached: true, stdio: "ignore" });
@@ -29,12 +27,6 @@ function writeTerminalNotification(title: string, body: string): void {
 function notifyMac(title: string, body: string): void {
 	run("osascript", ["-e", `display notification ${appleString(body)} with title ${appleString(title)}`]);
 
-	if (existsSync(SOUND_PATH)) {
-		run("afplay", [SOUND_PATH]);
-		return;
-	}
-
-	process.stdout.write("\x07");
 }
 
 function notify(title: string, body: string): void {
@@ -44,7 +36,6 @@ function notify(title: string, body: string): void {
 	}
 
 	writeTerminalNotification(title, body);
-	process.stdout.write("\x07");
 }
 
 function sessionName(pi: ExtensionAPI, ctx: ExtensionContext): string {
@@ -67,7 +58,7 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("notify-test", {
-		description: "Send a test notification and sound",
+		description: "Send a test notification",
 		handler: async (_args, ctx) => {
 			notify(notificationTitle(TEST), sessionBody(pi, ctx));
 			ctx.ui.notify("Sent notification test", "info");

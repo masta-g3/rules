@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Pi focus mode: prompts and runtime lifecycle</title>
+  <style>
+    :root {
+      --ink: #17243a;
+      --muted: #5e6c7e;
+      --paper: #f7f4ec;
+      --surface: #fffdf8;
+      --surface-strong: #ffffff;
+      --navy: #12213b;
+      --accent: #c64f2f;
+      --accent-soft: #f7dfd4;
+      --blue: #1c667a;
+      --blue-soft: #dceef1;
+      --green: #24634e;
+      --green-soft: #dcece3;
+      --amber: #8b5a10;
+      --amber-soft: #f5e8c7;
+      --line: #d8d3c8;
+      --line-strong: #b8b0a2;
+      --shadow: 0 14px 40px rgba(23, 36, 58, 0.09);
+      --radius-sm: 0.5rem;
+      --radius-md: 0.9rem;
+      --radius-lg: 1.35rem;
+      --space-1: 0.35rem;
+      --space-2: 0.65rem;
+      --space-3: 1rem;
+      --space-4: 1.5rem;
+      --space-5: 2.25rem;
+      --space-6: 3.5rem;
+      --content: 76rem;
+      --sidebar: 15rem;
+      --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 92% 2%, rgba(198, 79, 47, 0.12), transparent 26rem),
+        linear-gradient(90deg, rgba(18, 33, 59, 0.025) 1px, transparent 1px),
+        var(--paper);
+      background-size: auto, 4rem 4rem, auto;
+      font-family: var(--sans);
+      line-height: 1.6;
+    }
+
+    a { color: var(--blue); text-underline-offset: 0.2em; }
+    a:hover { color: var(--accent); }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+    .shell {
+      display: grid;
+      grid-template-columns: var(--sidebar) minmax(0, 1fr);
+      max-width: calc(var(--content) + var(--sidebar) + var(--space-5));
+      margin: 0 auto;
+      gap: var(--space-5);
+      padding: var(--space-4);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: var(--space-4);
+      align-self: start;
+      max-height: calc(100vh - (2 * var(--space-4)));
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: rgba(255, 253, 248, 0.92);
+      box-shadow: var(--shadow);
+      padding: var(--space-4);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .pulse {
+      width: 0.8rem;
+      height: 0.8rem;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 0.35rem var(--accent-soft);
+    }
+
+    .sidebar ol { list-style: none; padding: 0; margin: 0; }
+    .sidebar li + li { margin-top: var(--space-1); }
+    .sidebar a {
+      display: block;
+      padding: 0.45rem 0.6rem;
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 650;
+    }
+    .sidebar a:hover { background: var(--blue-soft); color: var(--navy); }
+    .sidebar .meta {
+      margin-top: var(--space-4);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    main { min-width: 0; max-width: var(--content); }
+    section { scroll-margin-top: var(--space-4); margin-bottom: var(--space-6); }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      min-height: 29rem;
+      display: grid;
+      align-content: end;
+      border-radius: var(--radius-lg);
+      color: #f8fafc;
+      background: var(--navy);
+      box-shadow: var(--shadow);
+      padding: clamp(2rem, 6vw, 4.5rem);
+    }
+    .hero::before {
+      content: "FOC ✦";
+      position: absolute;
+      right: -0.04em;
+      top: -0.22em;
+      font: 900 clamp(6rem, 17vw, 13rem)/1 var(--mono);
+      color: rgba(255,255,255,0.055);
+      letter-spacing: -0.09em;
+    }
+    .eyebrow {
+      margin: 0 0 var(--space-2);
+      color: #f2a88f;
+      font: 750 0.78rem/1.3 var(--mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { line-height: 1.13; text-wrap: balance; }
+    h1 { max-width: 14ch; margin: 0; font-size: clamp(2.5rem, 6vw, 5.2rem); letter-spacing: -0.055em; }
+    h2 { margin: 0 0 var(--space-3); font-size: clamp(1.8rem, 3vw, 2.8rem); letter-spacing: -0.035em; }
+    h3 { margin: 0 0 var(--space-2); font-size: 1.08rem; }
+    .lead { max-width: 49rem; margin: var(--space-4) 0 0; color: #dce4ef; font-size: clamp(1.08rem, 2vw, 1.35rem); }
+    .hero-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-top: var(--space-5);
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 999px;
+      padding: 0.4rem 0.7rem;
+      color: #edf3fa;
+      background: rgba(255,255,255,0.07);
+      font: 650 0.78rem/1 var(--mono);
+    }
+
+    .section-head { max-width: 50rem; margin-bottom: var(--space-4); }
+    .section-head p { color: var(--muted); font-size: 1.06rem; }
+
+    .core-point {
+      display: grid;
+      grid-template-columns: 1.35fr 0.65fr;
+      gap: var(--space-4);
+    }
+    .statement, .card, .prompt, .callout {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: 0 5px 22px rgba(23, 36, 58, 0.05);
+    }
+    .statement { padding: var(--space-5); }
+    .statement strong { display: block; max-width: 29ch; font-size: clamp(1.45rem, 3vw, 2.25rem); line-height: 1.28; letter-spacing: -0.025em; }
+    .statement p { margin-bottom: 0; color: var(--muted); }
+    .specs { margin: 0; padding: var(--space-4); }
+    .specs div { padding: 0.6rem 0; border-bottom: 1px solid var(--line); }
+    .specs div:last-child { border-bottom: 0; }
+    .specs dt { color: var(--muted); font: 700 0.72rem/1.3 var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
+    .specs dd { margin: 0.25rem 0 0; font-weight: 760; }
+
+    .lifecycle {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: var(--space-2);
+      align-items: stretch;
+    }
+    .step {
+      position: relative;
+      min-height: 12rem;
+      padding: var(--space-3);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+    }
+    .step:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      z-index: 2;
+      right: -0.8rem;
+      top: 2.9rem;
+      display: grid;
+      place-items: center;
+      width: 1.45rem;
+      height: 1.45rem;
+      border-radius: 50%;
+      color: white;
+      background: var(--accent);
+      font-weight: 800;
+    }
+    .num { color: var(--accent); font: 800 0.77rem/1 var(--mono); letter-spacing: 0.08em; }
+    .step h3 { margin-top: var(--space-2); }
+    .step p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    .loop { border-color: #8ab3bd; background: var(--blue-soft); }
+    .exit { border-color: #85ab99; background: var(--green-soft); }
+    .caption { margin-top: var(--space-3); color: var(--muted); font-size: 0.9rem; }
+
+    .prompt-index {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+    .card { padding: var(--space-3); }
+    .card .tag { color: var(--accent); font: 750 0.73rem/1.2 var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
+    .card p { margin-bottom: 0; color: var(--muted); font-size: 0.9rem; }
+
+    .prompt { overflow: hidden; margin-bottom: var(--space-3); }
+    .prompt summary {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: var(--space-3);
+      align-items: center;
+      cursor: pointer;
+      padding: var(--space-3) var(--space-4);
+      background: var(--surface-strong);
+      font-weight: 780;
+    }
+    .prompt summary:hover { background: #f9f5ec; }
+    .prompt summary::marker { color: var(--accent); }
+    .prompt-id {
+      display: grid;
+      place-items: center;
+      width: 2.1rem;
+      height: 2.1rem;
+      border-radius: 50%;
+      color: var(--surface-strong);
+      background: var(--navy);
+      font: 750 0.76rem/1 var(--mono);
+    }
+    .when { color: var(--muted); font: 600 0.75rem/1.2 var(--mono); }
+    .prompt-body { border-top: 1px solid var(--line); padding: var(--space-4); }
+    .source {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-3);
+      align-items: center;
+      margin-bottom: var(--space-2);
+      color: var(--muted);
+      font: 600 0.75rem/1.3 var(--mono);
+    }
+    .copy {
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-sm);
+      padding: 0.4rem 0.65rem;
+      color: var(--navy);
+      background: var(--surface);
+      font: 700 0.73rem/1 var(--mono);
+      cursor: pointer;
+    }
+    .copy:hover { border-color: var(--accent); color: var(--accent); }
+    pre {
+      overflow: auto;
+      margin: 0;
+      border-radius: var(--radius-sm);
+      padding: var(--space-3);
+      color: #eaf0f7;
+      background: #101b2e;
+      font: 0.82rem/1.55 var(--mono);
+      white-space: pre-wrap;
+      tab-size: 2;
+    }
+    .annotation {
+      margin: var(--space-3) 0 0;
+      padding-left: var(--space-3);
+      border-left: 3px solid var(--accent);
+      color: var(--muted);
+      font-size: 0.91rem;
+    }
+
+    .boundary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+    .boundary { padding: var(--space-4); }
+    .boundary ul { margin: var(--space-2) 0 0; padding-left: 1.1rem; }
+    .boundary li + li { margin-top: 0.35rem; }
+    .keep { border-top: 4px solid var(--green); }
+    .stop { border-top: 4px solid var(--accent); }
+    .warn { border-top: 4px solid var(--amber); }
+    .status {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 0.25rem 0.55rem;
+      font: 750 0.7rem/1 var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .status.keep { border: 0; color: var(--green); background: var(--green-soft); }
+    .status.stop { border: 0; color: var(--accent); background: var(--accent-soft); }
+
+    .callout {
+      padding: var(--space-5);
+      color: #edf3fa;
+      background: var(--navy);
+      border-color: var(--navy);
+    }
+    .callout h2 { max-width: 25ch; }
+    .callout p { max-width: 52rem; margin-bottom: 0; color: #cbd7e7; }
+    .takeaways { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); margin-top: var(--space-4); }
+    .takeaway { border-top: 1px solid rgba(255,255,255,0.22); padding-top: var(--space-3); }
+    .takeaway strong { display: block; color: #f2a88f; }
+    .takeaway span { color: #dce4ef; font-size: 0.92rem; }
+
+    .provenance {
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    code.inline { border: 1px solid var(--line); border-radius: 0.3rem; padding: 0.12rem 0.3rem; background: var(--surface); font-family: var(--mono); font-size: 0.88em; }
+
+    @media (max-width: 980px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar { position: static; max-height: none; }
+      .sidebar ol { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+      .sidebar li + li { margin-top: 0; }
+      .sidebar .meta { display: none; }
+      .lifecycle { grid-template-columns: 1fr 1fr; }
+      .step:not(:last-child)::after { display: none; }
+      .prompt-index { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 680px) {
+      .shell { padding: var(--space-2); gap: var(--space-3); }
+      .hero { min-height: 25rem; padding: var(--space-5) var(--space-4); }
+      .core-point, .boundary-grid, .takeaways, .prompt-index, .lifecycle { grid-template-columns: 1fr; }
+      .prompt summary { grid-template-columns: auto 1fr; }
+      .when { grid-column: 2; }
+      .source { align-items: flex-start; flex-direction: column; }
+      .sidebar { border-radius: var(--radius-md); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+
+    @media print {
+      :root { --paper: #fff; --surface: #fff; }
+      body { background: #fff; font-size: 10pt; }
+      .shell { display: block; max-width: none; padding: 0; }
+      .sidebar, .copy { display: none !important; }
+      .hero { min-height: 0; color: var(--ink); background: #fff; border: 2px solid var(--navy); box-shadow: none; break-after: page; }
+      .hero .lead { color: var(--ink); }
+      .hero::before { color: rgba(23,36,58,0.06); }
+      section { margin-bottom: 2rem; }
+      details.prompt { break-inside: avoid; }
+      details.prompt:not([open]) > *:not(summary) { display: block; }
+      .prompt, .card, .statement, .callout { box-shadow: none; }
+      .callout { color: var(--ink); background: #fff; border: 2px solid var(--navy); }
+      .callout p, .takeaway span { color: var(--ink); }
+      pre { color: #111; background: #f2f2f2; border: 1px solid #bbb; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav class="sidebar" aria-label="Explainer sections">
+      <div class="brand"><span class="pulse" aria-hidden="true"></span> Focus mode</div>
+      <ol>
+        <li><a href="#overview">01 · Core idea</a></li>
+        <li><a href="#lifecycle">02 · Runtime loop</a></li>
+        <li><a href="#prompts">03 · Exact prompts</a></li>
+        <li><a href="#boundaries">04 · Stop boundaries</a></li>
+        <li><a href="#takeaways">05 · Takeaways</a></li>
+      </ol>
+      <p class="meta">Grounded in the installed <code>focus</code> and <code>execute</code> skills plus <code>extensions/workflow-runtime/</code> at repository HEAD <code>0dc39d6</code>.</p>
+    </nav>
+
+    <main>
+      <header class="hero">
+        <p class="eyebrow">Pi runtime explainer · current behavior</p>
+        <h1>Focus mode prompts and lifecycle</h1>
+        <p class="lead">Focus is an autonomous wrapper around <code>execute</code>: the skill defines the work contract, while a Pi extension injects reminders and starts another turn until the agent explicitly finishes or hits a real boundary.</p>
+        <div class="hero-strip" aria-label="Focus mode attributes">
+          <span class="chip">/skill:focus [ticket-id]</span>
+          <span class="chip">no turn limit</span>
+          <span class="chip">end_focus exits</span>
+          <span class="chip">FOC ✦ rail</span>
+        </div>
+      </header>
+
+      <section id="overview" aria-labelledby="overview-title">
+        <div class="section-head">
+          <p class="eyebrow">01 · Core idea</p>
+          <h2 id="overview-title">Instructions decide what to do; the runtime decides to continue</h2>
+          <p>Focus does not replace the implementation workflow. It composes three layers: the <code>focus</code> skill, the authoritative <code>execute</code> skill, and a stateful Pi extension.</p>
+        </div>
+        <div class="core-point">
+          <article class="statement">
+            <strong>The autonomous behavior is a runtime loop—not a single oversized model response.</strong>
+            <p>Each completed agent run queues a follow-up message. The next run receives both a system-prompt contract and the continuation message, then resumes from the plan or original task.</p>
+          </article>
+          <dl class="specs card">
+            <div><dt>Entry</dt><dd><code class="inline">/skill:focus</code></dd></div>
+            <div><dt>Baseline</dt><dd><code class="inline">execute</code></dd></div>
+            <div><dt>State</dt><dd>ticket + run ID + turns</dd></div>
+            <div><dt>Exit</dt><dd><code class="inline">end_focus</code></dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section id="lifecycle" aria-labelledby="lifecycle-title">
+        <div class="section-head">
+          <p class="eyebrow">02 · Runtime loop</p>
+          <h2 id="lifecycle-title">One invocation activates a guarded sequence of agent runs</h2>
+          <p>The extension sees the raw skill command before Pi expands it, stores focus state, and moves the workflow rail to execute.</p>
+        </div>
+        <div class="lifecycle" role="list" aria-label="Focus mode lifecycle">
+          <article class="step" role="listitem"><span class="num">01</span><h3>Activate</h3><p>Parse an optional ticket ID, create a run ID, set turn count to zero, and show <strong>FOC ✦ / FOC ✧</strong>.</p></article>
+          <article class="step" role="listitem"><span class="num">02</span><h3>Load contracts</h3><p>Pi expands the focus skill. The agent is told to read <code>execute</code>; the runtime appends the focus system contract.</p></article>
+          <article class="step" role="listitem"><span class="num">03</span><h3>Work</h3><p>The agent implements and verifies the next phase, using a plan when one exists or the supplied task when it does not.</p></article>
+          <article class="step loop" role="listitem"><span class="num">04</span><h3>Continue</h3><p>On every <code>agent_end</code>, increment the turn count and queue a deduplicated follow-up for the same run.</p></article>
+          <article class="step exit" role="listitem"><span class="num">05</span><h3>Exit explicitly</h3><p>Call <code>end_focus</code> as completed or blocked. The runtime clears execution state but keeps workflow step and ticket context.</p></article>
+        </div>
+        <p class="caption"><strong>Queue guard:</strong> only one continuation can be pending, and a queued continuation is discarded if its run ID is no longer active.</p>
+      </section>
+
+      <section id="prompts" aria-labelledby="prompts-title">
+        <div class="section-head">
+          <p class="eyebrow">03 · Exact prompt inventory</p>
+          <h2 id="prompts-title">Six prompt surfaces are grouped into five source blocks</h2>
+          <p>The blocks below reproduce the current source text; exit guidance and its final-response cue share one block because both come from the same tool definition. Runtime values are shown as placeholders in braces, and the user’s skill argument is appended separately by Pi.</p>
+        </div>
+
+        <div class="prompt-index" aria-label="Prompt inventory overview">
+          <article class="card"><span class="tag">Loaded once</span><h3>Focus skill</h3><p>Defines autonomy, scope control, completion audit, and explicit exit.</p></article>
+          <article class="card"><span class="tag">Authoritative</span><h3>Execute skill</h3><p>Defines baseline tests, implementation phases, tracking, quality, and final response.</p></article>
+          <article class="card"><span class="tag">Every run</span><h3>System contract</h3><p>Reasserts “keep working,” current turn count, task source, and exit conditions.</p></article>
+          <article class="card"><span class="tag">Between runs</span><h3>Continuation</h3><p>Queues the next concrete implementation or verification action.</p></article>
+          <article class="card"><span class="tag">Tool metadata</span><h3>Exit guidance</h3><p>Teaches the model when the <code>end_focus</code> tool is valid.</p></article>
+          <article class="card"><span class="tag">Tool result</span><h3>Final-response cue</h3><p>After exit, asks the agent to give the user its normal final response.</p></article>
+        </div>
+
+        <details class="prompt" open>
+          <summary><span class="prompt-id">P1</span><span>Focus skill instructions</span><span class="when">activation · once</span></summary>
+          <div class="prompt-body">
+            <div class="source"><span>Source: pi/skills/focus/SKILL.md</span><button class="copy" type="button" data-copy="p1">Copy prompt</button></div>
+            <pre id="p1">Autonomous wrapper around `execute`.
+
+First read and follow the installed `execute` skill as authoritative:
+`$SKILLS_ROOT/execute/SKILL.md`
+
+Focus mode continues automatically after every turn. You do not need to emit a continuation marker or ask for another turn.
+
+Rules:
+
+- Follow `execute` exactly for baseline verification, tracked feature status, plan checklist updates, discovered work, docs policy, testing, and code quality.
+- Work from the active plan document when one exists; re-read it after compaction or whenever the next step is unclear.
+- Verify the plan checklist against the repository rather than trusting earlier progress summaries.
+- If no plan exists, continue from the feature or task the user provided.
+- Keep changes minimal and phase-based. Do not broaden scope.
+- Do not stop merely to report progress while actionable work remains.
+- Continue implementing and verifying until the requested work is complete or further progress requires user input or an external dependency.
+
+Focus mode has no turn limit. End it explicitly with the `end_focus` tool:
+
+- Use outcome `completed` only after the requested work is implemented and relevant verification passes.
+- Use outcome `blocked` only when no safe, in-scope work remains without user input or an external requirement.
+- Include a concise completion summary or blocker explanation.
+- After the tool returns, give the user the final response requested by `execute`.
+
+Before calling `end_focus` with outcome `completed`, perform a short completion audit:
+
+- Compare the active plan checklist, when present, to actual repository changes.
+- Confirm verification ran for completed work.
+- Check for remaining in-scope TODOs, temporary artifacts, or unreported blockers.
+- If meaningful work remains, do not call `end_focus`; continue working.</pre>
+            <p class="annotation">Frontmatter also declares <code>thinkingLevel: high</code>. The separate skill-thinking extension applies that level to the typed skill-command run, then restores the previous level at <code>agent_end</code>.</p>
+          </div>
+        </details>
+
+        <details class="prompt">
+          <summary><span class="prompt-id">P2</span><span>Authoritative execute instructions</span><span class="when">loaded by agent</span></summary>
+          <div class="prompt-body">
+            <div class="source"><span>Source: installed execute/SKILL.md</span><button class="copy" type="button" data-copy="p2">Copy prompt</button></div>
+            <pre id="p2">Work directly from the active plan or task we have been discussing.
+
+### Baseline Verification (First Task Only)
+
+Run a minimal smoke test before starting — run existing tests or start the app and confirm basic functionality. If broken, stop and report.
+
+### Begin Implementation
+
+Iterate through each phase: implement, verify existing features still work, confirm tests pass, then move on. Mark completed steps with `[x]` as you go.
+
+Execute the approved plan autonomously end-to-end unless the plan says otherwise. If it cannot be implemented as planned, try a clean minimal fix within the plan’s intent; stop and consult the user before hacks, ad-hoc patches, unreviewed rearchitecture, or significant deviations.
+
+**Tracked features (`{epic}-{nnn}.md`):** set status to `in_progress` before starting: `$SKILLS_ROOT/_lib/features_yaml.sh update "{feature-id}" --json '{"status":"in_progress"}'`
+
+### Discovered Work
+
+**Tracked features:** check if the work exists in `agent-work/features.yaml` first — if not, register it via `ticket-init` skill with `discovered_from` set to the parent feature ID.
+- Blocks current work → handle it first if small and low-risk; otherwise pause and report to the user
+- Parallelizable → add to backlog, continue
+
+Update the plan document with a "Discovered Work" section. Never silently absorb new scope into the current task.
+
+### Documentation
+
+Update docs during execution only when the approved plan lists them as explicit deliverables. Otherwise, capture documentation gaps or lessons discovered during implementation under `Reflection Candidates` in the plan for `/reflect`.
+
+### Code Quality
+
+- Before implementing, identify the existing code that owns the behavior.
+- Make the smallest, simplest change that fully solves the task. Prefer fundamental fixes over localized patches or parallel solutions, and replace obsolete code.
+- Reuse existing patterns; keep changes modular and avoid widening the impact without clear need.
+- Do not add fallbacks, inferred defaults, mock functionality, or blanket exception handling. Let errors surface unless recovery is specific and intentional.
+- Tests must validate actual behavior — no dummy assertions or placeholders.
+- For UI/UX work, invoke the `frontend-designer` subagent if available.
+
+### Functional Testing (User-Facing Features Only)
+
+For user-facing features (UI flows, API endpoints, interactive elements), invoke a testing subagent and validate real behavior:
+- UI: Playwright or equivalent real-browser automation to walk through flows
+- API: call endpoints with realistic payloads
+- Data: query edge cases that could corrupt user data
+
+### Session End
+
+At the end of each phase, ensure clean, reviewable state — no half-implemented features, no commented-out debug code.
+
+For successful execution, include a `Summary:` line with 1-2 sentences on what was implemented, verified, and any minor plan adjustments before the handoff label.
+- **READY FOR REVIEW** — all phases done and ready for `/review`
+
+Otherwise:
+- **BLOCKED / PENDING STEPS** — explain the blocker, list remaining phases/tasks, indicate next action</pre>
+            <p class="annotation">Focus delegates the engineering policy to this skill instead of duplicating it. That keeps autonomous and ordinary execution aligned.</p>
+          </div>
+        </details>
+
+        <details class="prompt" open>
+          <summary><span class="prompt-id">P3</span><span>Per-run system-prompt contract</span><span class="when">before_agent_start</span></summary>
+          <div class="prompt-body">
+            <div class="source"><span>Source: extensions/workflow-runtime/core.ts · focusContract()</span><button class="copy" type="button" data-copy="p3">Copy prompt</button></div>
+            <pre id="p3">Focus mode is active{ for ticket TICKET_ID}; {TURNS_COMPLETED} turns are complete and there is no turn limit. Continue working autonomously instead of stopping at a progress report. Follow `$SKILLS_ROOT/execute/SKILL.md`, re-read the active plan document if one exists, and verify its checklist against the repository. If there is no plan, continue the feature or task the user provided. When the work is implemented and verified, or when further progress requires user input, call `end_focus` with outcome `completed` or `blocked` and a concise summary. Only `end_focus`, manual user input, or a session boundary ends focus mode.</pre>
+            <p class="annotation">This string is appended to Pi’s system prompt before every focus run. The ticket phrase is omitted when no ticket is active.</p>
+          </div>
+        </details>
+
+        <details class="prompt" open>
+          <summary><span class="prompt-id">P4</span><span>Between-run continuation message</span><span class="when">after agent_end</span></summary>
+          <div class="prompt-body">
+            <div class="source"><span>Source: extensions/workflow-runtime/core.ts · continuationContent()</span><button class="copy" type="button" data-copy="p4">Copy prompt</button></div>
+            <pre id="p4">Continue focus mode on the same work.
+{Active ticket: TICKET_ID}
+Turns completed: {TURNS_COMPLETED}
+
+Re-read `$SKILLS_ROOT/execute/SKILL.md` and the active plan document if one exists. Verify the plan checklist against the repository, then take the next concrete implementation or verification step. If no plan exists, continue from the feature or task the user provided. Do not stop merely to report progress.
+
+When all requested work is implemented and verified, call `end_focus` with outcome `completed` and a concise summary. If progress is blocked on user input or an external requirement, call `end_focus` with outcome `blocked` and explain the blocker. If work remains, keep working; focus mode will continue automatically.</pre>
+            <p class="annotation">The extension sends this as a visible custom message with <code>triggerTurn: true</code> and <code>deliverAs: "followUp"</code>. In the TUI it collapses to “Workflow · Focus continuing · next turn N.”</p>
+          </div>
+        </details>
+
+        <details class="prompt">
+          <summary><span class="prompt-id">P5</span><span>end_focus tool guidance and result</span><span class="when">tool prompt + exit</span></summary>
+          <div class="prompt-body">
+            <div class="source"><span>Source: extensions/workflow-runtime/index.ts · registerTool()</span><button class="copy" type="button" data-copy="p5">Copy prompt</button></div>
+            <pre id="p5">Tool description:
+End active focus mode after the work is completed or blocked.
+
+Prompt snippet:
+End focus mode with an outcome and concise summary
+
+Prompt guidelines:
+- When focus mode is active, call end_focus only after the requested work is implemented and verified, or when progress requires user input or an external dependency.
+- Do not call end_focus merely to report progress while actionable work remains.
+
+Parameters:
+- outcome: "completed" | "blocked"
+- summary: non-empty concise completion summary or blocker explanation
+
+Tool result returned to the agent:
+Focus mode ended with outcome {OUTCOME}. Give the user a final response now. Summary: {SUMMARY}</pre>
+            <p class="annotation">The tool removes only the execution object. The workflow remains at <code>execute</code>, and an active ticket remains available for the later review step.</p>
+          </div>
+        </details>
+      </section>
+
+      <section id="boundaries" aria-labelledby="boundaries-title">
+        <div class="section-head">
+          <p class="eyebrow">04 · Stop boundaries</p>
+          <h2 id="boundaries-title">Compaction preserves focus; human input and session boundaries do not</h2>
+          <p>The loop is intentionally persistent within a live session and intentionally conservative across human or session transitions.</p>
+        </div>
+        <div class="boundary-grid">
+          <article class="card boundary keep"><span class="status keep">continues</span><h3>Normal agent completion</h3><ul><li>Turn count increments.</li><li>A follow-up is queued.</li><li>The same run ID is checked before delivery.</li></ul></article>
+          <article class="card boundary keep"><span class="status keep">preserved</span><h3>Context compaction</h3><ul><li>Manual, threshold, and overflow compaction retain focus state.</li><li>The reminders tell the agent to re-read the plan.</li></ul></article>
+          <article class="card boundary stop"><span class="status stop">stops</span><h3>Manual user input</h3><ul><li>Any ordinary non-extension input ends execution mode.</li><li>Workflow step and ticket stay visible.</li></ul></article>
+          <article class="card boundary warn"><span class="status stop">reinvoke</span><h3>Session boundary</h3><ul><li>Reload, restart/startup, resume, new session, and fork do not restore an active run.</li><li>New and fork also clear workflow context.</li></ul></article>
+        </div>
+      </section>
+
+      <section id="takeaways" class="callout" aria-labelledby="takeaways-title">
+        <p class="eyebrow">05 · What to remember</p>
+        <h2 id="takeaways-title">Focus is execute plus persistence, with an explicit exit contract.</h2>
+        <p>Its safety model is simple: keep taking concrete in-scope steps, repeatedly verify against repository reality, and stop only after completion or when no safe path remains without outside input.</p>
+        <div class="takeaways">
+          <div class="takeaway"><strong>Policy</strong><span><code>execute</code> owns implementation quality and workflow behavior.</span></div>
+          <div class="takeaway"><strong>Persistence</strong><span>The extension injects a system contract and queues the next run.</span></div>
+          <div class="takeaway"><strong>Control</strong><span><code>end_focus</code>, manual input, or a session boundary breaks the loop.</span></div>
+        </div>
+      </section>
+
+      <footer class="provenance">
+        <p><strong>Scope:</strong> current existing behavior, not a proposal. Sources inspected: <code>pi/skills/focus/SKILL.md</code>, installed <code>execute/SKILL.md</code>, <code>extensions/workflow-runtime/core.ts</code>, <code>extensions/workflow-runtime/index.ts</code>, <code>extensions/skill-thinking.ts</code>, runtime tests, README, and Pi’s skills/extensions documentation.</p>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const buttons = document.querySelectorAll('[data-copy]');
+      for (const button of buttons) {
+        button.addEventListener('click', async () => {
+          const target = document.getElementById(button.dataset.copy);
+          if (!target || !navigator.clipboard) return;
+          const original = button.textContent;
+          await navigator.clipboard.writeText(target.textContent);
+          button.textContent = 'Copied';
+          window.setTimeout(() => { button.textContent = original; }, 1400);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

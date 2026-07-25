@@ -6,7 +6,7 @@ metadata:
   thinkingLevel: high
 ---
 
-Create a detailed Markdown implementation plan for the provided request. Avoid scope creep.
+Create a detailed Markdown implementation plan for the provided request.
 
 ### Pre-Work & User Interview
 
@@ -35,20 +35,22 @@ Include a context-files section:
    - `**Feature:** {id} → {description}`
    - `**Session:** {harness session ID}`
 
-2. Identify the existing code that owns the behavior, brainstorm solution alternatives, and prefer the fundamental approach with the smallest surface area and simplest implementation.
+2. Inventory what already exists before designing: the code that owns this behavior, plus the architecture, libraries, utilities, and conventions the codebase already uses for this class of problem. Default to composing existing pieces, then brainstorm alternatives and pick the fundamental approach with the smallest surface area.
 
-3. Write a detailed implementation plan (code snippets, file paths, architecture layout with components, data flows, and dependencies). Scale depth to complexity; use pseudocode, diagrams, and breakdowns as needed.
+3. Include a `## Reuse` section listing the existing components, patterns, and dependencies the plan builds on, with file paths. Any new abstraction, library, or pattern needs a one-line justification of why the existing option is inadequate.
 
-4. If UI work, include a design direction section. Brainstorm with the `frontend-designer` subagent if available. Specify theme tokens, typography, and color choices centrally — no scattered magic values.
+4. Write a detailed implementation plan (code snippets, file paths, architecture layout with components, data flows, and dependencies). Scale depth to complexity; use pseudocode, diagrams, and breakdowns as needed.
 
-5. Under `## Implementation Phases`, divide work into incremental test-first phases (foundation → core → polish). Use `### Phase <number>: <short title>` headings, with actionable `[ ]` checkboxes directly under each phase, including its final verification. Write/update the failing test first, make the smallest passing change, then refactor. The `execute` skill marks completed actions with `[x]`. Move deferred work to `Discovered Work` or rewrite it as a plain note; do not leave it as an unchecked actionable item.
+5. If UI work, include a design direction section. Brainstorm with the `frontend-designer` subagent if available. Specify theme tokens, typography, and color choices centrally — no scattered magic values.
 
-6. Include a **verification strategy** for each phase:
+6. Under `## Implementation Phases`, divide work into incremental test-first phases (foundation → core → polish). Use `### Phase <number>: <short title>` headings, with actionable `[ ]` checkboxes directly under each phase, including its final verification. Write/update the failing test first, make the smallest passing change, then refactor. The `execute` skill marks completed actions with `[x]`. Move deferred work to `Discovered Work` or rewrite it as a plain note; do not leave it as an unchecked actionable item.
+
+7. Include a **verification strategy** for each phase:
    - Focus on outcomes: "Does it achieve the goal?" not "Does it import?"
    - Side effects: test workflows end-to-end, with the smallest necessary impact area
    - Pure logic: test with realistic inputs and edge cases
 
-7. Note likely doc impacts as `Reflection Candidates` for `/reflect`.
+8. Note likely doc impacts as `Reflection Candidates` for `/reflect`.
 
 ### Plan Review (Non-Trivial Plans Only)
 

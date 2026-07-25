@@ -27,7 +27,7 @@ EXPECTED_SKILL_THINKING = {
     "reflect": "medium",
     "review": "high",
     "test-coverage": "high",
-    "ticket-init": "medium",
+    "ticket-init": "low",
     "workflow-orchestrator": "medium",
 }
 VALID_THINKING_LEVELS = {"off", "minimal", "low", "medium", "high", "xhigh"}
@@ -70,8 +70,9 @@ class PiExtensionImportsTest(unittest.TestCase):
         source = EXTENSION.read_text()
 
         self.assertIn('const FOCUS_SKILL = "focus";', source)
-        self.assertIn('"FOC ✦"', source)
-        self.assertIn('"FOC ✧"', source)
+        self.assertIn('FOCUS_MODE_DISPLAY.short', source)
+        self.assertIn('"✦"', source)
+        self.assertIn('"✧"', source)
         self.assertIn('pi.on("agent_end"', source)
         self.assertNotIn("LONG EXECUTE CONTINUE", source)
         self.assertNotIn("maxTurns", source)
@@ -126,7 +127,7 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertNotIn("@mariozechner/pi-coding-agent", source)
         self.assertNotIn("@mariozechner/pi-tui", source)
 
-    def test_notify_uses_current_pi_package_and_macos_sound(self) -> None:
+    def test_notify_uses_current_pi_package_without_sound(self) -> None:
         source = NOTIFY_EXTENSION.read_text()
 
         self.assertIn('from "@earendil-works/pi-coding-agent"', source)
@@ -134,7 +135,8 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn('pi.on("agent_end"', source)
         self.assertIn('pi.registerCommand("notify-test"', source)
         self.assertIn("display notification", source)
-        self.assertIn("afplay", source)
+        self.assertNotIn("afplay", source)
+        self.assertNotIn('process.stdout.write("\\x07")', source)
         self.assertIn("sessionBody", source)
         self.assertIn("basename(ctx.cwd)", source)
         self.assertIn("sessionName(pi, ctx)", source)

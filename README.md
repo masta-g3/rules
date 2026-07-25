@@ -62,13 +62,15 @@ Pi-only skills live in `pi/skills/` and overlay into `~/.pi/agent/skills/` after
 
 `extensions/skill-thinking.ts` reads `metadata.thinkingLevel` from workflow skill frontmatter for typed `/skill:<name>` commands, sets Pi's thinking level for that turn, and restores the previous level when the turn ends. Without the extension installed, the metadata is inert; non-Pi harnesses ignore it.
 
-`extensions/notify.ts` sends a native macOS notification plus a direct `afplay` sound when Pi returns to input. Use `/notify-test` after `/reload` to verify local sound/notification permissions.
+`extensions/notify.ts` sends a silent native macOS notification when Pi returns to input. Use `/notify-test` after `/reload` to verify local notification permissions.
 
 Current Pi-specific extension work also includes a minimalist workflow rail that highlights the active tracked-work skill step inside Pi:
 
 `plan-md → execute → review → reflect → commit`
 
 This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the most recently invoked workflow step, not authoritative feature completion state.
+
+The runtime also owns the workflow's ordered display definition. Every persisted `workflow-runtime` custom entry includes the five step ids, short codes, and friendly labels alongside the active state and producer `updatedAt` timestamp. Consumers such as dashboards treat this as a soft transient contract: they can render the producer's order without mirroring stage constants, while missing or malformed metadata affects display only. Reloading or resuming an active historical workflow writes one normalized entry with the current definition; definition-current entries and inactive sessions do not incur that normalization write.
 
 Ticket context and shortcuts:
 

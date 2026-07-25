@@ -34,7 +34,7 @@ Create a polished, grounded visual explanation—not an implementation plan or a
 - Surface relevant boundaries, status, tradeoffs, and consequences; omit implementation checklists unless requested.
 - Ends with memorable takeaways or decisions.
 
-## Output Location
+## File Location
 
 - If the user provides a path, write there.
 - If tied to a tracked feature ID, prefer `agent-work/decks/<feature-id>-<slug>.html`.
@@ -42,6 +42,6 @@ Create a polished, grounded visual explanation—not an implementation plan or a
 
 Create parent directories as needed. Do not put generated HTML in `docs/` unless the user explicitly wants it to be durable project documentation.
 
-## Report
+## Output
 
 State the created file path and a one-sentence summary of what the explanation covers. Include design-delegation or reader-validation warnings, plus any assumptions or gaps that affected the explanation.

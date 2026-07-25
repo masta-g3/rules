@@ -31,7 +31,7 @@ Read the plan file provided. Evaluate against these criteria:
 ### Architecture
 - Does the plan respect the repo's high-level shape (`docs/STRUCTURE.md`) — right layer, right module, no bypassed flows?
 - Will the proposed code work with existing patterns?
-- Does it reinvent existing utilities or introduce new patterns when existing ones could be reused?
+- Does it introduce a new pattern, abstraction, or dependency where existing code already solves this? Check the `Reuse` section against the codebase — unjustified new machinery is the highest-priority finding.
 
 ### Scope
 - Are all affected files identified?

@@ -1,7 +1,7 @@
 ---
 name: second-opinion
-description: Opus 4.8 delegate for second opinions on plans, assessments, and decisions.
-model: claude-bridge/claude-opus-4-8
+description: Opus 5 delegate for second opinions on plans, assessments, and decisions.
+model: claude-bridge/claude-opus-5
 systemPromptMode: append
 inheritProjectContext: true
 inheritSkills: false

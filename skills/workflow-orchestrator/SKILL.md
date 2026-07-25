@@ -148,7 +148,7 @@ Do not require every child to report availability for unrelated tools. Ask about
 - Children may launch only explicitly allowed nested specialist agents for the current phase. Nested agents must not stage, commit, merge, push, or modify files unless the phase prompt explicitly allows it.
 - Require the child to report whether each expected nested specialist was used or skipped, plus the nested job ID/result path and which feedback was accepted/rejected.
 
-## Final output
+## Output
 
 Report:
 

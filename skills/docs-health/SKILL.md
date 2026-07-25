@@ -83,3 +83,7 @@ Once the user confirms:
 - Run relevant validation: path/link checks with `rg` or `find`, existing tests when docs affect tested inventories, and a final residue check for unfinished markers or prompt artifacts.
 
 Do not audit for completeness as an end in itself. The goal is healthier durable documentation with less noise.
+
+### Output
+
+Report the files changed and include a `Summary:` line with 1-2 sentences on what was fixed and what was deliberately left alone.

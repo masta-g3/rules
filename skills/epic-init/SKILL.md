@@ -39,6 +39,6 @@ references:
   - "agent-work/plans/{epic}-000.md"
 ```
 
-### 4. Report
+### Output
 
 Summarize: epic prefix, feature count by priority, key dependencies, and recommended starting feature. Do not begin implementation — use `/next-feature` to select and `/plan-md` to plan.

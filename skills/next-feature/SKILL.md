@@ -45,4 +45,4 @@ Rules:
 
 ### Output
 
-When an actionable feature is recommended, end with `READY FOR PLAN`. If nothing is actionable, report the blocked/no-ready state instead.
+When an actionable feature is recommended, include a `Summary:` line with 1-2 sentences on the recommended feature and why it is next, then end with `READY FOR PLAN`. If nothing is actionable, report the blocked/no-ready state instead.

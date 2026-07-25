@@ -5,7 +5,7 @@ metadata:
   thinkingLevel: high
 ---
 
-Autonomous wrapper around `execute`. During an active execute step, the agent may enter this mode with `start_focus` when approved in-scope work is likely to require multiple turns and can proceed without immediate user input.
+`focus` wraps `execute` for approved, in-scope work likely to span multiple turns without immediate user input. Enter it with `start_focus` during execution.
 
 First read and follow the installed `execute` skill as authoritative:
 `$SKILLS_ROOT/execute/SKILL.md`

@@ -68,3 +68,7 @@ Once user confirms:
 - Run tests to verify they pass
 
 If existing tests fail before adding new ones, report to user first.
+
+### Output
+
+Report the tests added and their pass/fail result, and include a `Summary:` line with 1-2 sentences on what behavior is now covered.

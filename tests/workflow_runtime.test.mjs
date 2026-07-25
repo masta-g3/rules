@@ -5,19 +5,94 @@ import {
   continuationContent,
   createContinuationQueue,
   finalAssistantStopReason,
+  FOCUS_MODE_DISPLAY,
   recoverFocus,
+  shouldNormalizeWorkflowDefinition,
   transition,
-  WORKFLOW_STEPS,
+  withWorkflowDefinition,
+  WORKFLOW_DEFINITION,
 } from "../extensions/workflow-runtime/core.ts";
 
-test("the progress rail covers plan through commit", () => {
-  assert.deepEqual(WORKFLOW_STEPS, [
-    "plan-md",
-    "execute",
-    "review",
-    "reflect",
-    "commit",
-  ]);
+const expectedWorkflowDefinition = [
+  { id: "plan-md", short: "PL", label: "Plan" },
+  { id: "execute", short: "EX", label: "Execute" },
+  { id: "review", short: "RV", label: "Review" },
+  { id: "reflect", short: "RF", label: "Reflect" },
+  { id: "commit", short: "CM", label: "Commit" },
+];
+
+test("the producer owns the ordered workflow definition", () => {
+  assert.deepEqual(WORKFLOW_DEFINITION, expectedWorkflowDefinition);
+});
+
+test("persisted runtime data includes the producer definition", () => {
+  assert.deepEqual(
+    withWorkflowDefinition({
+      activeStep: "execute",
+      ticketId: "workflow-board-001",
+      source: "input",
+      updatedAt: 1784772000000,
+    }),
+    {
+      activeStep: "execute",
+      ticketId: "workflow-board-001",
+      source: "input",
+      updatedAt: 1784772000000,
+      steps: expectedWorkflowDefinition,
+    },
+  );
+});
+
+test("focus entries publish one producer-owned active mode display", () => {
+  const focused = withWorkflowDefinition({
+    ...activeState({ turnsCompleted: 4 }),
+    updatedAt: 1784772000000,
+  });
+
+  assert.deepEqual(FOCUS_MODE_DISPLAY, { id: "focus", short: "FOC", label: "Focus" });
+  assert.deepEqual(focused.activeMode, {
+    id: "focus",
+    short: "FOC",
+    label: "Focus",
+    detail: "turn 4",
+  });
+  assert.equal(focused.steps.find((step) => step.id === "execute")?.short, "EX");
+
+  const continued = transition(activeState({ turnsCompleted: 4 }), {
+    type: "agent-end",
+    stopReason: "stop",
+  });
+  assert.equal(withWorkflowDefinition(continued.state).activeMode?.detail, "turn 5");
+
+  const exited = transition(continued.state, { type: "end-focus" });
+  assert.equal(withWorkflowDefinition(exited.state).activeMode, undefined);
+  assert.equal(withWorkflowDefinition({ activeStep: "execute" }).activeMode, undefined);
+});
+
+test("only active historical sessions need producer definition normalization", () => {
+  const historicalActive = { activeStep: "review", ticketId: "workflow-board-001" };
+  for (const reason of ["startup", "reload", "resume"]) {
+    assert.equal(shouldNormalizeWorkflowDefinition(historicalActive, reason), true, reason);
+    assert.equal(
+      shouldNormalizeWorkflowDefinition(withWorkflowDefinition(historicalActive), reason),
+      false,
+      `${reason} current definition`,
+    );
+  }
+
+  for (const steps of [
+    expectedWorkflowDefinition.slice().reverse(),
+    expectedWorkflowDefinition.map((step) => (step.id === "execute" ? { ...step, short: "DO" } : step)),
+    expectedWorkflowDefinition.map((step) => (step.id === "review" ? { ...step, label: "Inspect" } : step)),
+  ]) {
+    assert.equal(shouldNormalizeWorkflowDefinition({ ...historicalActive, steps }, "resume"), true);
+  }
+
+  assert.equal(shouldNormalizeWorkflowDefinition({}, "new"), false);
+  assert.equal(shouldNormalizeWorkflowDefinition({}, "startup"), false);
+  assert.equal(shouldNormalizeWorkflowDefinition({ ticketId: "workflow-board-001" }, "resume"), false);
+  assert.equal(shouldNormalizeWorkflowDefinition(historicalActive, "new"), false);
+  assert.equal(shouldNormalizeWorkflowDefinition(historicalActive, "fork"), false);
 });
 
 const activeState = (overrides = {}) => ({
