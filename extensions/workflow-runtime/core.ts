@@ -61,23 +61,29 @@ export function finalAssistantStopReason(
 	return undefined;
 }
 
-export function focusContract(state: WorkflowState): string {
-	const execution = state.execution;
-	if (!execution) return "";
-	const ticket = state.ticketId ? ` for ticket ${state.ticketId}` : "";
-	return `Focus mode is active${ticket}; ${execution.turnsCompleted} turns are complete and there is no turn limit. Continue working autonomously instead of stopping at a progress report. Follow \`$SKILLS_ROOT/execute/SKILL.md\`, re-read the active plan document if one exists, and verify its checklist against the repository. If there is no plan, continue the feature or task the user provided. When the work is implemented and verified, or when further progress requires user input, call \`end_focus\` with outcome \`completed\` or \`blocked\` and a concise summary. Ordinary user input does not end focus mode. Only \`end_focus\`, changing workflow steps, or a session boundary ends it.`;
+export type FocusRecoveryEvent =
+	| { type: "ordinary-input"; streaming: boolean }
+	| { type: "session-compact"; willRetry: boolean }
+	| { type: "before-agent-start" };
+
+export type FocusRecoveryResult = {
+	pending: boolean;
+	delivery?: "before-agent-start" | "steer";
+};
+
+export function recoverFocus(pending: boolean, event: FocusRecoveryEvent): FocusRecoveryResult {
+	if (event.type === "ordinary-input") return { pending: event.streaming ? pending : true };
+	if (event.type === "session-compact") {
+		return event.willRetry ? { pending: false, delivery: "steer" } : { pending };
+	}
+	return pending ? { pending: false, delivery: "before-agent-start" } : { pending: false };
 }
 
 export function continuationContent(state: WorkflowState): string {
-	const execution = state.execution;
-	if (!execution) return "";
-	const ticket = state.ticketId ? `\nActive ticket: ${state.ticketId}` : "";
-	return `Continue focus mode on the same work.${ticket}
-Turns completed: ${execution.turnsCompleted}
-
-Re-read \`$SKILLS_ROOT/execute/SKILL.md\` and the active plan document if one exists. Verify the plan checklist against the repository, then take the next concrete implementation or verification step. If no plan exists, continue from the feature or task the user provided. Do not stop merely to report progress.
-
-When all requested work is implemented and verified, call \`end_focus\` with outcome \`completed\` and a concise summary. If progress is blocked on user input or an external requirement, call \`end_focus\` with outcome \`blocked\` and explain the blocker. If work remains, keep working; focus mode will continue automatically.`;
+	if (!state.execution) return "";
+	const ticket = state.ticketId ? `Continue the active focus run for ticket ${state.ticketId}.\n` : "";
+	return `${ticket}Follow \`execute\` and the active plan when present; otherwise continue the user's task. Verify progress against the repository, then take the next concrete implementation or verification step.
+Exit focus explicitly: call \`end_focus\` with outcome \`completed\` when the work is implemented and verified, or \`blocked\` when further progress requires user input or an external dependency; include a concise summary in either case. Do not stop at a progress report or leave focus active after either condition.`;
 }
 
 export function transition(state: WorkflowState, event: RuntimeEvent): TransitionResult {

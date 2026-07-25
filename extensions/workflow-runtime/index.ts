@@ -7,7 +7,7 @@ import {
 	continuationContent,
 	createContinuationQueue,
 	finalAssistantStopReason,
-	focusContract,
+	recoverFocus,
 	transition,
 	WORKFLOW_STEPS,
 	type RuntimeEffect,
@@ -54,7 +54,7 @@ type CustomEntry = {
 };
 
 type RuntimeEventDetails = {
-	kind: "continuation";
+	kind: "continuation" | "recovery";
 	state: WorkflowState;
 };
 
@@ -214,16 +214,24 @@ function applyWidget(ctx: ExtensionContext, state: WorkflowState): void {
 	});
 }
 
+function focusMessage(state: WorkflowState, kind: RuntimeEventDetails["kind"], display: boolean) {
+	return {
+		customType: EVENT_TYPE,
+		content: continuationContent(state),
+		display,
+		details: { kind, state } satisfies RuntimeEventDetails,
+	};
+}
+
 function emitContinuation(pi: ExtensionAPI, state: WorkflowState): void {
-	pi.sendMessage(
-		{
-			customType: EVENT_TYPE,
-			content: continuationContent(state),
-			display: true,
-			details: { kind: "continuation", state } satisfies RuntimeEventDetails,
-		},
-		{ triggerTurn: true, deliverAs: "followUp" },
-	);
+	pi.sendMessage(focusMessage(state, "continuation", true), {
+		triggerTurn: true,
+		deliverAs: "followUp",
+	});
+}
+
+function emitRecovery(pi: ExtensionAPI, state: WorkflowState): void {
+	pi.sendMessage(focusMessage(state, "recovery", false), { deliverAs: "steer" });
 }
 
 function applyEffects(
@@ -248,6 +256,7 @@ function applyEffects(
 
 export default function workflowRuntime(pi: ExtensionAPI): void {
 	let state: WorkflowState = {};
+	let recoveryPending = false;
 	let lastAdvanceShortcutAt = 0;
 	const continuationQueue = createContinuationQueue();
 
@@ -267,8 +276,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		const box = new Box(1, 1, (value) => theme.bg("customMessageBg", value));
 		box.addChild(new Text(theme.fg("customMessageLabel", theme.bold("Workflow")), 0, 0));
 		box.addChild(new Spacer(1));
-		const ticket = eventState?.ticketId ? `Ticket: ${eventState.ticketId}\n` : "";
-		box.addChild(new Text(theme.fg("customMessageText", `${ticket}${String(message.content)}`), 0, 0));
+		box.addChild(new Text(theme.fg("customMessageText", String(message.content)), 0, 0));
 		return box;
 	});
 
@@ -288,6 +296,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 	pi.registerCommand("wf-clear", {
 		description: "Clear the workflow indicator",
 		handler: async (_args, ctx) => {
+			recoveryPending = false;
 			state = clearState(pi, ctx);
 			ctx.ui.notify("Workflow indicator cleared.", "info");
 		},
@@ -328,6 +337,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
 			if (state.execution) throw new Error("Focus mode is already active.");
 			if (state.activeStep !== "execute") throw new Error("Focus mode can only start during execute.");
+			recoveryPending = false;
 			const result = transition(state, {
 				type: "activate-focus",
 				ticketId: state.ticketId,
@@ -362,6 +372,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			if (!state.execution) throw new Error("Focus mode is not active.");
+			recoveryPending = false;
 			const result = transition(state, { type: "end-focus" });
 			state = setState(pi, ctx, result.state);
 			ctx.ui.notify(`Focus mode ended: ${params.outcome}.`, "info");
@@ -406,6 +417,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 			}
 
 			lastAdvanceShortcutAt = 0;
+			recoveryPending = false;
 			if (!nextStep) {
 				state = clearState(pi, ctx);
 				ctx.ui.notify("Workflow indicator cleared.", "info");
@@ -427,6 +439,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 
 		const skillName = extractSkill(event.text);
 		if (skillName === FOCUS_SKILL) {
+			recoveryPending = false;
 			const result = transition(state, {
 				type: "activate-focus",
 				ticketId: extractSkillTicket(event.text) ?? ticketIdFrom(event.text),
@@ -439,6 +452,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 
 		const stepName = extractStep(event.text);
 		if (stepName) {
+			recoveryPending = false;
 			const interrupted = state.execution
 				? transition(state, { type: "end-focus" })
 				: { state, effects: [] as RuntimeEffect[] };
@@ -453,6 +467,11 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		}
 
 		if (state.execution) {
+			const recovery = recoverFocus(recoveryPending, {
+				type: "ordinary-input",
+				streaming: event.streamingBehavior !== undefined,
+			});
+			recoveryPending = recovery.pending;
 			const result = transition(state, { type: "ordinary-input" });
 			state = setState(pi, ctx, result.state);
 			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
@@ -472,20 +491,36 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 	});
 
 	pi.on("before_agent_start", async (event) => {
-		let addition: string | undefined;
-		if (state.execution) addition = focusContract(state);
-		else if (state.ticketId) addition = `Active workflow ticket: ${state.ticketId}`;
-		if (!addition) return;
-		return { systemPrompt: `${event.systemPrompt}\n\n${addition}` };
+		if (state.execution) {
+			const recovery = recoverFocus(recoveryPending, { type: "before-agent-start" });
+			recoveryPending = recovery.pending;
+			if (recovery.delivery === "before-agent-start") {
+				return { message: focusMessage(state, "recovery", false) };
+			}
+			return;
+		}
+
+		recoveryPending = false;
+		if (!state.ticketId) return;
+		return { systemPrompt: `${event.systemPrompt}\n\nActive workflow ticket: ${state.ticketId}` };
 	});
 
 	pi.on("session_compact", async (event, ctx) => {
+		if (state.execution) {
+			const recovery = recoverFocus(recoveryPending, {
+				type: "session-compact",
+				willRetry: event.willRetry,
+			});
+			recoveryPending = recovery.pending;
+			if (recovery.delivery === "steer") emitRecovery(pi, state);
+		}
 		const result = transition(state, { type: "session-compact", reason: event.reason });
 		state = result.state;
 		applyWidget(ctx, state);
 	});
 
 	pi.on("session_start", async (event, ctx) => {
+		recoveryPending = false;
 		const restored = event.reason === "new" ? {} : findLatestState(ctx.sessionManager.getBranch());
 		const result = transition(restored, { type: "session-boundary", reason: event.reason });
 		if (event.reason === "fork" || result.effects.length) {
@@ -499,6 +534,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_shutdown", async () => {
+		recoveryPending = false;
 		syncFocusPulse(false);
 		activeTui = undefined;
 	});

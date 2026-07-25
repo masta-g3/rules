@@ -76,17 +76,18 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertNotIn("LONG EXECUTE CONTINUE", source)
         self.assertNotIn("maxTurns", source)
 
-    def test_workflow_runtime_wires_compaction_and_focus_contract(self) -> None:
+    def test_workflow_runtime_uses_hidden_focus_recovery_messages(self) -> None:
         source = EXTENSION.read_text()
         core = RUNTIME_CORE.read_text()
 
         self.assertIn('pi.on("session_compact"', source)
-        self.assertIn('reason: event.reason', source)
+        self.assertIn('willRetry: event.willRetry', source)
         self.assertIn('pi.on("before_agent_start"', source)
-        self.assertIn("focusContract(state)", source)
-        self.assertIn('$SKILLS_ROOT/execute/SKILL.md', core)
-        self.assertIn("active plan document if one exists", core)
-        self.assertIn("feature or task the user provided", core)
+        self.assertIn('return { message:', source)
+        self.assertIn('"recovery", false', source)
+        self.assertIn('deliverAs: "steer"', source)
+        self.assertNotIn("focusContract", source)
+        self.assertNotIn("focusContract", core)
 
     def test_workflow_runtime_registers_focus_tools(self) -> None:
         source = EXTENSION.read_text()
@@ -108,8 +109,9 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn('pi.registerMessageRenderer(EVENT_TYPE', source)
         self.assertIn('keyHint("app.tools.expand"', source)
         self.assertIn('customType: EVENT_TYPE', source)
-        self.assertIn('triggerTurn: true, deliverAs: "followUp"', source)
-        self.assertIn("When all requested work is implemented and verified, call", core)
+        self.assertIn('triggerTurn: true', source)
+        self.assertIn('deliverAs: "followUp"', source)
+        self.assertIn("Exit focus explicitly: call", core)
         self.assertIn("end_focus", core)
 
     def test_legacy_workflow_extensions_are_removed(self) -> None:

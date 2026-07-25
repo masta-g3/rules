@@ -5,7 +5,7 @@ import {
   continuationContent,
   createContinuationQueue,
   finalAssistantStopReason,
-  focusContract,
+  recoverFocus,
   transition,
   WORKFLOW_STEPS,
 } from "../extensions/workflow-runtime/core.ts";
@@ -41,21 +41,51 @@ test("activates focus mode with one workflow state", () => {
   assert.deepEqual(result.state, activeState());
 });
 
-test("focus reminders preserve the plan, task, ticket, and exit contract", () => {
-  const state = activeState({ turnsCompleted: 4 });
+test("focus reminders name the work, verification step, and explicit exit", () => {
+  const content = continuationContent(activeState({ turnsCompleted: 4 }));
 
-  for (const content of [focusContract(state), continuationContent(state)]) {
-    assert.match(content, /active plan document if one exists/);
-    assert.match(content, /feature or task the user provided/);
-    assert.match(content, /end_focus/);
-    assert.match(content, /completed/);
-    assert.match(content, /blocked/);
-  }
+  assert.match(content, /active focus run for ticket focus-001/);
+  assert.match(content, /Follow `execute` and the active plan when present/);
+  assert.match(content, /otherwise continue the user's task/);
+  assert.match(content, /Verify progress against the repository/);
+  assert.match(content, /call `end_focus`/);
+  assert.match(content, /outcome `completed`/);
+  assert.match(content, /`blocked`/);
+  assert.match(content, /concise summary/);
+  assert.match(content, /Do not stop at a progress report or leave focus active/);
+  assert.doesNotMatch(content, /Turns completed|turnsCompleted|next turn/);
 
-  assert.match(focusContract(state), /Ordinary user input does not end focus mode/);
-  assert.match(focusContract(state), /ticket focus-001/);
-  assert.match(continuationContent(state), /Active ticket: focus-001/);
-  assert.match(continuationContent(state), /Turns completed: 4/);
+  const unticketed = continuationContent({ ...activeState(), ticketId: undefined });
+  assert.doesNotMatch(unticketed, /ticket focus-001/);
+  assert.match(unticketed, /^Follow `execute`/);
+});
+
+test("focus recovery chooses one delivery for each Pi lifecycle path", () => {
+  assert.deepEqual(recoverFocus(false, { type: "ordinary-input", streaming: false }), {
+    pending: true,
+  });
+  assert.deepEqual(recoverFocus(false, { type: "ordinary-input", streaming: true }), {
+    pending: false,
+  });
+  assert.deepEqual(recoverFocus(false, { type: "session-compact", willRetry: false }), {
+    pending: false,
+  });
+  assert.deepEqual(recoverFocus(false, { type: "session-compact", willRetry: true }), {
+    pending: false,
+    delivery: "steer",
+  });
+
+  const pending = recoverFocus(false, { type: "ordinary-input", streaming: false });
+  assert.deepEqual(recoverFocus(pending.pending, { type: "before-agent-start" }), {
+    pending: false,
+    delivery: "before-agent-start",
+  });
+
+  const retry = recoverFocus(pending.pending, { type: "session-compact", willRetry: true });
+  assert.deepEqual(retry, { pending: false, delivery: "steer" });
+  assert.deepEqual(recoverFocus(retry.pending, { type: "before-agent-start" }), {
+    pending: false,
+  });
 });
 
 test("every successfully completed focus run continues automatically", () => {

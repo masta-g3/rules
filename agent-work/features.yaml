@@ -579,3 +579,22 @@
   created_at: '2026-07-09'
   id: long-execute-002
   completed_at: '2026-07-10'
+- epic: long-execute
+  status: done
+  title: Cache-safe focus reminders
+  description: Focus mode can continue, recover after user input or compaction, and
+    exit explicitly without changing the per-turn system prompt.
+  steps:
+  - Move focus reminders from the system prompt to compact custom messages.
+  - Keep automatic continuation visible and recovery reminders hidden.
+  - Tell the agent to call end_focus when work is complete or blocked.
+  priority: 2
+  depends_on: []
+  discovered_from: null
+  plan_file: agent-work/history/20260725_long-execute-003_cache_safe_focus.md
+  references:
+  - https://platform.openai.com/docs/guides/prompt-caching
+  - https://platform.claude.com/docs/en/build-with-claude/prompt-caching
+  created_at: '2026-07-25'
+  id: long-execute-003
+  completed_at: '2026-07-25'
