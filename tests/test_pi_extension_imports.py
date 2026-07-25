@@ -61,6 +61,7 @@ class PiExtensionImportsTest(unittest.TestCase):
         source = EXTENSION.read_text()
 
         self.assertIn('import { Type } from "typebox";', source)
+        self.assertIn('import { StringEnum } from "@earendil-works/pi-ai";', source)
         self.assertIn('pi.registerTool({', source)
         self.assertIn('name: "set_workflow_ticket"', source)
         self.assertIn('ticketId: Type.String', source)
@@ -94,8 +95,9 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn('state.activeStep !== "execute"', source)
         self.assertIn('type: "activate-focus"', source)
         self.assertIn('name: "end_focus"', source)
-        self.assertIn('Type.Literal("completed")', source)
-        self.assertIn('Type.Literal("blocked")', source)
+        self.assertIn('StringEnum(["completed", "blocked"] as const)', source)
+        self.assertNotIn('Type.Literal("completed")', source)
+        self.assertNotIn('Type.Literal("blocked")', source)
         self.assertIn('summary: Type.String', source)
         self.assertIn('{ type: "end-focus" }', source)
 

@@ -10,7 +10,7 @@ Autonomous wrapper around `execute`. During an active execute step, the agent ma
 First read and follow the installed `execute` skill as authoritative:
 `$SKILLS_ROOT/execute/SKILL.md`
 
-Focus mode continues automatically after every turn. You do not need to emit a continuation marker or ask for another turn.
+Focus mode continues automatically after each turn ending normally (`stop`). Esc/abort, provider errors, output limits, and other non-normal stops leave focus active but paused without scheduling another turn; ordinary user input resumes it.
 
 Rules:
 

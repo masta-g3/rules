@@ -1,6 +1,7 @@
 export const WORKFLOW_STEPS = ["plan-md", "execute", "review", "reflect", "commit"] as const;
 export type StepName = (typeof WORKFLOW_STEPS)[number];
 export type WorkflowSource = "input" | "command" | "shortcut" | "tool";
+export type AgentStopReason = "stop" | "length" | "toolUse" | "error" | "aborted";
 
 export type FocusExecution = {
 	mode: "focus";
@@ -24,7 +25,7 @@ export type RuntimeEffect =
 
 export type RuntimeEvent =
 	| { type: "activate-focus"; ticketId?: string; runId: string }
-	| { type: "agent-end" }
+	| { type: "agent-end"; stopReason?: AgentStopReason }
 	| { type: "end-focus" }
 	| { type: "ordinary-input" }
 	| { type: "session-compact"; reason: "manual" | "threshold" | "overflow" }
@@ -38,6 +39,26 @@ export type TransitionResult = {
 function withoutExecution(state: WorkflowState): WorkflowState {
 	const { execution: _execution, updatedAt: _updatedAt, source: _source, ...rest } = state;
 	return rest;
+}
+
+export function finalAssistantStopReason(
+	messages: readonly { role: string; stopReason?: string }[],
+): AgentStopReason | undefined {
+	for (let index = messages.length - 1; index >= 0; index--) {
+		const message = messages[index];
+		if (message?.role !== "assistant") continue;
+		switch (message.stopReason) {
+			case "stop":
+			case "length":
+			case "toolUse":
+			case "error":
+			case "aborted":
+				return message.stopReason;
+			default:
+				return undefined;
+		}
+	}
+	return undefined;
 }
 
 export function focusContract(state: WorkflowState): string {
@@ -91,6 +112,8 @@ export function transition(state: WorkflowState, event: RuntimeEvent): Transitio
 	if (event.type === "end-focus") return { state: withoutExecution(state), effects: [] };
 
 	if (event.type === "ordinary-input") return { state, effects: [] };
+
+	if (event.stopReason !== "stop") return { state, effects: [] };
 
 	return {
 		state: {

@@ -1,10 +1,12 @@
 import { keyHint, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Box, Spacer, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
 	continuationContent,
 	createContinuationQueue,
+	finalAssistantStopReason,
 	focusContract,
 	transition,
 	WORKFLOW_STEPS,
@@ -355,7 +357,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 			"Do not call end_focus merely to report progress while actionable work remains.",
 		],
 		parameters: Type.Object({
-			outcome: Type.Union([Type.Literal("completed"), Type.Literal("blocked")]),
+			outcome: StringEnum(["completed", "blocked"] as const),
 			summary: Type.String({ minLength: 1, description: "Concise completion summary or blocker explanation" }),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -458,9 +460,13 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		return { action: "continue" };
 	});
 
-	pi.on("agent_end", async (_event, ctx) => {
+	pi.on("agent_end", async (event, ctx) => {
 		if (!state.execution) return;
-		const result = transition(state, { type: "agent-end" });
+		const result = transition(state, {
+			type: "agent-end",
+			stopReason: finalAssistantStopReason(event.messages),
+		});
+		if (!result.effects.length) return;
 		state = setState(pi, ctx, result.state);
 		applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
 	});

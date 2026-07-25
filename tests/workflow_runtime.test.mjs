@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   continuationContent,
   createContinuationQueue,
+  finalAssistantStopReason,
   focusContract,
   transition,
   WORKFLOW_STEPS,
@@ -57,29 +58,53 @@ test("focus reminders preserve the plan, task, ticket, and exit contract", () =>
   assert.match(continuationContent(state), /Turns completed: 4/);
 });
 
-test("every completed focus turn continues automatically", () => {
-  const result = transition(activeState(), { type: "agent-end" });
+test("every successfully completed focus run continues automatically", () => {
+  const result = transition(activeState(), { type: "agent-end", stopReason: "stop" });
 
   assert.equal(result.state.execution.turnsCompleted, 1);
   assert.deepEqual(result.effects, [{ kind: "continue", runId: "run-1" }]);
+});
+
+test("aborted and failed focus runs pause without scheduling a continuation", () => {
+  for (const stopReason of ["aborted", "error", "length", "toolUse", undefined]) {
+    const state = activeState({ turnsCompleted: 2 });
+    const result = transition(state, { type: "agent-end", stopReason });
+
+    assert.deepEqual(result, { state, effects: [] }, String(stopReason));
+  }
+});
+
+test("the final assistant stop reason ignores trailing tool results", () => {
+  assert.equal(
+    finalAssistantStopReason([
+      { role: "assistant", stopReason: "aborted" },
+      { role: "toolResult" },
+    ]),
+    "aborted",
+  );
+  assert.equal(finalAssistantStopReason([{ role: "user" }]), undefined);
 });
 
 test("focus mode has no turn limit", () => {
   let state = activeState();
 
   for (let turn = 1; turn <= 100; turn += 1) {
-    const result = transition(state, { type: "agent-end" });
+    const result = transition(state, { type: "agent-end", stopReason: "stop" });
     assert.equal(result.state.execution.turnsCompleted, turn);
     assert.deepEqual(result.effects, [{ kind: "continue", runId: "run-1" }]);
     state = result.state;
   }
 });
 
-test("the explicit focus exit preserves workflow context", () => {
-  const result = transition(activeState({ turnsCompleted: 3 }), { type: "end-focus" });
+test("the explicit focus exit preserves workflow context and prevents later continuation", () => {
+  const exited = transition(activeState({ turnsCompleted: 3 }), { type: "end-focus" });
 
-  assert.deepEqual(result, {
+  assert.deepEqual(exited, {
     state: { activeStep: "execute", ticketId: "focus-001" },
+    effects: [],
+  });
+  assert.deepEqual(transition(exited.state, { type: "agent-end", stopReason: "stop" }), {
+    state: exited.state,
     effects: [],
   });
 });
