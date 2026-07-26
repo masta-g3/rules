@@ -42,7 +42,7 @@ If this session touched multiple repositories, commit all session work independe
 If the plan names a worktree, the commit above went to its branch. Close it out per repo:
 
 1. Confirm the archived plan and the `agent-work/features.yaml` completion are part of that commit — the PR carries the ticket's full story, not just its code.
-2. Push the branch and open a PR against the repo's default branch with `gh pr create`. Summarize the ticket and link the archived plan path. Report the PR URL; do not merge it.
+2. Before pushing, confirm the recorded PR target with the user; if absent, inspect and recommend the default branch. Push the branch and open the PR with `gh pr create --base <pr-target>`. Summarize the ticket and link the archived plan path. Report the PR URL; do not merge it.
 3. Copy back anything worth keeping that the PR does not carry — `agent-work/tickets/<feature-id>/` evidence, decks, logs — into the top-level checkout, after the cleanup rules above have already pruned it.
 4. Remove the worktree with `git worktree remove`, then delete its now-empty parent under `agent-work/worktrees/`.
 
