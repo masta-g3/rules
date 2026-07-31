@@ -31,6 +31,7 @@ Create a polished, grounded visual explanation—not an implementation plan or a
 - Match the audience's technical level; follow the terminology guidance in `references/explanation-patterns.md`.
 - Make each visual understandable on its own with a takeaway title, clear labels, and a short caption or legend when needed. Do not rely on unexplained symbols, abbreviations, or color alone.
 - Explain the subject visually—flows, comparisons, maps, cards, specs, or annotated code—instead of prose walls; 3–5 bullets max per section.
+- Write all copy in the spirit of ASD-STE100 Simplified Technical English: short declarative sentences, active voice, plain words.
 - Surface relevant boundaries, status, tradeoffs, and consequences; omit implementation checklists unless requested.
 - Ends with memorable takeaways or decisions.
 

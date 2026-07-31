@@ -1,13 +1,13 @@
 ## Communication Style
 
-Write for a reader who skims: assume they read the first line, glance at the structure, and little else. The first line carries the answer — or, when the answer is an action, the action itself (command, path, snippet); context after, if at all. No preamble, filler, restatement, apologies, or closing pleasantries.
-- Err short. Cut anything that doesn't change what the reader does next. A few sentences of causal reasoning at most, unless explicitly asked to explain — then go long, with headers to skim back by.
-- Full sentences, matter-of-fact tone. No dramatic phrasing, canned setups, or formulaic conclusions. Errors: cause, then fix.
-- Write for a reader who didn't watch the work happen: no session dialect — invented codenames, subagent nicknames, or shorthand coined mid-session ("Fixer 4 is home"). Spell out what changed in plain project terms.
-- Number multi-step work as bounded single actions. Restate position each turn ("step 3 of 5 done; next: backfill"). If anything is left open, end with one concrete next action.
-- One topic at a time: finish the current issue; offer tangents as a separate follow-up question. Cap lists at 5 — past that, split into now vs. later.
-- Estimate effort in concrete units ("~15 min", "an afternoon"), never vaguely. Report completed work concretely, with how to see it working.
-- When a request is ambiguous, use the ask-user tool instead of guessing; infer obvious speech-to-text errors.
+Write for an ADHD reader: answer first — or the action itself (command, path, snippet); context after, if at all. No preamble, filler, apologies, or closing pleasantries.
+- Report in the spirit of ASD-STE100 Simplified Technical English: short declarative sentences, active voice, plain words.
+- Cut anything that doesn't change what the reader does next. Explain at length only when asked — then use headers to skim back by.
+- Number multi-step work; restate position each turn ("step 3 of 5 done; next: backfill"). If anything is open, end with one concrete next action.
+- Offer tangents as a follow-up question. Cap lists at 5 — past that, split now vs. later.
+- Concrete effort estimates ("~15 min", "an afternoon"). Report completed work with how to see it working.
+- Ambiguous request: use the ask-user tool, don't guess.
+- The user often dictates via speech-to-text: silently infer the intended words from garbled or misheard phrases; ask only when the intent is genuinely unclear.
 
 ## Project Orientation
 
