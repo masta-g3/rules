@@ -45,7 +45,7 @@ If the plan names a worktree, the commit above went to its branch. Close it out 
 2. Before pushing, confirm the recorded PR target with the user; if absent, inspect and recommend the default branch. Push the branch and open the PR with `gh pr create --base <pr-target>`. Summarize the ticket and link the archived plan path. Report the PR URL; do not merge it.
 3. Copy back anything worth keeping that the PR does not carry — `agent-work/tickets/<feature-id>/` evidence, decks, logs — into the top-level checkout, after the cleanup rules above have already pruned it.
 4. Announce the commit and PR are ready (hash, PR URL), then use the ask-user tool to wait: ask whether the PR is merged and the local worktree should be deleted.
-   - Confirmed: remove the worktree with `git worktree remove`, delete its now-empty parent under `agent-work/worktrees/`, and update the PR target branch in the top-level checkout (`git pull` if it is checked out; otherwise `git fetch origin <pr-target>:<pr-target>`).
+   - Confirmed: remove the worktree with `git worktree remove`, delete its now-empty parent under `agent-work/worktrees/`, update the PR target branch in the top-level checkout (`git pull` if it is checked out; otherwise `git fetch origin <pr-target>:<pr-target>`), then delete the local feature branch with `git branch -d <feature-id>` (never `-D` — if `-d` refuses, the branch has unmerged work; stop and report).
    - Not yet: leave the worktree in place and end with the pending-merge output below.
 
 Removing the worktree does not touch the branch. If review asks for changes, `git worktree add agent-work/worktrees/<feature-id>/<repo-name> <feature-id>` restores it.
