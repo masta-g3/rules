@@ -35,9 +35,10 @@ Update docs during execution only when the approved plan lists them as explicit 
 
 ### Code Quality
 
-- Make the smallest, simplest change that fully solves the task. Prefer fundamental fixes over localized patches or parallel solutions, and replace obsolete code.
-- Reuse existing patterns; keep changes modular and avoid widening the impact without clear need.
-- Do not add conditional branches to special-case around an existing pattern. If code does not fit the convention, fix the code or the pattern — do not route around it with `if/else`.
+- Before writing new machinery, inspect the plan's reference paths and the nearest analogous implementation. Reuse or extend the code that already owns the behavior.
+- Make the smallest, simplest change that fully solves the task. Prefer a fundamental fix in the owning layer over a localized patch, and replace obsolete code instead of leaving parallel paths.
+- Do not introduce another way to perform an existing operation because this case varies slightly. Use the established mechanism or its extension points; if they are genuinely inadequate, stop and justify changing the shared pattern rather than adding a competing one.
+- Do not stack hotfixes, workarounds, or conditional branches around an existing pattern. Fix the underlying code or shared pattern; if that exceeds the approved plan, consult the user instead of patching around it.
 - Do not add fallbacks, inferred defaults, mock functionality, or blanket exception handling. Let errors surface unless recovery is specific and intentional.
 - Tests must validate actual behavior — no dummy assertions or placeholders.
 
