@@ -44,7 +44,9 @@ If the plan names a worktree, the commit above went to its branch. Close it out 
 1. Confirm the archived plan and the `agent-work/features.yaml` completion are part of that commit — the PR carries the ticket's full story, not just its code.
 2. Before pushing, confirm the recorded PR target with the user; if absent, inspect and recommend the default branch. Push the branch and open the PR with `gh pr create --base <pr-target>`. Summarize the ticket and link the archived plan path. Report the PR URL; do not merge it.
 3. Copy back anything worth keeping that the PR does not carry — `agent-work/tickets/<feature-id>/` evidence, decks, logs — into the top-level checkout, after the cleanup rules above have already pruned it.
-4. Remove the worktree with `git worktree remove`, then delete its now-empty parent under `agent-work/worktrees/`.
+4. Announce the commit and PR are ready (hash, PR URL), then use the ask-user tool to wait: ask whether the PR is merged and the local worktree should be deleted.
+   - Confirmed: remove the worktree with `git worktree remove`, delete its now-empty parent under `agent-work/worktrees/`, and `git pull` the top-level checkout.
+   - Not yet: leave the worktree in place and end with the pending-merge output below.
 
 Removing the worktree does not touch the branch. If review asks for changes, `git worktree add agent-work/worktrees/<feature-id>/<repo-name> <feature-id>` restores it.
 
@@ -52,5 +54,5 @@ Removing the worktree does not touch the branch. If review asks for changes, `gi
 
 Include a `Summary:` line with 1-2 sentences on what was committed, then end with one of:
 
-- `WORKFLOW COMPLETE` — no worktree; include the commit hash
-- `WORKFLOW COMPLETE — PENDING PR MERGE` — include the commit hash and PR URL. The worktree is removed and the ticket is done on its branch; the top-level checkout needs a `git pull` once the PR merges.
+- `WORKFLOW COMPLETE` — no worktree, or the user confirmed the merge and the worktree is cleaned up; include the commit hash (and PR URL if any)
+- `WORKFLOW COMPLETE — PENDING PR MERGE` — include the commit hash and PR URL. The user has not merged yet; the worktree stays in place. Once merged, they can ask for cleanup: remove the worktree and `git pull` the top-level checkout.
