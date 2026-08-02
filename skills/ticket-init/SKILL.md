@@ -27,8 +27,10 @@ $SKILLS_ROOT/_lib/features_yaml.sh epics
 
 Register each ticket under the chosen epic; the helper generates the ID.
 
+Write an authored title that targets 5-7 words and uses no more than 48 characters. This title becomes the dashboard's `plan.feature` description, so keep it longer than a short Hub session label. Do not prefix it with a ticket ID. Keep the full user outcome and relevant context in the description instead of shortening them to fit the title.
+
 ```bash
-$SKILLS_ROOT/_lib/features_yaml.sh register --json '{"epic":"...","status":"pending","title":"{concise}","description":"User can [action] with [context]","steps":["{only if user provided}"],"priority":2,"depends_on":[],"discovered_from":null,"plan_file":null,"references":[],"created_at":"YYYY-MM-DD"}'
+$SKILLS_ROOT/_lib/features_yaml.sh register --json '{"epic":"...","status":"pending","title":"{5-7 words, max 48 characters, no ticket ID}","description":"User can [action] with [context]","steps":["{only if user provided}"],"priority":2,"depends_on":[],"discovered_from":null,"plan_file":null,"references":[],"created_at":"YYYY-MM-DD"}'
 ```
 
 Priority: 1=foundation, 2=core (default), 3=polish.
