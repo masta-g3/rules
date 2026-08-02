@@ -155,8 +155,8 @@ Pytest is scoped to `tests/` via `pytest.ini`.
 - id: auth-001
   epic: auth
   status: pending
-  title: User can sign up
-  description: Implement signup flow with email validation
+  title: Sign up using email validation
+  description: User can create an account with email validation before submission
   priority: 1
   depends_on:
     - auth-000
@@ -177,6 +177,8 @@ Pytest is scoped to `tests/` via `pytest.ini`.
 **Common tracked-ticket fields:** `epic`, `description`, `priority`, `depends_on`, `created_at`
 
 **Optional fields:** `title`, `steps`, `discovered_from`, `plan_file`, `references`, `completed_at`, plus custom metadata when needed
+
+**Authored titles:** Target 5-7 words and use no more than 48 characters. This title becomes the dashboard's `plan.feature` description, so keep it longer than a short Hub session label. Do not prefix it with its ticket ID. Keep the full user outcome and relevant context in `description`.
 
 **Status values:** `pending` → `in_progress` → `done` (or `abandoned`, `superseded`)
 
