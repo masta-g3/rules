@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  completeWorkflow,
   continuationContent,
   createContinuationQueue,
   finalAssistantStopReason,
@@ -104,6 +105,44 @@ const activeState = (overrides = {}) => ({
     turnsCompleted: 0,
     ...overrides,
   },
+});
+
+test("workflow completion clears state only from Commit", () => {
+  const calls = [];
+  const cleared = completeWorkflow(
+    { activeStep: "commit", ticketId: "workflow-board-001", source: "input" },
+    () => {
+      calls.push("clearState");
+      return {};
+    },
+  );
+
+  assert.deepEqual(cleared, {});
+  assert.deepEqual(calls, ["clearState"]);
+});
+
+test("workflow completion is rejected outside Commit without clearing", () => {
+  for (const activeStep of [undefined, "plan-md", "execute", "review", "reflect"]) {
+    let cleared = false;
+    assert.throws(
+      () => completeWorkflow({ activeStep }, () => {
+        cleared = true;
+        return {};
+      }),
+      /only be completed during commit/i,
+      String(activeStep),
+    );
+    assert.equal(cleared, false, String(activeStep));
+  }
+});
+
+test("an incomplete commit closeout keeps Commit active", () => {
+  const state = { activeStep: "commit", ticketId: "workflow-board-001", source: "input" };
+
+  assert.deepEqual(transition(state, { type: "agent-end", stopReason: "stop" }), {
+    state,
+    effects: [],
+  });
 });
 
 test("activates focus mode with one workflow state", () => {

@@ -151,6 +151,11 @@ export function recoverFocus(pending: boolean, event: FocusRecoveryEvent): Focus
 	return pending ? { pending: false, delivery: "before-agent-start" } : { pending: false };
 }
 
+export function completeWorkflow(state: WorkflowState, clearState: () => WorkflowState): WorkflowState {
+	if (state.activeStep !== "commit") throw new Error("Workflow can only be completed during commit.");
+	return clearState();
+}
+
 export function continuationContent(state: WorkflowState): string {
 	if (!state.execution) return "";
 	const ticket = state.ticketId ? `Continue the active focus run for ticket ${state.ticketId}.\n` : "";

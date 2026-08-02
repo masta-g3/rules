@@ -68,7 +68,7 @@ Current Pi-specific extension work also includes a minimalist workflow rail that
 
 `plan-md → execute → review → reflect → commit`
 
-This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the most recently invoked workflow step, not authoritative feature completion state.
+This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the active workflow step, not authoritative feature completion state. After `/commit` finishes all required repository commits and feature/plan closeout, the skill calls the guarded `complete_workflow` tool to clear the rail. Failed or blocked commit turns leave Commit active.
 
 The runtime also owns the workflow's ordered display definition. Every persisted `workflow-runtime` custom entry includes the five step ids, short codes, and friendly labels alongside the active state and producer `updatedAt` state-change timestamp. While focus is active, the same entry adds a generic `activeMode` display (`FOC`, `Focus`, and `turn N`) without changing the base Execute step; ending focus omits it. Consumers such as dashboards can render the producer's order and optional mode without mirroring vocabulary or reading private execution state, while missing or malformed metadata affects display only. Reloading or resuming an active historical workflow writes one normalized entry with the current definition; definition-current entries and inactive sessions do not incur that normalization write.
 
@@ -76,7 +76,7 @@ Ticket context and shortcuts:
 
 - Invoking a workflow skill with an explicit ticket (`/skill:plan-md engine-003`) makes the rail remember that ticket, show it beside the active step, and inject `Active workflow ticket: engine-003` into later turns until cleared.
 - `/wf-ticket <ticket-id>` sets or overrides the active ticket manually, even before a workflow step is visible in the rail. `/wf-clear` clears both the rail and the active ticket.
-- Double-press `ctrl+shift+right` to run the next workflow skill (with the active ticket when set); on `commit`, the same double-press clears the indicator instead. Ignored while Pi is busy or the editor contains unsent text.
+- Double-press `ctrl+shift+right` to run the next workflow skill (with the active ticket when set); on `commit`, the same double-press remains a manual way to clear the indicator. Ignored while Pi is busy or the editor contains unsent text.
 - Forking a session clears the workflow indicator and ticket context in the fork.
 
 ## Shared Helper Tooling

@@ -4,6 +4,7 @@ import type { TUI } from "@earendil-works/pi-tui";
 import { Box, Spacer, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
+	completeWorkflow,
 	continuationContent,
 	createContinuationQueue,
 	finalAssistantStopReason,
@@ -324,6 +325,28 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 			state = setState(pi, ctx, { ...state, ticketId, source: "tool" });
 			return {
 				content: [{ type: "text", text: `Workflow ticket set to ${ticketId}.` }],
+				details: { ticketId },
+			};
+		},
+	});
+
+	pi.registerTool({
+		name: "complete_workflow",
+		label: "Complete Workflow",
+		description: "Clear the workflow indicator after successful Commit closeout.",
+		promptSnippet: "Complete the active workflow only after successful Commit closeout",
+		promptGuidelines: [
+			"Use complete_workflow only during commit, after every required repository commit succeeds and tracked feature and plan closeout is complete.",
+			"Do not use complete_workflow when commit work failed, is blocked, or still has required closeout work.",
+		],
+		parameters: Type.Object({}),
+		async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+			const ticketId = state.ticketId;
+			state = completeWorkflow(state, () => clearState(pi, ctx));
+			recoveryPending = false;
+			ctx.ui.notify("Workflow completed.", "info");
+			return {
+				content: [{ type: "text", text: "Workflow completed and the indicator was cleared." }],
 				details: { ticketId },
 			};
 		},

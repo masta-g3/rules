@@ -50,6 +50,12 @@ If the plan names a worktree, the commit above went to its branch. Close it out 
 
 Removing the worktree does not touch the branch. If review asks for changes, `git worktree add agent-work/worktrees/<feature-id>/<repo-name> <feature-id>` restores it.
 
+### Complete Workflow Indicator
+
+When the current harness provides the Pi-only `complete_workflow` tool, call it once as the final action before the output, but only after every required repository commit succeeds and tracked feature and plan closeout is complete. For untracked work, first confirm that no feature or plan closeout is required. A worktree with an explicit pending-PR-merge handoff has completed repository closeout for this commit turn; later merge cleanup is a separate user-invoked task. In other harnesses, skip only this indicator step.
+
+Do not call `complete_workflow` if a commit failed, required feature or plan changes are not committed, or the turn is blocked before closeout. Failed or blocked commit turns must keep Commit active.
+
 ### Output
 
 Include a `Summary:` line with 1-2 sentences on what was committed, then end with one of:
