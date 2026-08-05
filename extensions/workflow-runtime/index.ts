@@ -9,15 +9,42 @@ import {
 	createContinuationQueue,
 	finalAssistantStopReason,
 	FOCUS_MODE_DISPLAY,
+	positionalMarker,
 	recoverFocus,
+	setWorkflowActivity,
+	setWorkflowTicketState,
 	shouldNormalizeWorkflowDefinition,
+	startWorkflowStep,
 	transition,
 	withWorkflowDefinition,
+	WORKFLOW_ACTIVITIES,
 	WORKFLOW_DEFINITION,
 	type RuntimeEffect,
 	type StepName,
 	type WorkflowState,
 } from "./core.ts";
+import {
+	ATTENTION_PROMPT,
+	CONTEXT_ENTRY_TYPE,
+	NAMING_PROMPT,
+	attentionInput,
+	contextSnapshot,
+	effectiveProjectCwd,
+	normalizeText,
+	parseAttention,
+	parseContextSnapshot,
+	readTicketContext,
+	recentTranscript,
+	sanitizeSessionName,
+	ticketNamingInput,
+	type PiAgentHubContextV1,
+	type TicketContext,
+	type TranscriptEntry,
+} from "./session-context.ts";
+import { boundedModelCall } from "./session-model.ts";
+import { applyPlanWidget } from "./plan-widget.ts";
+import { readWorkflowPlan } from "./workflow-plan.ts";
+import { TodoPanel, TODO_PANEL_OVERLAY_OPTIONS, TODO_PANEL_SHORTCUT } from "./todo-panel.ts";
 
 const ENTRY_TYPE = "workflow-runtime";
 const EVENT_TYPE = "workflow-runtime-event";
@@ -38,6 +65,7 @@ const TOKENS = {
 } as const;
 
 const WORKFLOW = WORKFLOW_DEFINITION;
+const ACTIVITY_IDS = Object.values(WORKFLOW_ACTIVITIES).flatMap((items) => items.map((item) => item.id));
 
 const STOP_NOTICES: Record<Exclude<RuntimeEffect, { kind: "continue" }>["reason"], string> = {
 	"session-boundary": "Focus mode stopped at a session boundary. Reinvoke /skill:focus to continue.",
@@ -125,6 +153,15 @@ function newRunId(): string {
 	return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function findLatestContext(entries: unknown[]): PiAgentHubContextV1 | undefined {
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i] as { type?: string; customType?: string; data?: unknown };
+		if (entry?.type !== "custom" || entry.customType !== CONTEXT_ENTRY_TYPE) continue;
+		return parseContextSnapshot(entry.data);
+	}
+	return undefined;
+}
+
 function findLatestState(entries: unknown[]): RestoredState {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i] as CustomEntry;
@@ -144,6 +181,7 @@ function setState(pi: ExtensionAPI, ctx: ExtensionContext, nextState: WorkflowSt
 	const state = { ...nextState, updatedAt: Date.now() };
 	persistState(pi, state);
 	applyWidget(ctx, state);
+	applyPlanWidget(ctx, state.plan);
 	return state;
 }
 
@@ -167,17 +205,20 @@ function renderRail(state: WorkflowState, theme: ExtensionContext["ui"]["theme"]
 	if (!activeStep) return { full: "", compact: "" };
 
 	const separator = theme.fg(TOKENS.rail, " ─ ");
-	const full = WORKFLOW.map((step) => {
-		const short = renderStepShort(step, state);
-		return step.id === activeStep.id
-			? theme.bg(TOKENS.activeBg, theme.fg(TOKENS.activeFg, short))
-			: theme.fg(TOKENS.muted, short);
+	const activeIndex = getStepIndex(activeStep.id);
+	const full = WORKFLOW.map((step, index) => {
+		const marker = positionalMarker(index, activeIndex, state.currentStepComplete === true);
+		const display = `${marker} ${renderStepShort(step, state)}`;
+		return index === activeIndex && marker === "◉"
+			? theme.bg(TOKENS.activeBg, theme.fg(TOKENS.activeFg, display))
+			: theme.fg(index <= activeIndex ? TOKENS.activeFg : TOKENS.muted, display);
 	}).join(separator);
 
-	const compact = `${theme.fg(TOKENS.muted, `${getStepIndex(activeStep.id) + 1}/${WORKFLOW.length} `)}${theme.bg(
-		TOKENS.activeBg,
-		theme.fg(TOKENS.activeFg, renderStepShort(activeStep, state)),
-	)}`;
+	const marker = positionalMarker(activeIndex, activeIndex, state.currentStepComplete === true);
+	const positioned = `${marker} ${renderStepShort(activeStep, state)}`;
+	const compact = `${theme.fg(TOKENS.muted, `${activeIndex + 1}/${WORKFLOW.length} `)}${
+		marker === "◉" ? theme.bg(TOKENS.activeBg, theme.fg(TOKENS.activeFg, positioned)) : theme.fg(TOKENS.activeFg, positioned)
+	}`;
 	return { full, compact };
 }
 
@@ -260,11 +301,88 @@ function applyEffects(
 	}
 }
 
-export default function workflowRuntime(pi: ExtensionAPI): void {
+type ModelCall = typeof boundedModelCall;
+
+export default function workflowRuntime(
+	pi: ExtensionAPI,
+	dependencies: { modelCall?: ModelCall } = {},
+): void {
+	const modelCall = dependencies.modelCall ?? boundedModelCall;
+	const optionalModelCall: ModelCall = async (...args) => {
+		try { return await modelCall(...args); } catch { return undefined; }
+	};
 	let state: WorkflowState = {};
+	let ticketContext: TicketContext | undefined;
 	let recoveryPending = false;
 	let lastAdvanceShortcutAt = 0;
+	let generation = 0;
+	let automaticNamingStarted = false;
+	let currentAttention: { kind: "ready" | "question" | "blocked"; text: string } | undefined;
+	let attentionGenerationDone = -1;
+	let latestUserRequest: string | undefined;
 	const continuationQueue = createContinuationQueue();
+
+	const publishContext = (attention?: { kind: "ready" | "question" | "blocked"; text: string }) => {
+		pi.appendEntry(CONTEXT_ENTRY_TYPE, contextSnapshot(ticketContext, attention));
+	};
+
+	const refreshPlan = async (ctx: ExtensionContext) => {
+		const requestGeneration = generation;
+		const requestedTicket = ticketContext;
+		const root = effectiveProjectCwd(ctx.cwd);
+		const result = requestedTicket?.planFile ? await readWorkflowPlan(root, requestedTicket.planFile) : {};
+		if (requestGeneration !== generation || requestedTicket?.id !== ticketContext?.id) return undefined;
+		const projection = state.activeStep ? result.projection : undefined;
+		const current = JSON.stringify(state.plan);
+		if (JSON.stringify(projection) !== current) state = setState(pi, ctx, { ...state, plan: projection });
+		else applyPlanWidget(ctx, state.plan);
+		return { ticket: requestedTicket, plan: result.plan };
+	};
+
+	const selectTicket = async (
+		ctx: ExtensionContext,
+		ticketId: string,
+		rename = true,
+		attention?: typeof currentAttention,
+		awaitGeneratedName = false,
+	) => {
+		const requestGeneration = ++generation;
+		const selected = await readTicketContext(effectiveProjectCwd(ctx.cwd), ticketId) ?? { id: ticketId };
+		if (requestGeneration !== generation) return false;
+		ticketContext = selected;
+		currentAttention = attention;
+		publishContext(attention);
+		let nameApplied = false;
+		if (rename && ticketContext.title) {
+			pi.setSessionName(ticketContext.title);
+			nameApplied = true;
+		} else if (rename) {
+			const source = ticketNamingInput(ticketContext, recentTranscript(ctx.sessionManager.getBranch() as TranscriptEntry[]));
+			const initialName = pi.getSessionName();
+			const applyGeneratedName = async () => {
+				const title = sanitizeSessionName(await optionalModelCall(ctx, NAMING_PROMPT, source, 64) ?? "");
+				if (requestGeneration !== generation || pi.getSessionName() !== initialName) return false;
+				pi.setSessionName(title ?? ticketId);
+				return true;
+			};
+			if (awaitGeneratedName) nameApplied = await applyGeneratedName();
+			else void applyGeneratedName();
+		}
+		await refreshPlan(ctx);
+		return nameApplied;
+	};
+
+	const generateName = async (ctx: ExtensionContext, source: string, explicit: boolean) => {
+		if (!source || (!explicit && automaticNamingStarted)) return false;
+		if (!explicit) automaticNamingStarted = true;
+		const requestGeneration = explicit ? ++generation : generation;
+		const initialName = pi.getSessionName();
+		const name = sanitizeSessionName(await optionalModelCall(ctx, NAMING_PROMPT, source, 64) ?? "");
+		if (!name || requestGeneration !== generation || pi.getSessionName() !== initialName) return false;
+		if (explicit) { ticketContext = undefined; publishContext(); }
+		pi.setSessionName(name);
+		return true;
+	};
 
 	pi.registerMessageRenderer(EVENT_TYPE, (message, { expanded }, theme) => {
 		const details = message.details as RuntimeEventDetails | undefined;
@@ -294,7 +412,8 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 				ctx.ui.notify("Usage: /wf-ticket <ticket-id>", "warning");
 				return;
 			}
-			state = setState(pi, ctx, { ...state, ticketId, source: "command" });
+			state = setState(pi, ctx, setWorkflowTicketState(state, ticketId, "command"));
+			if (ticketContext?.id !== ticketId) await selectTicket(ctx, ticketId);
 			ctx.ui.notify(`Workflow ticket set to ${ticketId}.`, "info");
 		},
 	});
@@ -305,6 +424,53 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 			recoveryPending = false;
 			state = clearState(pi, ctx);
 			ctx.ui.notify("Workflow indicator cleared.", "info");
+		},
+	});
+
+	pi.registerCommand("session-name", {
+		description: "Regenerate the native Pi session name (usage: /session-name refresh)",
+		handler: async (args, ctx) => {
+			if (args.trim() !== "refresh") return ctx.ui.notify("Usage: /session-name refresh", "warning");
+			if (ticketContext) {
+				const ticketId = ticketContext.id;
+				const ok = await selectTicket(ctx, ticketId, true, currentAttention, true);
+				return ctx.ui.notify(ok ? `Session name refreshed from ${ticketId}.` : "Could not refresh the session name.", ok ? "info" : "warning");
+			}
+			const ok = await generateName(ctx, recentTranscript(ctx.sessionManager.getBranch() as TranscriptEntry[]), true);
+			ctx.ui.notify(ok ? "Session name refreshed." : "Could not refresh the session name.", ok ? "info" : "warning");
+		},
+	});
+
+	const openTodos = async (ctx: ExtensionContext) => {
+		const refreshed = await refreshPlan(ctx);
+		if (!refreshed) return;
+		if (!refreshed.ticket || !refreshed.plan) return ctx.ui.notify("No active ticket plan checklist.", "warning");
+		if (ctx.mode !== "tui") return ctx.ui.notify("The plan checklist drawer requires TUI mode.", "warning");
+		await ctx.ui.custom<void>((tui, theme, _keys, done) => new TodoPanel(tui, theme, refreshed.ticket!.id, refreshed.plan!, () => done()), { overlay: true, overlayOptions: TODO_PANEL_OVERLAY_OPTIONS });
+	};
+	pi.registerCommand("wf-todos", { description: "Open the active workflow plan checklist", handler: async (_args, ctx) => openTodos(ctx) });
+	pi.registerShortcut(TODO_PANEL_SHORTCUT, { description: "Open the active workflow plan checklist", handler: openTodos });
+
+	pi.registerTool({
+		name: "set_session_name",
+		label: "Set Session Name",
+		description: "Set the exact native Pi session name.",
+		parameters: Type.Object({ name: Type.String({ minLength: 1 }) }),
+		async execute(_id, params) {
+			pi.setSessionName(params.name);
+			generation += 1;
+			return { content: [{ type: "text", text: `Session named: ${params.name}` }], details: { name: params.name } };
+		},
+	});
+
+	pi.registerTool({
+		name: "set_workflow_activity",
+		label: "Set Workflow Activity",
+		description: "Publish a fixed activity for the active workflow step.",
+		parameters: Type.Object({ activityId: StringEnum(ACTIVITY_IDS as [string, ...string[]]) }),
+		async execute(_id, params, _signal, _update, ctx) {
+			state = setState(pi, ctx, setWorkflowActivity(state, params.activityId));
+			return { content: [{ type: "text", text: `Workflow activity: ${state.activity!.label}${state.activity!.pass ? ` (pass ${state.activity!.pass})` : ""}.` }], details: { activity: state.activity } };
 		},
 	});
 
@@ -322,7 +488,8 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			const ticketId = parseTicketArg(params.ticketId);
 			if (!ticketId) throw new Error("Invalid ticket id. Use format like engine-003.");
-			state = setState(pi, ctx, { ...state, ticketId, source: "tool" });
+			state = setState(pi, ctx, setWorkflowTicketState(state, ticketId, "tool"));
+			if (ticketContext?.id !== ticketId) await selectTicket(ctx, ticketId);
 			return {
 				content: [{ type: "text", text: `Workflow ticket set to ${ticketId}.` }],
 				details: { ticketId },
@@ -333,7 +500,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 	pi.registerTool({
 		name: "complete_workflow",
 		label: "Complete Workflow",
-		description: "Clear the workflow indicator after successful Commit closeout.",
+		description: "Mark Commit complete after successful closeout and retain the terminal workflow indicator.",
 		promptSnippet: "Complete the active workflow only after successful Commit closeout",
 		promptGuidelines: [
 			"Use complete_workflow only during commit, after every required repository commit succeeds and tracked feature and plan closeout is complete.",
@@ -342,11 +509,11 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		parameters: Type.Object({}),
 		async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
 			const ticketId = state.ticketId;
-			state = completeWorkflow(state, () => clearState(pi, ctx));
+			state = setState(pi, ctx, completeWorkflow(state));
 			recoveryPending = false;
 			ctx.ui.notify("Workflow completed.", "info");
 			return {
-				content: [{ type: "text", text: "Workflow completed and the indicator was cleared." }],
+				content: [{ type: "text", text: "Workflow completed; the terminal indicator is retained." }],
 				details: { ticketId },
 			};
 		},
@@ -417,7 +584,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 	});
 
 	pi.registerShortcut(ADVANCE_SHORTCUT, {
-		description: "Run the next workflow skill, or clear after commit, on double press",
+		description: "Run the next workflow skill, or dismiss completed Commit, on double press",
 		handler: async (ctx) => {
 			if (!state.activeStep) {
 				ctx.ui.notify("No active workflow step to advance.", "warning");
@@ -440,7 +607,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 			const now = Date.now();
 			if (now - lastAdvanceShortcutAt > ADVANCE_DOUBLE_PRESS_MS) {
 				lastAdvanceShortcutAt = now;
-				ctx.ui.notify(`Again to ${command ? `run ${command}` : "clear workflow indicator"}`, "info");
+				ctx.ui.notify(`Again to ${command ? `run ${command}` : "dismiss workflow indicator"}`, "info");
 				return;
 			}
 
@@ -452,18 +619,17 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 				return;
 			}
 
-			state = setState(pi, ctx, {
-				...state,
-				activeStep: nextStep,
-				execution: undefined,
-				source: "shortcut",
-			});
+			generation += 1;
+			latestUserRequest = command;
+			state = setState(pi, ctx, startWorkflowStep(state, nextStep, "shortcut"));
 			pi.sendUserMessage(command);
 		},
 	});
 
 	pi.on("input", async (event, ctx) => {
 		if (event.source === "extension") return { action: "continue" };
+		generation += 1;
+		latestUserRequest = event.text;
 
 		const skillName = extractSkill(event.text);
 		if (skillName === FOCUS_SKILL) {
@@ -474,6 +640,8 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 				runId: newRunId(),
 			});
 			state = setState(pi, ctx, { ...result.state, source: "input" });
+			if (state.ticketId && state.ticketId !== ticketContext?.id) await selectTicket(ctx, state.ticketId);
+			else await refreshPlan(ctx);
 			ctx.ui.notify("Focus mode enabled.", "info");
 			return { action: "continue" };
 		}
@@ -484,15 +652,16 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 			const interrupted = state.execution
 				? transition(state, { type: "end-focus" })
 				: { state, effects: [] as RuntimeEffect[] };
-			state = setState(pi, ctx, {
-				...interrupted.state,
-				activeStep: stepName,
-				ticketId: extractSkillTicket(event.text) ?? state.ticketId,
-				source: "input",
-			});
+			const selectedTicket = extractSkillTicket(event.text) ?? state.ticketId;
+			state = setState(pi, ctx, startWorkflowStep(setWorkflowTicketState(interrupted.state, selectedTicket, "input"), stepName, "input"));
+			if (selectedTicket && selectedTicket !== ticketContext?.id) await selectTicket(ctx, selectedTicket);
+			else if (!selectedTicket && !pi.getSessionName()) void generateName(ctx, normalizeText(event.text, 1_500) ?? "", false);
+			await refreshPlan(ctx);
 			applyEffects(pi, ctx, () => state, interrupted.effects, continuationQueue);
 			return { action: "continue" };
 		}
+
+		if (!pi.getSessionName() && !ticketContext) void generateName(ctx, normalizeText(event.text, 1_500) ?? "", false);
 
 		if (state.execution) {
 			const recovery = recoverFocus(recoveryPending, {
@@ -507,18 +676,55 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		return { action: "continue" };
 	});
 
+	pi.on("tool_execution_start", async (event, ctx) => {
+		if (state.activeStep === "plan-md" && event.toolName === "ask_user_question") {
+			state = setState(pi, ctx, setWorkflowActivity(state, "clarifying-requirements"));
+			return;
+		}
+		if (event.toolName !== "tmux_subagent") return;
+		const args = event.args as { action?: unknown; agent?: unknown } | undefined;
+		if (!args || args.action !== undefined) return;
+		const activity = state.activeStep === "plan-md" && args.agent === "plan-critic" ? "reviewing-plan"
+			: state.activeStep === "review" && args.agent === "code-critic" ? "reviewing-implementation"
+			: state.activeStep === "reflect" && args.agent === "docs-critic" ? "reviewing-guidance"
+			: undefined;
+		if (activity) state = setState(pi, ctx, setWorkflowActivity(state, activity));
+	});
+
+	pi.on("tool_execution_end", async (_event, ctx) => {
+		if (state.activeStep && ticketContext?.planFile) await refreshPlan(ctx);
+	});
+
 	pi.on("agent_end", async (event, ctx) => {
-		if (!state.execution) return;
-		const result = transition(state, {
-			type: "agent-end",
-			stopReason: finalAssistantStopReason(event.messages),
-		});
-		if (!result.effects.length) return;
-		state = setState(pi, ctx, result.state);
-		applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
+		const requestGeneration = generation;
+		const stopReason = finalAssistantStopReason(event.messages);
+		const assistant = [...event.messages].reverse().find((message) => message.role === "assistant") as { content?: string | Array<{ type?: string; text?: string }> } | undefined;
+		const assistantText = typeof assistant?.content === "string" ? assistant.content : assistant?.content?.filter((part) => part.type === "text").map((part) => part.text ?? "").join("\n");
+		const input = attentionInput(latestUserRequest, assistantText, ticketContext, state.activity?.label);
+		await refreshPlan(ctx);
+		if (requestGeneration !== generation) return;
+		if (state.execution) {
+			const result = transition(state, { type: "agent-end", stopReason });
+			if (result.effects.length) {
+				state = setState(pi, ctx, result.state);
+				applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
+				return;
+			}
+		}
+		if (attentionGenerationDone === requestGeneration || stopReason !== "stop" || !input) return;
+		attentionGenerationDone = requestGeneration;
+		void (async () => {
+			const accepted = parseAttention(await optionalModelCall(ctx, ATTENTION_PROMPT, input, 128) ?? "");
+			if (requestGeneration !== generation) return;
+			if (accepted) {
+				currentAttention = accepted;
+				publishContext(accepted);
+			}
+		})();
 	});
 
 	pi.on("before_agent_start", async (event) => {
+		if (currentAttention) { currentAttention = undefined; publishContext(); }
 		if (state.execution) {
 			const recovery = recoverFocus(recoveryPending, { type: "before-agent-start" });
 			recoveryPending = recovery.pending;
@@ -545,27 +751,43 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		const result = transition(state, { type: "session-compact", reason: event.reason });
 		state = result.state;
 		applyWidget(ctx, state);
+		applyPlanWidget(ctx, state.plan);
 	});
 
 	pi.on("session_start", async (event, ctx) => {
+		generation += 1;
 		recoveryPending = false;
-		const restored = event.reason === "new" ? { state: {} } : findLatestState(ctx.sessionManager.getBranch());
+		const branch = ctx.sessionManager.getBranch();
+		const restoredContext = event.reason === "new" || event.reason === "fork" ? undefined : findLatestContext(branch);
+		currentAttention = restoredContext?.attention;
+		const restored = event.reason === "new" ? { state: {} } : findLatestState(branch);
 		const result = transition(restored.state, { type: "session-boundary", reason: event.reason });
 		const normalizeDefinition = shouldNormalizeWorkflowDefinition(
 			{ ...restored.state, steps: restored.steps },
 			event.reason,
 		);
+		if (event.reason === "new" || event.reason === "fork") {
+			automaticNamingStarted = false;
+			ticketContext = undefined;
+			if (event.reason === "fork") publishContext();
+		}
 		if (event.reason === "fork" || result.effects.length || normalizeDefinition) {
 			state = setState(pi, ctx, result.state);
 			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
-			return;
+		} else {
+			state = result.state;
+			applyWidget(ctx, state);
+			applyPlanWidget(ctx, state.plan);
 		}
-
-		state = result.state;
-		applyWidget(ctx, state);
+		if (event.reason !== "new" && event.reason !== "fork") {
+			const ticketId = state.ticketId ?? restoredContext?.ticket?.id;
+			if (ticketId) await selectTicket(ctx, ticketId, false, currentAttention);
+			else if (currentAttention) publishContext(currentAttention);
+		}
 	});
 
 	pi.on("session_shutdown", async () => {
+		generation += 1;
 		recoveryPending = false;
 		syncFocusPulse(false);
 		activeTui = undefined;

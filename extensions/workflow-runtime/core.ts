@@ -36,13 +36,88 @@ export type FocusExecution = {
 	turnsCompleted: number;
 };
 
+export type WorkflowActivityDisplay = { id: string; label: string; pass?: number };
+export type WorkflowPlanDisplay = {
+	phase?: { index: number; count: number; title: string };
+	tasks: { completed: number; total: number };
+	phases?: Array<{ completed: number; total: number }>;
+	nextStep?: string;
+};
+
+export const WORKFLOW_ACTIVITIES = {
+	"plan-md": [
+		{ id: "inspecting-code", label: "Inspecting code" },
+		{ id: "clarifying-requirements", label: "Clarifying scope" },
+		{ id: "writing-plan", label: "Writing plan" },
+		{ id: "reviewing-plan", label: "Reviewing plan", review: true },
+		{ id: "updating-plan", label: "Updating plan" },
+		{ id: "plan-ready", label: "Plan ready", terminal: true },
+	],
+	execute: [],
+	review: [
+		{ id: "reviewing-implementation", label: "Reviewing changes", review: true },
+		{ id: "fixing-review-findings", label: "Fixing findings" },
+		{ id: "review-complete", label: "Review complete", terminal: true },
+	],
+	reflect: [
+		{ id: "reviewing-guidance", label: "Reviewing guidance", review: true },
+		{ id: "updating-guidance", label: "Updating guidance" },
+		{ id: "reflection-complete", label: "Reflection complete", terminal: true },
+	],
+	commit: [
+		{ id: "archiving-plan", label: "Archiving plan" },
+		{ id: "committing-changes", label: "Committing changes" },
+	],
+} as const;
+
 export type WorkflowState = {
 	activeStep?: StepName;
 	ticketId?: string;
 	execution?: FocusExecution;
+	activity?: WorkflowActivityDisplay;
+	activityPasses?: Record<string, number>;
+	plan?: WorkflowPlanDisplay;
+	currentStepComplete?: boolean;
 	source?: WorkflowSource;
 	updatedAt?: number;
 };
+
+export function setWorkflowTicketState(state: WorkflowState, ticketId: string | undefined, source?: WorkflowSource): WorkflowState {
+	const { plan: _plan, activity: _activity, activityPasses: _passes, currentStepComplete: _complete, ...withoutStepRun } = state;
+	return {
+		...(state.ticketId === ticketId ? state : withoutStepRun),
+		ticketId,
+		...(source ? { source } : {}),
+	};
+}
+
+export function startWorkflowStep(state: WorkflowState, step: StepName, source?: WorkflowSource): WorkflowState {
+	const first = WORKFLOW_ACTIVITIES[step][0];
+	return {
+		...state,
+		activeStep: step,
+		execution: undefined,
+		activity: first ? { id: first.id, label: first.label } : undefined,
+		activityPasses: {},
+		currentStepComplete: undefined,
+		...(source ? { source } : {}),
+	};
+}
+
+export function setWorkflowActivity(state: WorkflowState, activityId: string): WorkflowState {
+	if (!state.activeStep) throw new Error("No active workflow step.");
+	const definition = (WORKFLOW_ACTIVITIES[state.activeStep] as readonly { id: string; label: string; review?: boolean; terminal?: boolean }[]).find((item) => item.id === activityId);
+	if (!definition) throw new Error(`Activity ${activityId} does not belong to ${state.activeStep}.`);
+	const passes = { ...(state.activityPasses ?? {}) };
+	if (definition.review) passes[activityId] = (passes[activityId] ?? 0) + 1;
+	const pass = definition.review ? (passes[activityId] ?? 1) : undefined;
+	return {
+		...state,
+		activityPasses: passes,
+		activity: { id: definition.id, label: definition.label, ...(pass && pass > 1 ? { pass } : {}) },
+		currentStepComplete: definition.terminal ? true : undefined,
+	};
+}
 
 export type WorkflowRuntimeEntryData = WorkflowState & {
 	steps: WorkflowStepDefinition[];
@@ -151,9 +226,18 @@ export function recoverFocus(pending: boolean, event: FocusRecoveryEvent): Focus
 	return pending ? { pending: false, delivery: "before-agent-start" } : { pending: false };
 }
 
-export function completeWorkflow(state: WorkflowState, clearState: () => WorkflowState): WorkflowState {
+export function completeWorkflow(state: WorkflowState): WorkflowState {
 	if (state.activeStep !== "commit") throw new Error("Workflow can only be completed during commit.");
-	return clearState();
+	return {
+		...state,
+		currentStepComplete: true,
+		activity: { id: "commit-complete", label: "Commit complete" },
+	};
+}
+
+export function positionalMarker(index: number, activeIndex: number, currentStepComplete = false): "✓" | "◉" | "·" {
+	if (index < activeIndex || (index === activeIndex && currentStepComplete)) return "✓";
+	return index === activeIndex ? "◉" : "·";
 }
 
 export function continuationContent(state: WorkflowState): string {

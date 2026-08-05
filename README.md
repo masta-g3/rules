@@ -68,16 +68,20 @@ Current Pi-specific extension work also includes a minimalist workflow rail that
 
 `plan-md → execute → review → reflect → commit`
 
-This is a visual cue only. It appears after a tracked workflow skill has been invoked (or when restoring an existing session state) and reflects the active workflow step, not authoritative feature completion state. After `/commit` finishes all required repository commits and feature/plan closeout, the skill calls the guarded `complete_workflow` tool to clear the rail. Failed or blocked commit turns leave Commit active.
+This is a positional cue, not an execution audit. Invoking a later step directly checks every earlier position. The current marker is `◉` while active and `✓` after Plan, Review, or Reflect publishes its terminal activity. Full rails show glyph plus short stage (`✓ PL ─ ◉ EX`); narrow rails show `N/5 <marker> <short>`. After `/commit` finishes all required repository commits and feature/plan closeout, the guarded `complete_workflow` tool retains `✓✓✓✓✓` and `Commit complete`. A new step or ticket, `/wf-clear`, or manual dismissal replaces it. Failed or blocked Commit turns remain active.
 
 The runtime also owns the workflow's ordered display definition. Every persisted `workflow-runtime` custom entry includes the five step ids, short codes, and friendly labels alongside the active state and producer `updatedAt` state-change timestamp. While focus is active, the same entry adds a generic `activeMode` display (`FOC`, `Focus`, and `turn N`) without changing the base Execute step; ending focus omits it. Consumers such as dashboards can render the producer's order and optional mode without mirroring vocabulary or reading private execution state, while missing or malformed metadata affects display only. Reloading or resuming an active historical workflow writes one normalized entry with the current definition; definition-current entries and inactive sessions do not incur that normalization write.
 
 Ticket context and shortcuts:
 
 - Invoking a workflow skill with an explicit ticket (`/skill:plan-md engine-003`) makes the rail remember that ticket, show it beside the active step, and inject `Active workflow ticket: engine-003` into later turns until cleared.
-- `/wf-ticket <ticket-id>` sets or overrides the active ticket manually, even before a workflow step is visible in the rail. `/wf-clear` clears both the rail and the active ticket.
+- `/wf-ticket <ticket-id>` sets or overrides the active ticket manually, publishes generic `pi-agent-hub-context`, and names Pi from the ticket title. `/wf-clear` clears the workflow rail; the last associated ticket context remains until replaced.
+- `/session-name refresh` regenerates the native Pi name. `/wf-todos` or `Ctrl+Alt+T` opens a fresh read-only plan checklist drawer.
+- Fixed activities use explicit semantic transitions plus exact tool-start automation: Plan questions publish clarification, and step-matched tmux critic launches publish review and increment pass counts. Tmux management actions do nothing. Execute omits activity and publishes deterministic plan progress instead.
+- After completed turns, one bounded Spark-first call may publish explicit `ready`, `question`, or `blocked` attention. It clears before the next run. Naming uses the same resolver but a separate prompt and output contract.
 - Double-press `ctrl+shift+right` to run the next workflow skill (with the active ticket when set); on `commit`, the same double-press remains a manual way to clear the indicator. Ignored while Pi is busy or the editor contains unsent text.
 - Forking a session clears the workflow indicator and ticket context in the fork.
+- Managed Hub launches may set an absolute `PI_AGENT_HUB_PRIMARY_CWD`. Rules uses it only for ticket, linked-plan, and plan-progress reads; absent or malformed values preserve `ctx.cwd` behavior.
 
 ## Shared Helper Tooling
 
@@ -85,9 +89,9 @@ Shared backlog operations live in `skills/_lib/features_yaml.py` and are invoked
 
 - Purpose: keep `agent-work/features.yaml` selection and mutation logic packaged with the repo
 - Runtime: `uv` manages the script-local PyYAML dependency
-- Contract: `epics`, `next-id`, `register`, `next`, `get`, `create`, `update`, `complete`, and `describe`
+- Contract: `epics`, `next-id`, `register`, `normalize`, `next`, `get`, `create`, `update`, `complete`, and `describe`
 - Direct lookup: `skills/_lib/features_yaml.sh get <feature-id> --output json`
-- Ticket creation: `register --json '{"epic":"auth","title":"..."}'` generates the next ID and appends the feature in one mutation
+- Ticket creation: `register --json '{"epic":"auth","title":"Email signup","subtitle":"Validate email before account creation","description":"User can create an account after email validation.","priority":1}'` generates the next ID and appends a minimal canonical record
 - Pipeline input: `register --json -`, `create --json -`, and `update <feature-id> --json -` read JSON objects from stdin
 - Retry behavior: repeated no-op `update` returns `changed:false` and does not rewrite the file
 
@@ -153,32 +157,22 @@ Pytest is scoped to `tests/` via `pytest.ini`.
 
 ```yaml
 - id: auth-001
-  epic: auth
   status: pending
-  title: Sign up using email validation
-  description: User can create an account with email validation before submission
+  title: Email signup
+  subtitle: Validate email before account creation
+  description: User can create an account after email validation.
   priority: 1
+  created_at: 2024-01-15
   depends_on:
     - auth-000
-  steps:
-    - Create form
-    - Add validation
-    - Connect API
-  created_at: 2024-01-15
   plan_file: agent-work/plans/auth-001.md
-  references:
-    - agent-work/plans/auth-000.md
-  discovered_from: null
-  notes: null
 ```
 
-**Minimal required:** `id`, `status`
+**Required for new tickets:** `id`, `status`, `title`, `subtitle`, `description`, `priority`, and `created_at`.
 
-**Common tracked-ticket fields:** `epic`, `description`, `priority`, `depends_on`, `created_at`
+`title` is 1–3 concrete words and at most 32 normalized characters. `subtitle` is 4–6 words and at most 64. `description` is one outcome sentence and at most 240. Registration trims and collapses whitespace before checking bounds.
 
-**Optional fields:** `title`, `steps`, `discovered_from`, `plan_file`, `references`, `completed_at`, plus custom metadata when needed
-
-**Authored titles:** Target 5-7 words and use no more than 48 characters. This title becomes the dashboard's `plan.feature` description, so keep it longer than a short Hub session label. Do not prefix it with its ticket ID. Keep the full user outcome and relevant context in `description`.
+Persist optional `depends_on`, `plan_file`, `discovered_from`, `references`, and terminal completion fields only when meaningful. `epic` is register input for ID allocation and is not persisted. Never write `steps`; the Markdown plan owns detailed scope and checklists. Legacy readers remain tolerant, and `normalize` only removes persisted `epic` and empty/null fields while preserving unknown nonempty history and nonempty legacy steps.
 
 **Status values:** `pending` → `in_progress` → `done` (or `abandoned`, `superseded`)
 

@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -8,11 +11,28 @@ import {
   finalAssistantStopReason,
   FOCUS_MODE_DISPLAY,
   recoverFocus,
+  positionalMarker,
+  setWorkflowActivity,
+  setWorkflowTicketState,
   shouldNormalizeWorkflowDefinition,
+  startWorkflowStep,
   transition,
   withWorkflowDefinition,
+  WORKFLOW_ACTIVITIES,
   WORKFLOW_DEFINITION,
 } from "../extensions/workflow-runtime/core.ts";
+
+import {
+  attentionInput,
+  contextSnapshot,
+  effectiveProjectCwd,
+  parseAttention,
+  parseContextSnapshot,
+  readTicketContext,
+  recentTranscript,
+  sanitizeSessionName,
+} from "../extensions/workflow-runtime/session-context.ts";
+import { parseWorkflowPlan } from "../extensions/workflow-runtime/workflow-plan.ts";
 
 const expectedWorkflowDefinition = [
   { id: "plan-md", short: "PL", label: "Plan" },
@@ -21,6 +41,124 @@ const expectedWorkflowDefinition = [
   { id: "reflect", short: "RF", label: "Reflect" },
   { id: "commit", short: "CM", label: "Commit" },
 ];
+
+test("ticket changes clear prior step-run and completion state", () => {
+  const state = { activeStep: "commit", ticketId: "old-001", currentStepComplete: true, activity: { id: "commit-complete", label: "Commit complete" }, activityPasses: { review: 2 }, plan: { tasks: { completed: 2, total: 3 } } };
+  assert.deepEqual(setWorkflowTicketState(state, "new-001", "command"), { activeStep: "commit", ticketId: "new-001", source: "command" });
+  assert.deepEqual(setWorkflowTicketState(state, "old-001", "tool"), { ...state, source: "tool" });
+});
+
+test("positional markers support active, complete, and direct later steps", () => {
+  assert.deepEqual([0, 1, 2, 3, 4].map((index) => positionalMarker(index, 2, false)), ["✓", "✓", "◉", "·", "·"]);
+  assert.deepEqual([0, 1, 2, 3, 4].map((index) => positionalMarker(index, 4, true)), ["✓", "✓", "✓", "✓", "✓"]);
+});
+
+test("completion is positional, terminal-derived, and reset by later work", () => {
+  let state = startWorkflowStep({}, "review");
+  assert.equal(state.currentStepComplete, undefined);
+  state = setWorkflowActivity(state, "review-complete");
+  assert.equal(state.currentStepComplete, true);
+  state = setWorkflowActivity(state, "fixing-review-findings");
+  assert.equal(state.currentStepComplete, undefined);
+  assert.equal(startWorkflowStep(state, "review").currentStepComplete, undefined);
+  assert.equal(startWorkflowStep(state, "commit").currentStepComplete, undefined);
+
+  const complete = completeWorkflow({ activeStep: "commit", ticketId: "x-001" });
+  assert.equal(complete.currentStepComplete, true);
+  assert.deepEqual(complete.activity, { id: "commit-complete", label: "Commit complete" });
+  assert.equal(Object.values(WORKFLOW_ACTIVITIES).flat().some((item) => item.id === "commit-complete"), false);
+});
+
+test("activity labels use the approved concise display without changing ids", () => {
+  assert.deepEqual(Object.fromEntries(Object.values(WORKFLOW_ACTIVITIES).flat().map(({ id, label }) => [id, label])), {
+    "inspecting-code": "Inspecting code", "clarifying-requirements": "Clarifying scope", "writing-plan": "Writing plan",
+    "reviewing-plan": "Reviewing plan", "updating-plan": "Updating plan", "plan-ready": "Plan ready",
+    "reviewing-implementation": "Reviewing changes", "fixing-review-findings": "Fixing findings", "review-complete": "Review complete",
+    "reviewing-guidance": "Reviewing guidance", "updating-guidance": "Updating guidance", "reflection-complete": "Reflection complete",
+    "archiving-plan": "Archiving plan", "committing-changes": "Committing changes",
+  });
+});
+
+test("effective project cwd accepts only an absolute managed root", () => {
+  assert.equal(effectiveProjectCwd("/source", "/managed/worktree"), "/managed/worktree");
+  assert.equal(effectiveProjectCwd("/source", "relative/path"), "/source");
+  assert.equal(effectiveProjectCwd("/source", "/bad\0path"), "/source");
+  assert.equal(effectiveProjectCwd("/source", ""), "/source");
+  assert.equal(effectiveProjectCwd("/source", undefined), "/source");
+});
+
+test("producer activities validate steps and count critic passes", () => {
+  assert.deepEqual(WORKFLOW_ACTIVITIES.commit.map(({ label }) => label), ["Archiving plan", "Committing changes"]);
+  let state = startWorkflowStep({}, "plan-md", "input");
+  assert.equal(state.activity.label, "Inspecting code");
+  state = setWorkflowActivity(state, "reviewing-plan");
+  assert.deepEqual(state.activity, { id: "reviewing-plan", label: "Reviewing plan" });
+  state = setWorkflowActivity(state, "updating-plan");
+  state = setWorkflowActivity(state, "reviewing-plan");
+  assert.equal(state.activity.pass, 2);
+  state = setWorkflowActivity(state, "reviewing-plan");
+  assert.equal(state.activity.pass, 3);
+  assert.throws(() => setWorkflowActivity(state, "reviewing-implementation"), /does not belong/);
+  let review = startWorkflowStep({}, "review");
+  assert.deepEqual(review.activity, { id: "reviewing-implementation", label: "Reviewing changes" });
+  review = setWorkflowActivity(review, "reviewing-implementation");
+  assert.equal(review.activity.pass, undefined);
+  review = setWorkflowActivity(review, "reviewing-implementation");
+  assert.equal(review.activity.pass, 2);
+  assert.equal(startWorkflowStep(state, "execute").activity, undefined);
+});
+
+test("session context bounds transcript, names, and attention", () => {
+  const entries = [
+    { type: "custom", message: { role: "user", content: "ignore" } },
+    { type: "message", message: { role: "user", content: [{ type: "image" }, { type: "text", text: "  first   prompt " }] } },
+    ...Array.from({ length: 8 }, (_, i) => ({ type: "message", message: { role: i % 2 ? "assistant" : "user", content: `message ${i} ${"x".repeat(700)}` } })),
+  ];
+  assert.ok(recentTranscript(entries).length <= 3000);
+  assert.equal(recentTranscript(entries).split("\n\n").length, 4);
+  assert.equal(sanitizeSessionName('"metadata redesign"'), "Metadata Redesign");
+  assert.equal(sanitizeSessionName("four word session name"), undefined);
+  assert.deepEqual(parseAttention('{"kind":"ready","text":"Review the patch","confidence":0.8}'), { kind: "ready", text: "Review the patch" });
+  assert.equal(parseAttention('{"kind":"ready","text":"Maybe","confidence":0.4}'), undefined);
+  assert.ok(attentionInput("request", "done", { id: "x-001", description: "Outcome" }, "Plan ready").includes("Current context"));
+  const snapshot = { version: 1, updatedAt: 7, ticket: { id: "x-001", subtitle: "Scan context", future: true }, attention: { kind: "ready", text: "Review it" }, future: true };
+  assert.deepEqual(parseContextSnapshot(snapshot), { version: 1, updatedAt: 7, ticket: { id: "x-001", subtitle: "Scan context" }, attention: { kind: "ready", text: "Review it" } });
+  assert.equal(parseContextSnapshot({ ...snapshot, version: 2 }), undefined);
+  assert.equal(parseContextSnapshot({ ...snapshot, attention: { kind: "ready", text: "x".repeat(97) } }), undefined);
+  assert.deepEqual(contextSnapshot({ id: "x-001", title: "Ignored", subtitle: "Scan context" }, undefined, 7), { version: 1, updatedAt: 7, ticket: { id: "x-001", subtitle: "Scan context" } });
+});
+
+test("ticket context resolves canonical fields and legacy plan title", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "rules-context-"));
+  try {
+    await mkdir(join(cwd, "agent-work/plans"), { recursive: true });
+    await writeFile(join(cwd, "agent-work/features.yaml"), `- id: meta-001\n  title: Metadata redesign\n  subtitle: Simplify cross package session context\n  description: User can rely on one\n    context.\n  metadata:\n    title: Wrong nested title\n    description: Wrong nested description.\n  plan_file: agent-work/plans/meta-001.md\n- id: legacy-001\n  plan_file: agent-work/plans/legacy-001.md\n- id: legacy-arrow-001\n  plan_file: agent-work/plans/legacy-arrow-001.md\n`);
+    await writeFile(join(cwd, "agent-work/plans/legacy-001.md"), "**Feature:** Legacy naming\n");
+    await writeFile(join(cwd, "agent-work/plans/legacy-arrow-001.md"), "**Feature:** `legacy-arrow-001` → Legacy naming\n");
+    assert.deepEqual(await readTicketContext(cwd, "meta-001"), { id: "meta-001", title: "Metadata redesign", subtitle: "Simplify cross package session context", description: "User can rely on one context.", planFile: "agent-work/plans/meta-001.md" });
+    assert.equal((await readTicketContext(cwd, "legacy-001")).title, "Legacy naming");
+    assert.equal((await readTicketContext(cwd, "legacy-arrow-001")).title, "Legacy naming");
+    assert.equal(await readTicketContext(cwd, "missing-001"), undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("deterministic plan projection handles phases, fences, and flat lists", () => {
+  const parsed = parseWorkflowPlan(`# Plan\n\n### Phase 1: Foundation\n- [x] First\n- [ ] Second\n\n\`\`\`md\n- [ ] ignored\n\`\`\`\n### Phase 2 — Finish\n- [ ] Third`);
+  assert.equal(parsed.plan.total, 3);
+  assert.deepEqual(parsed.projection.phase, { index: 1, count: 2, title: "Foundation" });
+  assert.deepEqual(parsed.projection.tasks, { completed: 1, total: 3 });
+  assert.equal(parsed.projection.nextStep, "Second");
+  assert.deepEqual(parseWorkflowPlan("- [x] A\n- [ ] B").projection.tasks, { completed: 1, total: 2 });
+
+  const scoped = parseWorkflowPlan("### Phase 1: Foundation\n- [ ] Phase task\n\n## Verification\n- [ ] Outside phase\n\n### Phase 2: Finish\n- [ ] Final task");
+  assert.deepEqual(scoped.projection.tasks, { completed: 0, total: 2 });
+  assert.deepEqual(scoped.projection.phases, [{ completed: 0, total: 1 }, { completed: 0, total: 1 }]);
+
+  const hundredPhases = Array.from({ length: 100 }, (_, index) => `### Phase ${index + 1}: P${index + 1}\n- [ ] Task ${index + 1}`).join("\n");
+  const bounded = parseWorkflowPlan(hundredPhases).projection;
+  assert.equal(bounded.phase.count, 100);
+  assert.equal(bounded.phases.length, 100);
+});
 
 test("the producer owns the ordered workflow definition", () => {
   assert.deepEqual(WORKFLOW_DEFINITION, expectedWorkflowDefinition);
@@ -107,28 +245,19 @@ const activeState = (overrides = {}) => ({
   },
 });
 
-test("workflow completion clears state only from Commit", () => {
-  const calls = [];
-  const cleared = completeWorkflow(
-    { activeStep: "commit", ticketId: "workflow-board-001", source: "input" },
-    () => {
-      calls.push("clearState");
-      return {};
-    },
-  );
-
-  assert.deepEqual(cleared, {});
-  assert.deepEqual(calls, ["clearState"]);
+test("workflow completion retains terminal state only from Commit", () => {
+  const completed = completeWorkflow({ activeStep: "commit", ticketId: "workflow-board-001", source: "input" });
+  assert.deepEqual(completed, {
+    activeStep: "commit", ticketId: "workflow-board-001", source: "input",
+    currentStepComplete: true, activity: { id: "commit-complete", label: "Commit complete" },
+  });
 });
 
 test("workflow completion is rejected outside Commit without clearing", () => {
   for (const activeStep of [undefined, "plan-md", "execute", "review", "reflect"]) {
     let cleared = false;
     assert.throws(
-      () => completeWorkflow({ activeStep }, () => {
-        cleared = true;
-        return {};
-      }),
+      () => completeWorkflow({ activeStep }),
       /only be completed during commit/i,
       String(activeStep),
     );

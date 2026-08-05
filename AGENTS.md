@@ -86,15 +86,18 @@ Root-level sequence (not wrapped in a mapping):
 ```yaml
 - id: auth-001
   status: pending  # pending | in_progress | done | abandoned | superseded
-  description: "..."
+  title: "Email signup"       # 1–3 words, max 32 normalized characters
+  subtitle: "Validate email before account creation" # 4–6 words, max 64
+  description: "User can create an account after email validation." # one sentence, max 240
   priority: 1
-  depends_on: []
   created_at: 2024-01-15
-  completed_at: null  # set on terminal status
-  # optional: discovered_from, plan_file, references, epic, or custom metadata
+  # persist only meaningful optional fields: depends_on, plan_file,
+  # discovered_from, references, and terminal completion fields
 ```
 
 ### Mutating agent-work/features.yaml
+
+New tickets require `id`, `status`, `title`, `subtitle`, `description`, `priority`, and `created_at`. The ID prefix is authoritative, so `register` accepts `epic` for allocation but does not persist it. Never add `steps`; detailed scope and checklists belong in the Markdown plan. Readers remain tolerant of legacy and unknown fields.
 
 When `agent-work/features.yaml` exists, avoid reading the full file into context. Use `$SKILLS_ROOT/_lib/features_yaml.sh` for listing epics, registering new tickets (`register` generates the ID and appends in one mutation), selecting the next feature, inspecting a feature by ID (`get <feature-id> --output json`), and updating status/plan fields. `next-id` is for inspection; do not reserve IDs with it before ticket creation. `describe` explains helper commands, not feature IDs. Only fall back to direct YAML edits for operations the helper does not yet cover.
 

@@ -10,6 +10,8 @@ Create a detailed Markdown implementation plan for the provided request.
 
 ### Pre-Work & User Interview
 
+The step starts with `inspecting-code`. Pi publishes `clarifying-requirements` automatically when `ask_user_question` starts. Do not make redundant activity calls for either boundary.
+
 Open the interview by asking whether to isolate this work in a git worktree; the answer shapes where every later step runs. If approved, inspect the current and default branches. Ask which branch should seed the worktree, then which should receive the PR; recommend the default branch for both. Then investigate the codebase to resolve discoverable facts, and interview the user about the decisions that remain. Ask one decision question at a time, include your recommended answer and rationale, and wait for feedback before continuing. Resolve dependent decisions in order until scope, approach, dependencies, product direction, domain concepts, boundaries, and trade-offs are mutually understood. Do not batch questions or carry unresolved assumptions into the plan. Write the plan only after the user confirms shared understanding; never implement it during this skill.
 
 ### Worktree (Only If The User Approved One)
@@ -31,6 +33,7 @@ Store plans in `agent-work/plans/`:
 - If the request names a feature ID, use it. Otherwise create one with the `ticket-init` skill.
 - Write the plan to `agent-work/plans/<feature-id>.md`, update `plan_file`, and call `set_workflow_ticket` when available:
   `$SKILLS_ROOT/_lib/features_yaml.sh update "<feature-id>" --json '{"plan_file":"agent-work/plans/<feature-id>.md"}'`
+- Before replacing a tracked plan, inspect any nonempty legacy `steps`. Copy useful scope into the reviewed Markdown plan, then remove `steps` from YAML in the same reviewed mutation. Never remove legacy steps merely because a plan is linked.
 - If `agent-work/features.yaml` does not exist, use `agent-work/plans/FEATURE_NAME.md`.
 - Tracked features keep `status: pending`; `execute` owns the `pending` → `in_progress` transition.
 
@@ -43,8 +46,8 @@ Include a context-files section:
 
 ### Create Plan
 
-1. Create markdown document with the determined name. Start with:
-   - `**Feature:** {id} → {description}`
+1. When available, call `set_workflow_activity` with `writing-plan`, then create the Markdown document. Start with:
+   - `**Feature:** {id} → {canonical title}` — repeated for readability; `features.yaml.title` remains authoritative
    - `**Session:** {harness session ID}`
    - `**Worktree:** {path(s) and branch, or `none`}` — later steps run wherever this points
    - `**Start branch:** {branch per repository, or `n/a`}`
@@ -69,8 +72,8 @@ Include a context-files section:
 
 ### Plan Review (Non-Trivial Plans Only)
 
-For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** subagent and act on its feedback per the AGENTS.md critic rule.
+For plans involving architectural decisions, multi-file changes, or complex logic, invoke the **plan-critic** through `tmux_subagent`; Pi publishes `reviewing-plan` and increments its pass count from that exact launch. If fixes are needed, call `set_workflow_activity` with `updating-plan` when available before editing, then launch the critic again after fixes. For a non-tmux critic path only, call `reviewing-plan` manually as the fallback before each pass. Never use both paths for one pass. Act on feedback per the AGENTS.md critic rule.
 
 ### Output
 
-For successful planning, report the plan path, include a `Summary:` line with 1-2 sentences on the planned approach, then end with `READY FOR EXECUTE`. If planning is blocked, report `BLOCKED — <reason>`.
+For successful planning, call `set_workflow_activity` with `plan-ready` when available, report the plan path, include a `Summary:` line with 1-2 sentences on the planned approach, then end with `READY FOR EXECUTE`. If planning is blocked, report `BLOCKED — <reason>`.

@@ -27,10 +27,16 @@ $SKILLS_ROOT/_lib/features_yaml.sh epics
 
 Register each ticket under the chosen epic; the helper generates the ID.
 
-Write an authored title that targets 5-7 words and uses no more than 48 characters. This title becomes the dashboard's `plan.feature` description, so keep it longer than a short Hub session label. Do not prefix it with a ticket ID. Keep the full user outcome and relevant context in the description instead of shortening them to fit the title.
+Author three distinct display fields. Normalize whitespace before checking limits.
+
+- `title`: 1–3 concrete words, at most 32 Unicode characters. This becomes Pi's native session name.
+- `subtitle`: 4–6 words of scan context, at most 64 characters.
+- `description`: one concise outcome sentence, at most 240 characters.
+
+Do not prefix text with a ticket ID. Never write `steps`; detailed scope and checklists belong in the Markdown plan. Omit empty arrays, empty strings, null placeholders, and unassigned optional fields. `epic` allocates the ID but is not persisted.
 
 ```bash
-$SKILLS_ROOT/_lib/features_yaml.sh register --json '{"epic":"...","status":"pending","title":"{5-7 words, max 48 characters, no ticket ID}","description":"User can [action] with [context]","steps":["{only if user provided}"],"priority":2,"depends_on":[],"discovered_from":null,"plan_file":null,"references":[],"created_at":"YYYY-MM-DD"}'
+$SKILLS_ROOT/_lib/features_yaml.sh register --json '{"epic":"auth","title":"Email signup","subtitle":"Validate email before account creation","description":"User can create an account after email validation.","priority":2}'
 ```
 
 Priority: 1=foundation, 2=core (default), 3=polish.
@@ -41,6 +47,7 @@ Priority: 1=foundation, 2=core (default), 3=polish.
 TICKET CREATED: {id}
 Epic: {epic}
 Title: {title}
+Subtitle: {subtitle}
 Priority: {priority}
 ```
 

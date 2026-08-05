@@ -9,6 +9,8 @@ Update durable documentation and agent guidance after implementation has passed 
 
 ### Process
 
+The step starts with `reviewing-guidance` as its default activity. Pi republishes it and increments its pass count when the exact `docs-critic` tmux launch starts. For a non-tmux critic path only, call it manually as the fallback before each pass. Never use both paths for one pass.
+
 1. Inspect the active plan, review output, the conversation with the user, `git status --short`, and changed files.
 2. Identify the highest-value durable documentation gaps by asking: what missing context could cause future users, maintainers, or agents to make wrong decisions, and who would act differently if it were documented? Route each gap to its owner:
    - project purpose, target user, project type, project stage, operating assumptions, or shared terminology → `CONTEXT.md`
@@ -17,7 +19,7 @@ Update durable documentation and agent guidance after implementation has passed 
    - product/API/design truth → the relevant domain doc
    - recurring agent mistakes, user corrections, review findings, or counterintuitive workflow pitfalls → the project-local `AGENTS.md`
    - repeatable project workflows already encoded in project-local skills or agent configuration → update the owning file; do not create new skills or modify user-global configuration unless explicitly requested
-3. For non-trivial durable doc/guidance edits, invoke the `docs-critic` subagent once to check clarity, fit, and whether the additions are truly durable. Skip when there are no edits or only tiny mechanical fixes such as typos, links, paths, or formatting. Act on its feedback per the AGENTS.md critic rule; deleting the update is acceptable when the critique shows it is not worth keeping.
+3. For non-trivial durable doc/guidance edits, call `updating-guidance` when available before edits, then invoke the `docs-critic` subagent; its tmux launch restores `reviewing-guidance` automatically and records the pass. Skip when there are no edits or only tiny mechanical fixes such as typos, links, paths, or formatting. Act on its feedback per the AGENTS.md critic rule; deleting the update is acceptable when the critique shows it is not worth keeping.
 
 ### Editing Rules
 
@@ -34,7 +36,7 @@ Only update durable docs/guidance. Do not change code, tracked state, archives, 
 
 ### Output
 
-Report one of:
+Before a successful report, call `set_workflow_activity` with `reflection-complete` when available. Report one of:
 
 - `READY FOR COMMIT` — include a `Summary:` line with 1-2 sentences on docs/guidance updated before the handoff label, then list docs updated
 - `NO REFLECTION UPDATES — READY FOR COMMIT` — include a `Summary:` line with 1-2 sentences explaining why no durable updates were needed before the handoff label
