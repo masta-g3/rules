@@ -1,38 +1,39 @@
 ---
 name: focus
-description: Autonomous mode for long-running execution that follows execute across turns until completion or a real blocker.
+description: Autonomous mode for long-running bounded work until completion or a real blocker.
 metadata:
   thinkingLevel: high
 ---
 
-`focus` wraps `execute` for approved, in-scope work likely to span multiple turns without immediate user input. Enter it with `start_focus` during execution.
+`focus` continues an approved, bounded task likely to span multiple turns without immediate user input.
 
-First read and follow the installed `execute` skill as authoritative:
-`$SKILLS_ROOT/execute/SKILL.md`
+Focus itself does not start or advance workflow steps. Start or advance one only when the user explicitly requests it. Do not infer a workflow step from the kind of task.
+
+Follow the active scope:
+
+- During Execute, follow `$SKILLS_ROOT/execute/SKILL.md` and the active plan as authoritative. Re-read them after compaction or when the next step is unclear.
+- With no active workflow step, follow the user's task and project instructions.
 
 Focus mode continues automatically after each turn ending normally (`stop`). Esc/abort, provider errors, output limits, and other non-normal stops leave focus active but paused without scheduling another turn; ordinary user input resumes it.
 
 Rules:
 
-- Follow `execute` exactly for baseline verification, tracked feature status, plan checklist updates, discovered work, docs policy, testing, and code quality.
-- Work from the active plan document when one exists; re-read it after compaction or whenever the next step is unclear.
-- Verify the plan checklist against the repository rather than trusting earlier progress summaries.
-- If no plan exists, continue from the feature or task the user provided.
 - Keep changes minimal and phase-based. Do not broaden scope.
+- Verify progress against the actual result rather than trusting earlier summaries.
 - Do not stop merely to report progress while actionable work remains.
-- Continue implementing and verifying until the requested work is complete or further progress requires user input or an external dependency.
+- Continue working and verifying until the requested outcome is complete or further progress requires user input or an external dependency.
 - Treat ordinary user messages as additional instructions within the active run; they do not end focus mode.
 
 Focus mode has no turn limit. End it explicitly with the `end_focus` tool:
 
-- Use outcome `completed` only after the requested work is implemented and relevant verification passes.
+- Use outcome `completed` only after the requested outcome is complete and relevant verification passes.
 - Use outcome `blocked` only when no safe, in-scope work remains without user input or an external requirement.
 - Include a concise completion summary or blocker explanation.
-- After the tool returns, give the user the final response requested by `execute`.
+- After the tool returns, give the user the final response requested by the active task.
 
 Before calling `end_focus` with outcome `completed`, perform a short completion audit:
 
-- Compare the active plan checklist, when present, to actual repository changes.
-- Confirm verification ran for completed work.
+- Compare the user's requested outcome and any active checklist to the actual result.
+- Confirm relevant verification ran.
 - Check for remaining in-scope TODOs, temporary artifacts, or unreported blockers.
 - If meaningful work remains, do not call `end_focus`; continue working.

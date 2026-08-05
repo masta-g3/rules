@@ -30,8 +30,11 @@ export type WorkflowSource = "input" | "command" | "shortcut" | "tool";
 export type SessionBoundaryReason = "startup" | "reload" | "new" | "resume" | "fork";
 export type AgentStopReason = "stop" | "length" | "toolUse" | "error" | "aborted";
 
+export type FocusScope = "execute" | "standalone";
+
 export type FocusExecution = {
 	mode: "focus";
+	scope: FocusScope;
 	runId: string;
 	turnsCompleted: number;
 };
@@ -171,7 +174,7 @@ export type RuntimeEffect =
 	| { kind: "notify-stop"; reason: StopReason };
 
 export type RuntimeEvent =
-	| { type: "activate-focus"; ticketId?: string; runId: string }
+	| { type: "activate-focus"; scope: FocusScope; ticketId?: string; runId: string }
 	| { type: "agent-end"; stopReason?: AgentStopReason }
 	| { type: "end-focus" }
 	| { type: "ordinary-input" }
@@ -240,21 +243,34 @@ export function positionalMarker(index: number, activeIndex: number, currentStep
 	return index === activeIndex ? "◉" : "·";
 }
 
+export function focusScope(state: WorkflowState): FocusScope | undefined {
+	if (!state.activeStep) return "standalone";
+	return state.activeStep === "execute" ? "execute" : undefined;
+}
+
 export function continuationContent(state: WorkflowState): string {
 	if (!state.execution) return "";
-	const ticket = state.ticketId ? `Continue the active focus run for ticket ${state.ticketId}.\n` : "";
-	return `${ticket}Follow \`execute\` and the active plan when present; otherwise continue the user's task. Verify progress against the repository, then take the next concrete implementation or verification step.
-Exit focus explicitly: call \`end_focus\` with outcome \`completed\` when the work is implemented and verified, or \`blocked\` when further progress requires user input or an external dependency; include a concise summary in either case. Do not stop at a progress report or leave focus active after either condition.`;
+	const start = state.execution.scope === "execute"
+		? state.ticketId
+			? `Continue the active focus run for ticket ${state.ticketId}.\nFollow Execute and the active plan.`
+			: "Continue the active Execute focus run.\nFollow Execute and the active plan."
+		: "Continue the active standalone focus run.\nFollow the user's task and project instructions.";
+	return `${start}
+Focus itself does not start or advance workflow steps. Start or advance one only when the user explicitly requests it.
+Verify progress against the actual result, then take the next concrete work or verification step.
+Exit focus explicitly: call \`end_focus\` with outcome \`completed\` when the requested outcome is complete and verified, or \`blocked\` when further progress requires user input or an external dependency; include a concise summary in either case. Do not stop at a progress report or leave focus active after either condition.`;
 }
 
 export function transition(state: WorkflowState, event: RuntimeEvent): TransitionResult {
 	if (event.type === "activate-focus") {
+		const ticketId = event.ticketId ?? state.ticketId;
 		return {
 			state: {
-				activeStep: "execute",
-				ticketId: event.ticketId ?? state.ticketId,
+				...(event.scope === "execute" ? { activeStep: "execute" as const } : {}),
+				...(ticketId ? { ticketId } : {}),
 				execution: {
 					mode: "focus",
+					scope: event.scope,
 					runId: event.runId,
 					turnsCompleted: 0,
 				},
