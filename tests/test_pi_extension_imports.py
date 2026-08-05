@@ -71,7 +71,8 @@ class PiExtensionImportsTest(unittest.TestCase):
         source = EXTENSION.read_text()
 
         self.assertIn('name: "complete_workflow"', source)
-        self.assertIn('completeWorkflow(state, () => clearState(pi, ctx))', source)
+        self.assertIn('setState(pi, ctx, completeWorkflow(state))', source)
+        self.assertIn('terminal indicator is retained', source)
         agent_end_handler = source.split('pi.on("agent_end"', 1)[1].split(
             'pi.on("before_agent_start"', 1
         )[0]

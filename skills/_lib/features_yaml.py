@@ -34,6 +34,11 @@ STATUSES = {"pending", "in_progress", "done", "abandoned", "superseded"}
 MUTABLE_STATUSES = STATUSES - {"done"}
 DEFAULT_FEATURES_FILE = "agent-work/features.yaml"
 PLAN_DIR = "agent-work/plans"
+MAX_ID_CHARS = 80
+MAX_TITLE_CHARS = 32
+MAX_SUBTITLE_CHARS = 64
+MAX_DESCRIPTION_CHARS = 240
+REGISTER_FIELDS = {"epic", "status", "title", "subtitle", "description", "priority", "created_at", "depends_on", "plan_file", "discovered_from", "references"}
 
 
 COMMAND_SPECS = {
@@ -58,6 +63,15 @@ COMMAND_SPECS = {
         "summary": "Append a new feature object with the next sequential tracked ID for an epic.",
         "arguments": [
             {"name": "--json", "required": True, "type": "json-object"},
+            {"name": "--file", "required": False, "type": "path", "default": DEFAULT_FEATURES_FILE},
+            {"name": "--dry-run", "required": False, "type": "flag", "default": False},
+            {"name": "--output", "required": False, "type": "text|json", "default": "text"},
+        ],
+        "output_modes": ["text", "json"],
+    },
+    "normalize": {
+        "summary": "Remove redundant epic and empty/null fields without inventing content.",
+        "arguments": [
             {"name": "--file", "required": False, "type": "path", "default": DEFAULT_FEATURES_FILE},
             {"name": "--dry-run", "required": False, "type": "flag", "default": False},
             {"name": "--output", "required": False, "type": "text|json", "default": "text"},
@@ -183,8 +197,19 @@ def ensure_plain_text(name: str, value: str) -> str:
     return value
 
 
+def normalize_text(name: str, value: str, max_chars: int) -> str:
+    value = " ".join(ensure_plain_text(name, value).split())
+    if not value:
+        fail(f"{name} must not be empty")
+    if len(value) > max_chars:
+        fail(f"{name} must be at most {max_chars} characters")
+    return value
+
+
 def ensure_tracked_id(feature_id: str) -> str:
     ensure_plain_text("feature id", feature_id)
+    if len(feature_id) > MAX_ID_CHARS:
+        fail(f"feature id must be at most {MAX_ID_CHARS} characters")
     if any(char in feature_id for char in INVALID_ID_CHARACTERS):
         fail(f"invalid feature id: {feature_id}")
     if not ID_PATTERN.match(feature_id):
@@ -238,6 +263,8 @@ def feature_details(feature: dict) -> dict[str, Any]:
         "id": feature.get("id"),
         "priority": feature.get("priority"),
         "depends_on": feature.get("depends_on", []) or [],
+        "title": feature.get("title"),
+        "subtitle": feature.get("subtitle"),
         "description": feature.get("description") or feature.get("title") or "(no description)",
     }
     if "status" in feature:
@@ -302,17 +329,56 @@ def create_feature(path_str: str, payload: dict, *, dry_run: bool) -> dict[str, 
 def register_feature(path_str: str, payload: dict, *, dry_run: bool) -> dict[str, Any]:
     if "id" in payload:
         fail("register payload must not include id; it is generated from epic")
+    if "steps" in payload:
+        fail("register payload must not include steps; use the Markdown plan checklist")
+    extra = sorted(set(payload) - REGISTER_FIELDS)
+    if extra:
+        fail(f"unsupported register field(s): {', '.join(extra)}")
     epic = payload.get("epic")
     if not isinstance(epic, str):
         fail("register payload must include string field: epic")
     epic = ensure_epic(epic)
+    required_text = {"title": (1, 3, MAX_TITLE_CHARS), "subtitle": (4, 6, MAX_SUBTITLE_CHARS)}
+    clean: dict[str, Any] = {}
+    for field, (minimum, maximum, chars) in required_text.items():
+        value = payload.get(field)
+        if not isinstance(value, str):
+            fail(f"register payload must include string field: {field}")
+        value = normalize_text(field, value, chars)
+        words = value.split()
+        if not minimum <= len(words) <= maximum:
+            fail(f"{field} must contain {minimum}–{maximum} words")
+        clean[field] = value
+    description = payload.get("description")
+    if not isinstance(description, str):
+        fail("register payload must include string field: description")
+    description = normalize_text("description", description, MAX_DESCRIPTION_CHARS)
+    if len(re.findall(r"[.!?](?=\s|$)", description)) > 1:
+        fail("description must be one sentence")
+    priority = payload.get("priority")
+    if not isinstance(priority, int) or isinstance(priority, bool):
+        fail("register payload must include integer field: priority")
+
+    status = payload.get("status", "pending")
+    if not isinstance(status, str) or status not in STATUSES:
+        fail("register status must be a valid status string")
+    created_at = payload.get("created_at") or date.today().isoformat()
+    if not isinstance(created_at, str):
+        fail("register created_at must be a date string")
 
     data = load_features(path_str)
-    result = dict(payload)
-    result["epic"] = epic
-    result["id"] = next_feature_id(data, epic)
-    result.setdefault("status", "pending")
-    result.setdefault("created_at", date.today().isoformat())
+    result = {
+        "id": next_feature_id(data, epic),
+        "status": status,
+        **clean,
+        "description": description,
+        "priority": priority,
+        "created_at": created_at,
+    }
+    for field in ("depends_on", "plan_file", "discovered_from", "references"):
+        value = payload.get(field)
+        if value not in (None, "", []):
+            result[field] = value
     validate_new_feature(result, command="register")
 
     if any(feature.get("id") == result["id"] for feature in data):
@@ -327,6 +393,17 @@ def register_feature(path_str: str, payload: dict, *, dry_run: bool) -> dict[str
         "dry_run": dry_run,
         "feature": feature_details(result),
     }
+
+
+def normalize_features(path_str: str, *, dry_run: bool) -> dict[str, Any]:
+    data = load_features(path_str)
+    normalized = []
+    for feature in data:
+        normalized.append({key: value for key, value in feature.items() if key != "epic" and value not in (None, "", [])})
+    changed = normalized != data
+    if changed and not dry_run:
+        save_features(path_str, normalized)
+    return {"command": "normalize", "changed": changed, "dry_run": dry_run, "normalized": len(data)}
 
 
 def validate_patch(patch: dict) -> dict[str, Any]:
@@ -553,7 +630,7 @@ def emit_text(result: dict[str, Any]) -> None:
         feature = result["feature"]
         status = feature.get("status") or "-"
         print(f"{feature.get('id')} [{status}]")
-        for key in ("priority", "depends_on", "plan_file", "description"):
+        for key in ("title", "subtitle", "priority", "depends_on", "plan_file", "description"):
             if key not in feature:
                 continue
             value = feature[key]
@@ -615,6 +692,10 @@ def emit_text(result: dict[str, Any]) -> None:
         print("RECOMMENDED NEXT")
         print(recommended)
         print(f"Suggested plan file: {result['suggested_plan_file']}")
+        return
+
+    if command == "normalize":
+        print(f"Normalized {result['normalized']} feature records" if result["changed"] else "No normalization changes")
         return
 
     if command in {"create", "register", "update", "complete"}:
@@ -696,6 +777,9 @@ def build_parser() -> argparse.ArgumentParser:
     next_id_parser.add_argument("epic")
     next_id_parser.set_defaults(handler=handle_next_id)
 
+    normalize = subparsers.add_parser("normalize", parents=[file_parent, mutation_parent])
+    normalize.set_defaults(handler=handle_normalize)
+
     next_parser = subparsers.add_parser("next", parents=[file_parent])
     next_parser.add_argument("--epic")
     next_parser.add_argument(
@@ -734,8 +818,8 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[file_parent, mutation_parent],
         description="Append a new feature object with the next ID for an epic. Use --json - to read the payload from stdin.",
         epilog="""Examples:
-  features_yaml.sh register --json '{"epic":"tui","title":"Add table filters"}'
-  echo '{"epic":"tui","title":"Add table filters"}' | features_yaml.sh register --json - --output json
+  features_yaml.sh register --json '{"epic":"tui","title":"Table filters","subtitle":"Filter visible rows by field","description":"User can filter table rows by field.","priority":2}'
+  echo '{"epic":"tui","title":"Table filters","subtitle":"Filter visible rows by field","description":"User can filter table rows by field.","priority":2}' | features_yaml.sh register --json - --output json
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -793,6 +877,10 @@ def handle_epics(args: argparse.Namespace) -> dict[str, Any]:
 
 def handle_next_id(args: argparse.Namespace) -> dict[str, Any]:
     return next_id(args.file, args.epic)
+
+
+def handle_normalize(args: argparse.Namespace) -> dict[str, Any]:
+    return normalize_features(args.file, dry_run=args.dry_run)
 
 
 def handle_next(args: argparse.Namespace) -> dict[str, Any]:

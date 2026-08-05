@@ -9,6 +9,8 @@ Assume the work has already been reviewed and reflected. Quick final scan for de
 
 ### Archive Planning Document
 
+The step starts with `archiving-plan`. Rely on that default during archive work; do not make a redundant activity call.
+
 If a planning file exists, archive it:
 
 1. Run `$SKILLS_ROOT/commit/scripts/archive_plan.sh <plan-file> <short-desc>` — moves the plan to `agent-work/history/yyyymmdd_{feature-id}_{short_desc}.md` and removes the original. Use 2-4 word snake_case description (e.g., `user_signup`).
@@ -23,6 +25,8 @@ If tracked feature: `$SKILLS_ROOT/_lib/features_yaml.sh complete <feature-id> --
 Assume `/reflect` handled durable documentation updates. Do not make broad documentation changes here. If obvious documentation drift remains and the user skipped `/reflect`, stop and ask whether to run `/reflect` before committing.
 
 ### Commit
+
+When `set_workflow_activity` is available, call it with `committing-changes` before staging and committing.
 
 1. Inspect `git status --short`. If unrelated staged paths are present, ask the user whether to unstage them. If a worktree path appears as untracked, stop and add `agent-work/worktrees/` to `.gitignore` before staging — never commit a nested checkout. Then `git add` only session files.
 2. `git commit -m` format:

@@ -243,7 +243,9 @@ class FeaturesYamlCliTest(unittest.TestCase):
                 {
                     "epic": "skill",
                     "title": "Register tickets",
-                    "description": "Agent can register tickets",
+                    "subtitle": "Create canonical tracked feature records",
+                    "description": "Agent can register canonical tickets.",
+                    "priority": 2,
                 }
             ),
             "--output",
@@ -259,11 +261,12 @@ class FeaturesYamlCliTest(unittest.TestCase):
         self.assertEqual(
             features[-1],
             {
-                "epic": "skill",
-                "title": "Register tickets",
-                "description": "Agent can register tickets",
                 "id": "skill-004",
                 "status": "pending",
+                "title": "Register tickets",
+                "subtitle": "Create canonical tracked feature records",
+                "description": "Agent can register canonical tickets.",
+                "priority": 2,
                 "created_at": date.today().isoformat(),
             },
         )
@@ -291,6 +294,32 @@ class FeaturesYamlCliTest(unittest.TestCase):
         )
         self.assertIn("register payload must include string field: epic", missing_epic.stderr)
 
+    def test_register_requires_canonical_text_and_rejects_steps(self) -> None:
+        self.write_features([])
+        base = {"epic": "skill", "title": "Metadata redesign", "subtitle": "Simplify cross package session context", "description": "User can rely on canonical context.", "priority": 1}
+        for field in ("title", "subtitle", "description", "priority"):
+            payload = dict(base)
+            payload.pop(field)
+            result = self.run_helper("--file", str(self.features_file), "register", "--json", json.dumps(payload), expect_ok=False)
+            self.assertIn(field, result.stderr)
+        result = self.run_helper("--file", str(self.features_file), "register", "--json", json.dumps({**base, "steps": ["legacy"]}), expect_ok=False)
+        self.assertIn("must not include steps", result.stderr)
+
+    def test_normalize_is_mechanical_and_preserves_nonempty_history(self) -> None:
+        self.write_features([{ "id": "skill-001", "epic": "skill", "status": "pending", "steps": ["Keep scope"], "unknown": {"keep": True}, "references": [], "plan_file": None }])
+        result = self.run_helper("--file", str(self.features_file), "normalize", "--output", "json")
+        self.assertTrue(json.loads(result.stdout)["changed"])
+        self.assertEqual(yaml.safe_load(self.features_file.read_text()), [{"id": "skill-001", "status": "pending", "steps": ["Keep scope"], "unknown": {"keep": True}}])
+
+    def test_normalize_dry_run_reports_pending_change_without_mutation(self) -> None:
+        self.write_features([{"id": "skill-001", "epic": "skill", "status": "pending", "plan_file": None}])
+        original = self.features_file.read_text()
+        result = self.run_helper("--file", str(self.features_file), "normalize", "--dry-run", "--output", "json")
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["changed"])
+        self.assertTrue(payload["dry_run"])
+        self.assertEqual(self.features_file.read_text(), original)
+
     def test_register_dry_run_does_not_mutate_file(self) -> None:
         self.write_features([])
         original = self.features_file.read_text()
@@ -300,7 +329,7 @@ class FeaturesYamlCliTest(unittest.TestCase):
             str(self.features_file),
             "register",
             "--json",
-            json.dumps({"epic": "skill", "title": "Dry run"}),
+            json.dumps({"epic": "skill", "title": "Dry run", "subtitle": "Validate changes without file mutation", "description": "Agent can preview canonical registration.", "priority": 1}),
             "--dry-run",
             "--output",
             "json",
@@ -324,7 +353,7 @@ class FeaturesYamlCliTest(unittest.TestCase):
             "-",
             "--output",
             "json",
-            input_text=json.dumps({"epic": "skill", "title": "From stdin"}),
+            input_text=json.dumps({"epic": "skill", "title": "From stdin", "subtitle": "Read canonical fields from stdin", "description": "Agent can register from standard input.", "priority": 1}),
         )
 
         self.assertEqual(json.loads(result.stdout)["feature"]["id"], "skill-001")

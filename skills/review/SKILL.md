@@ -9,13 +9,15 @@ Review the active task after implementation and before `/reflect`. If the plan n
 
 ### Review Process
 
+The step starts with `reviewing-implementation` as its default activity. Pi republishes it and increments its pass count when the exact `code-critic` tmux launch starts. For a non-tmux critic path only, call it manually as the fallback before each pass. Never use both paths for one pass.
+
 Verify correctness, minimal surface area, and reuse of existing patterns. Treat a second implementation of an existing concept — including one with small variations — as pattern drift, not harmless duplication. Flag scope creep, ad-hoc or layered patches, unnecessary abstractions or one-use wrappers/classes, broad exception handling or silent fallbacks, unrequested compatibility layers, and other AI bloat.
 
 1. Identify the files changed during implementation. Exclude commit-step artifacts (plan archival and `agent-work/features.yaml` completion updates), but include explicitly planned documentation deliverables.
 2. Read them and verify against the task: does the change solve it, did the plan's verification steps actually run and pass, and did scope stay within the plan? Compare the change with the nearest analogous implementations, not only the files named in the plan. If an existing mechanism could be reused or extended, flag any competing implementation; small behavioral variations alone do not justify another path. Check the plan's `## Reuse` section: were the listed components actually used, and does any new abstraction, library, or pattern have the justification the plan required? Ask whether the same task could have been solved with a simpler change in the owning layer, and flag hotfixes or conditionals that mask the underlying problem, scope creep, plan overreach, or edits that widen the impact surface.
 3. Check session and `agent-work` hygiene per the AGENTS.md artifact retention rules.
 4. Invoke the `code-critic` reviewer subagent with the assembled file list and the plan path. Craft review is its lane — do a light pass yourself rather than duplicating it.
-5. Evaluate the findings and fix all clear, high-impact, in-scope issues before reporting. Ignore nits, low-confidence findings, and suggestions that widen scope. After material fixes, rerun relevant verification and invoke `code-critic` again on the updated files. Continue until no actionable issues remain or progress requires user input. Do not stop merely to relay feedback that can be fixed within the current review step.
+5. Evaluate the findings and fix all clear, high-impact, in-scope issues before reporting. When available, call `set_workflow_activity` with `fixing-review-findings` before fixes; the later tmux critic launch restores `reviewing-implementation` automatically. Ignore nits, low-confidence findings, and suggestions that widen scope. After material fixes, rerun relevant verification and invoke `code-critic` again on the updated files. Continue until no actionable issues remain or progress requires user input. Do not stop merely to relay feedback that can be fixed within the current review step.
 
 ### Boundaries
 
@@ -27,7 +29,7 @@ Do not:
 
 ### Output
 
-For successful review, include a `Summary:` line with 1-2 sentences or a bullet list covering the review result, fixes applied, and verification rerun. Include any documentation or reflection candidates before the handoff label.
+For successful review, call `set_workflow_activity` with `review-complete` when available, then include a `Summary:` line with 1-2 sentences or a bullet list covering the review result, fixes applied, and verification rerun. Include any documentation or reflection candidates before the handoff label.
 - **READY FOR REFLECT** — no actionable review issues remain
 
 Otherwise:
