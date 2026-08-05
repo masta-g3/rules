@@ -117,7 +117,7 @@ class PiExtensionImportsTest(unittest.TestCase):
         source = EXTENSION.read_text()
 
         self.assertIn('name: "start_focus"', source)
-        self.assertIn('state.activeStep !== "execute"', source)
+        self.assertIn('focusScope(state)', source)
         self.assertIn('type: "activate-focus"', source)
         self.assertIn('name: "end_focus"', source)
         self.assertIn('StringEnum(["completed", "blocked"] as const)', source)
@@ -194,11 +194,12 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertNotIn('${cursor_root}/skills/" "pi_skills"', source)
         self.assertNotIn('${codex_root}/skills/" "pi_skills"', source)
 
-    def test_focus_skill_delegates_execution_and_requires_explicit_exit(self) -> None:
+    def test_focus_skill_supports_execute_and_standalone_scopes(self) -> None:
         source = (REPO_ROOT / "pi" / "skills" / "focus" / "SKILL.md").read_text()
 
         self.assertIn("$SKILLS_ROOT/execute/SKILL.md", source)
-        self.assertIn("active plan document when one exists", source)
+        self.assertIn("With no active workflow step", source)
+        self.assertIn("only when the user explicitly requests it", source)
         self.assertIn("`end_focus`", source)
         self.assertNotIn("LONG EXECUTE CONTINUE", source)
         self.assertFalse((REPO_ROOT / "pi" / "skills" / "long-execute").exists())

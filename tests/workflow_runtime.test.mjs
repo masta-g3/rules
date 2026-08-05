@@ -7,6 +7,7 @@ import {
   createContinuationQueue,
   finalAssistantStopReason,
   FOCUS_MODE_DISPLAY,
+  focusScope,
   recoverFocus,
   shouldNormalizeWorkflowDefinition,
   transition,
@@ -101,6 +102,7 @@ const activeState = (overrides = {}) => ({
   ticketId: "focus-001",
   execution: {
     mode: "focus",
+    scope: "execute",
     runId: "run-1",
     turnsCompleted: 0,
     ...overrides,
@@ -145,33 +147,56 @@ test("an incomplete commit closeout keeps Commit active", () => {
   });
 });
 
-test("activates focus mode with one workflow state", () => {
-  const result = transition(
-    { activeStep: "plan-md", ticketId: "existing-001" },
-    { type: "activate-focus", ticketId: "focus-001", runId: "run-1" },
-  );
-
-  assert.deepEqual(result.effects, []);
-  assert.deepEqual(result.state, activeState());
+test("focus scope is limited to Execute and standalone work", () => {
+  assert.equal(focusScope({ activeStep: "execute" }), "execute");
+  assert.equal(focusScope({}), "standalone");
+  for (const activeStep of ["plan-md", "review", "reflect", "commit"]) {
+    assert.equal(focusScope({ activeStep }), undefined, activeStep);
+  }
 });
 
-test("focus reminders name the work, verification step, and explicit exit", () => {
-  const content = continuationContent(activeState({ turnsCompleted: 4 }));
+test("activates focus without selecting a workflow step", () => {
+  const execute = transition(
+    { activeStep: "execute", ticketId: "focus-001" },
+    { type: "activate-focus", scope: "execute", ticketId: "focus-001", runId: "run-1" },
+  );
+  assert.deepEqual(execute, { state: activeState(), effects: [] });
 
-  assert.match(content, /active focus run for ticket focus-001/);
-  assert.match(content, /Follow `execute` and the active plan when present/);
-  assert.match(content, /otherwise continue the user's task/);
-  assert.match(content, /Verify progress against the repository/);
-  assert.match(content, /call `end_focus`/);
-  assert.match(content, /outcome `completed`/);
-  assert.match(content, /`blocked`/);
-  assert.match(content, /concise summary/);
-  assert.match(content, /Do not stop at a progress report or leave focus active/);
-  assert.doesNotMatch(content, /Turns completed|turnsCompleted|next turn/);
+  const standalone = transition(
+    {},
+    { type: "activate-focus", scope: "standalone", runId: "run-2" },
+  );
+  assert.deepEqual(standalone, {
+    state: {
+      execution: { mode: "focus", scope: "standalone", runId: "run-2", turnsCompleted: 0 },
+    },
+    effects: [],
+  });
+});
+
+test("focus reminders follow the active scope and require explicit exit", () => {
+  const execute = continuationContent(activeState({ turnsCompleted: 4 }));
+
+  assert.match(execute, /active focus run for ticket focus-001/);
+  assert.match(execute, /Follow Execute and the active plan/);
+  assert.match(execute, /Verify progress against the actual result/);
+  assert.match(execute, /call `end_focus`/);
+  assert.match(execute, /outcome `completed`/);
+  assert.match(execute, /`blocked`/);
+  assert.match(execute, /concise summary/);
+  assert.match(execute, /Do not stop at a progress report or leave focus active/);
+  assert.doesNotMatch(execute, /Turns completed|turnsCompleted|next turn/);
 
   const unticketed = continuationContent({ ...activeState(), ticketId: undefined });
-  assert.doesNotMatch(unticketed, /ticket focus-001/);
-  assert.match(unticketed, /^Follow `execute`/);
+  assert.match(unticketed, /^Continue the active Execute focus run/);
+
+  const standalone = continuationContent({
+    execution: { mode: "focus", scope: "standalone", runId: "run-2", turnsCompleted: 2 },
+  });
+  assert.match(standalone, /^Continue the active standalone focus run/);
+  assert.match(standalone, /Follow the user's task and project instructions/);
+  assert.match(standalone, /only when the user explicitly requests it/);
+  assert.doesNotMatch(standalone, /Follow Execute/);
 });
 
 test("focus recovery chooses one delivery for each Pi lifecycle path", () => {

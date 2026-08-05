@@ -9,6 +9,7 @@ import {
 	createContinuationQueue,
 	finalAssistantStopReason,
 	FOCUS_MODE_DISPLAY,
+	focusScope,
 	recoverFocus,
 	shouldNormalizeWorkflowDefinition,
 	transition,
@@ -155,16 +156,22 @@ function renderTicket(theme: ExtensionContext["ui"]["theme"], ticketId?: string)
 	return ticketId ? `${theme.fg(TOKENS.rail, " · ")}${theme.fg(TOKENS.ticket, ticketId)}` : "";
 }
 
+function focusShort(): string {
+	return `${FOCUS_MODE_DISPLAY.short} ${focusPulseOn ? "✦" : "✧"}`;
+}
+
 function renderStepShort(step: (typeof WORKFLOW)[number], state: WorkflowState): string {
-	if (step.id === "execute" && state.execution?.mode === "focus") {
-		return `${FOCUS_MODE_DISPLAY.short} ${focusPulseOn ? "✦" : "✧"}`;
-	}
+	if (step.id === "execute" && state.execution?.mode === "focus") return focusShort();
 	return step.short;
 }
 
 function renderRail(state: WorkflowState, theme: ExtensionContext["ui"]["theme"]): { full: string; compact: string } {
 	const activeStep = getStep(state.activeStep);
-	if (!activeStep) return { full: "", compact: "" };
+	if (!activeStep) {
+		if (state.execution?.scope !== "standalone") return { full: "", compact: "" };
+		const focus = theme.bg(TOKENS.activeBg, theme.fg(TOKENS.activeFg, focusShort()));
+		return { full: focus, compact: focus };
+	}
 
 	const separator = theme.fg(TOKENS.rail, " ─ ");
 	const full = WORKFLOW.map((step) => {
@@ -203,7 +210,7 @@ function renderIndicator(width: number, state: WorkflowState, theme: ExtensionCo
 
 function applyWidget(ctx: ExtensionContext, state: WorkflowState): void {
 	syncFocusPulse(state.execution?.mode === "focus");
-	if (!state.activeStep) {
+	if (!state.activeStep && !state.execution) {
 		ctx.ui.setWidget(ENTRY_TYPE, undefined);
 		return;
 	}
@@ -273,14 +280,14 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		const progress = execution ? ` · next turn ${execution.turnsCompleted + 1}` : "";
 		if (!expanded) {
 			return new Text(
-				`${theme.fg("customMessageLabel", theme.bold("Workflow"))}${theme.fg("dim", " · ")}${theme.fg("customMessageText", `Focus continuing${progress}`)} ${theme.fg("dim", `(${keyHint("app.tools.expand", "to expand")})`)}`,
+				`${theme.fg("customMessageLabel", theme.bold("Focus"))}${theme.fg("dim", " · ")}${theme.fg("customMessageText", `Continuing${progress}`)} ${theme.fg("dim", `(${keyHint("app.tools.expand", "to expand")})`)}`,
 				0,
 				0,
 			);
 		}
 
 		const box = new Box(1, 1, (value) => theme.bg("customMessageBg", value));
-		box.addChild(new Text(theme.fg("customMessageLabel", theme.bold("Workflow")), 0, 0));
+		box.addChild(new Text(theme.fg("customMessageLabel", theme.bold("Focus")), 0, 0));
 		box.addChild(new Spacer(1));
 		box.addChild(new Text(theme.fg("customMessageText", String(message.content)), 0, 0));
 		return box;
@@ -355,32 +362,36 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 	pi.registerTool({
 		name: "start_focus",
 		label: "Start Focus",
-		description: "Enable autonomous focus mode for long-running execute work.",
-		promptSnippet: "Enable focus mode when execute work should continue autonomously across turns",
+		description: "Enable autonomous focus mode for long-running Execute or standalone work.",
+		promptSnippet: "Enable focus mode when the current bounded task should continue autonomously across turns",
 		promptGuidelines: [
-			"Use start_focus during execute when approved in-scope work is likely to require multiple turns and can proceed without immediate user input.",
+			"Use start_focus during Execute or outside an active workflow when approved in-scope work is likely to require multiple turns without immediate user input.",
 			"Do not use start_focus during planning, review, reflection, or commit, or when a user decision or external dependency is already needed.",
+			"Focus does not start or advance workflow steps. Do so only when the user explicitly requests a step.",
 		],
 		parameters: Type.Object({}),
 		async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
 			if (state.execution) throw new Error("Focus mode is already active.");
-			if (state.activeStep !== "execute") throw new Error("Focus mode can only start during execute.");
+			const scope = focusScope(state);
+			if (!scope) throw new Error(`Focus mode cannot start during ${state.activeStep}.`);
 			recoveryPending = false;
 			const result = transition(state, {
 				type: "activate-focus",
+				scope,
 				ticketId: state.ticketId,
 				runId: newRunId(),
 			});
 			state = setState(pi, ctx, { ...result.state, source: "tool" });
 			ctx.ui.notify("Focus mode enabled.", "info");
+			const work = scope === "execute" ? "current Execute work" : "current user task";
 			return {
 				content: [
 					{
 						type: "text",
-						text: "Focus mode is active. Continue the current execute work until it is complete or blocked, then call end_focus.",
+						text: `Focus mode is active. Continue the ${work} until it is complete or blocked, then call end_focus.`,
 					},
 				],
-				details: { ticketId: state.ticketId },
+				details: { scope, ticketId: state.ticketId },
 			};
 		},
 	});
@@ -391,7 +402,7 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 		description: "End active focus mode after the work is completed or blocked.",
 		promptSnippet: "End focus mode with an outcome and concise summary",
 		promptGuidelines: [
-			"When focus mode is active, call end_focus only after the requested work is implemented and verified, or when progress requires user input or an external dependency.",
+			"When focus mode is active, call end_focus only after the requested outcome is complete and verified, or when progress requires user input or an external dependency.",
 			"Do not call end_focus merely to report progress while actionable work remains.",
 		],
 		parameters: Type.Object({
@@ -467,9 +478,19 @@ export default function workflowRuntime(pi: ExtensionAPI): void {
 
 		const skillName = extractSkill(event.text);
 		if (skillName === FOCUS_SKILL) {
+			if (state.execution) {
+				ctx.ui.notify("Focus mode is already active.", "warning");
+				return { action: "handled" };
+			}
+			const scope = focusScope(state);
+			if (!scope) {
+				ctx.ui.notify(`Focus mode cannot start during ${state.activeStep}.`, "warning");
+				return { action: "handled" };
+			}
 			recoveryPending = false;
 			const result = transition(state, {
 				type: "activate-focus",
+				scope,
 				ticketId: extractSkillTicket(event.text) ?? ticketIdFrom(event.text),
 				runId: newRunId(),
 			});
