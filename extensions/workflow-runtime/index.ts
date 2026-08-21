@@ -215,7 +215,7 @@ function renderRail(state: WorkflowState, theme: ExtensionContext["ui"]["theme"]
 	const activeIndex = getStepIndex(activeStep.id);
 	const full = WORKFLOW.map((step, index) => {
 		const marker = positionalMarker(index, activeIndex, state.currentStepComplete === true);
-		const display = `${marker} ${renderStepShort(step, state)}`;
+		const display = `${marker} ${step.id === "execute" && state.execution?.mode === "focus" ? renderStepShort(step, state) : step.label}`;
 		return index === activeIndex && marker === "◉"
 			? theme.bg(TOKENS.activeBg, theme.fg(TOKENS.activeFg, display))
 			: theme.fg(index <= activeIndex ? TOKENS.activeFg : TOKENS.muted, display);

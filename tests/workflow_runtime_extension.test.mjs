@@ -528,10 +528,13 @@ test("workflow widget uses positional full and bounded narrow markers", async ()
   try {
     const runtime = harness(cwd, [], "Metadata redesign");
     await runtime.emit("input", { source: "interactive", text: "/skill:review" });
-    assert.match(runtime.renderWorkflow(80), /^✓ PL ─ ✓ EX ─ ◉ RV ─ · RF ─ · CM$/);
+    assert.match(runtime.renderWorkflow(80), /^✓ Plan ─ ✓ Execute ─ ◉ Review ─ · Reflect ─ · Commit$/);
     assert.equal(runtime.renderWorkflow(8), "3/5 ◉ RV");
+    await runtime.emit("input", { source: "interactive", text: "/skill:execute" });
+    assert.match(runtime.renderWorkflow(80), /^✓ Plan ─ ◉ Execute ─ · Review ─ · Reflect ─ · Commit$/);
+    await runtime.emit("input", { source: "interactive", text: "/skill:review" });
     await runtime.tools.get("set_workflow_activity").execute("done", { activityId: "review-complete" }, undefined, undefined, runtime.ctx);
-    assert.match(runtime.renderWorkflow(80), /^✓ PL ─ ✓ EX ─ ✓ RV ─ · RF ─ · CM$/);
+    assert.match(runtime.renderWorkflow(80), /^✓ Plan ─ ✓ Execute ─ ✓ Review ─ · Reflect ─ · Commit$/);
     assert.equal(runtime.renderWorkflow(8), "3/5 ✓ RV");
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });

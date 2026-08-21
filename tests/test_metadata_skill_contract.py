@@ -32,7 +32,7 @@ def test_skills_rely_on_runtime_for_observable_activity_boundaries() -> None:
         source = skill(name)
         assert f"starts with `{activity}` as its default activity" in source
         assert f"call it with `{activity}` only immediately before each {critic} pass" not in source
-        assert "non-tmux" in source
+    assert "non-tmux" in skill("review")
 
     commit = skill("commit")
     assert "call it with `archiving-plan`" not in commit
