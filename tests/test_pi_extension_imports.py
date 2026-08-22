@@ -95,8 +95,8 @@ class PiExtensionImportsTest(unittest.TestCase):
 
         self.assertIn('const FOCUS_SKILL = "focus";', source)
         self.assertIn('FOCUS_MODE_DISPLAY.label', source)
-        self.assertIn('"✦"', source)
-        self.assertIn('"✧"', source)
+        self.assertIn('"◆"', source)
+        self.assertIn('"◇"', source)
         self.assertIn('pi.on("agent_end"', source)
         self.assertNotIn("LONG EXECUTE CONTINUE", source)
         self.assertNotIn("maxTurns", source)

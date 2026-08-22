@@ -195,7 +195,7 @@ function renderTicket(theme: ExtensionContext["ui"]["theme"], ticketId?: string)
 }
 
 function focusShort(): string {
-	return `${FOCUS_MODE_DISPLAY.label} ${focusPulseOn ? "✦" : "✧"}`;
+	return FOCUS_MODE_DISPLAY.label;
 }
 
 function renderStepShort(step: (typeof WORKFLOW)[number], state: WorkflowState): string {
@@ -215,13 +215,16 @@ function renderRail(state: WorkflowState, theme: ExtensionContext["ui"]["theme"]
 	const activeIndex = getStepIndex(activeStep.id);
 	const full = WORKFLOW.map((step, index) => {
 		const marker = positionalMarker(index, activeIndex, state.currentStepComplete === true);
-		const display = `${marker} ${step.id === "execute" && state.execution?.mode === "focus" ? renderStepShort(step, state) : step.label}`;
+		const focused = step.id === "execute" && index === activeIndex && state.execution?.mode === "focus";
+		const displayMarker = focused ? (focusPulseOn ? "◆" : "◇") : marker;
+		const display = `${displayMarker} ${step.id === "execute" && state.execution?.mode === "focus" ? renderStepShort(step, state) : step.label}`;
 		return index === activeIndex && marker === "◉"
 			? theme.bg(TOKENS.activeBg, theme.fg(TOKENS.activeFg, display))
 			: theme.fg(index <= activeIndex ? TOKENS.activeFg : TOKENS.muted, display);
 	}).join(separator);
 
-	const marker = positionalMarker(activeIndex, activeIndex, state.currentStepComplete === true);
+	const focused = activeStep.id === "execute" && state.execution?.mode === "focus";
+	const marker = focused ? (focusPulseOn ? "◆" : "◇") : positionalMarker(activeIndex, activeIndex, state.currentStepComplete === true);
 	const positioned = `${marker} ${renderStepShort(activeStep, state)}`;
 	const compact = `${theme.fg(TOKENS.muted, `${activeIndex + 1}/${WORKFLOW.length} `)}${
 		marker === "◉" ? theme.bg(TOKENS.activeBg, theme.fg(TOKENS.activeFg, positioned)) : theme.fg(TOKENS.activeFg, positioned)
