@@ -198,6 +198,7 @@ test("focus ticket switches refresh canonical context, name, and plan", async ()
     assert.ok(runtime.latest("workflow-runtime").plan);
 
     await runtime.emit("input", { source: "interactive", text: "/skill:focus other-001" });
+    assert.match(runtime.renderWorkflow(80), /^✓ Plan ─ ◉ Focus [✦✧] ─ · Review ─ · Reflect ─ · Commit/);
     assert.equal(runtime.latest("workflow-runtime").ticketId, "other-001");
     assert.equal(runtime.latest("workflow-runtime").plan, undefined);
     assert.equal(runtime.latest("pi-agent-hub-context").ticket.id, "other-001");

@@ -195,7 +195,7 @@ function renderTicket(theme: ExtensionContext["ui"]["theme"], ticketId?: string)
 }
 
 function focusShort(): string {
-	return `${FOCUS_MODE_DISPLAY.short} ${focusPulseOn ? "✦" : "✧"}`;
+	return `${FOCUS_MODE_DISPLAY.label} ${focusPulseOn ? "✦" : "✧"}`;
 }
 
 function renderStepShort(step: (typeof WORKFLOW)[number], state: WorkflowState): string {

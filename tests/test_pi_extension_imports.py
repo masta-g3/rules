@@ -94,7 +94,7 @@ class PiExtensionImportsTest(unittest.TestCase):
         source = EXTENSION.read_text()
 
         self.assertIn('const FOCUS_SKILL = "focus";', source)
-        self.assertIn('FOCUS_MODE_DISPLAY.short', source)
+        self.assertIn('FOCUS_MODE_DISPLAY.label', source)
         self.assertIn('"✦"', source)
         self.assertIn('"✧"', source)
         self.assertIn('pi.on("agent_end"', source)
