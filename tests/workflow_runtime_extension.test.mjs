@@ -524,6 +524,97 @@ test("managed primary cwd owns ticket context and plan reads", async () => {
   }
 });
 
+test("queued workflow skills become active only when their user message is delivered", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    await runtime.emit("input", { source: "interactive", text: "/skill:execute meta-001" });
+    assert.equal(runtime.latest("workflow-runtime").activeStep, "execute");
+
+    await runtime.emit("input", {
+      source: "interactive",
+      text: "/skill:review meta-001",
+      streamingBehavior: "followUp",
+    });
+    assert.equal(runtime.latest("workflow-runtime").activeStep, "execute");
+    assert.match(runtime.renderWorkflow(80), /◉ Execute ─ · Review/);
+
+    await runtime.emit("message_start", {
+      message: {
+        role: "user",
+        content: [{ type: "text", text: '<skill name="review" location="/skills/review/SKILL.md">\nReview instructions can mention </skill> syntax.\n</skill>\n\nmeta-001' }],
+      },
+    });
+    assert.equal(runtime.latest("workflow-runtime").activeStep, "review");
+    assert.match(runtime.renderWorkflow(80), /✓ Execute ─ ◉ Review/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("queued focus does not affect Execute until delivery", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    await runtime.emit("input", { source: "interactive", text: "/skill:execute meta-001" });
+    await runtime.emit("input", {
+      source: "interactive",
+      text: "/skill:focus meta-001",
+      streamingBehavior: "followUp",
+    });
+    assert.equal(runtime.latest("workflow-runtime").execution, undefined);
+    assert.match(runtime.renderWorkflow(80), /◉ Execute ─ · Review/);
+
+    await runtime.emit("message_start", {
+      message: {
+        role: "user",
+        content: [{ type: "text", text: '<skill name="focus" location="/skills/focus/SKILL.md">\nFocus instructions\n</skill>\n\nmeta-001' }],
+      },
+    });
+    assert.equal(runtime.latest("workflow-runtime").execution.mode, "focus");
+    assert.match(runtime.renderWorkflow(80), /[◇◆] Focus ─ · Review/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("raw queued workflow skill messages also activate on delivery", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    await runtime.emit("input", { source: "interactive", text: "/skill:execute meta-001" });
+    await runtime.emit("input", {
+      source: "interactive",
+      text: "/skill:review meta-001",
+      streamingBehavior: "steer",
+    });
+    assert.equal(runtime.latest("workflow-runtime").activeStep, "execute");
+
+    await runtime.emit("message_start", {
+      message: { role: "user", content: "/skill:review meta-001" },
+    });
+    assert.equal(runtime.latest("workflow-runtime").activeStep, "review");
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("undelivered queued workflow skills do not change later turns", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    await runtime.emit("input", { source: "interactive", text: "/skill:execute meta-001" });
+    await runtime.emit("input", {
+      source: "interactive",
+      text: "/skill:review meta-001",
+      streamingBehavior: "followUp",
+    });
+    await runtime.emit("agent_settled");
+
+    await runtime.emit("message_start", {
+      message: {
+        role: "user",
+        content: [{ type: "text", text: '<skill name="review" location="/skills/review/SKILL.md">\nReview instructions\n</skill>\n\nmeta-001' }],
+      },
+    });
+    assert.equal(runtime.latest("workflow-runtime").activeStep, "execute");
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
 test("workflow widget uses positional full and bounded narrow markers", async () => {
   const cwd = await project();
   try {

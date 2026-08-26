@@ -1,11 +1,8 @@
 ## Communication Style
 
-Write for an ADHD reader: answer first — or the action itself (command, path, snippet); context after, if at all. No preamble, filler, apologies, or closing pleasantries.
+- Write for a busy reader: answer first — or the action itself (command, path, snippet); context after, if at all. No preamble, filler, apologies, or closing pleasantries.
 - Report in the spirit of ASD-STE100 Simplified Technical English: short declarative sentences, active voice, plain words.
-- Cut anything that doesn't change what the reader does next. Explain at length only when asked — then use headers to skim back by.
 - Number multi-step work; restate position each turn ("step 3 of 5 done; next: backfill"). If anything is open, end with one concrete next action.
-- Offer tangents as a follow-up question. Cap lists at 5 — past that, split now vs. later.
-- Concrete effort estimates ("~15 min", "an afternoon"). Report completed work with how to see it working.
 - Ambiguous request: use the ask-user tool, don't guess.
 - The user often dictates via speech-to-text: silently infer the intended words from garbled or misheard phrases; ask only when the intent is genuinely unclear.
 
@@ -13,7 +10,6 @@ Write for an ADHD reader: answer first — or the action itself (command, path, 
 
 - Read root `CONTEXT.md` when present to understand the project's purpose, target user, stage, operating assumptions, and terminology.
 - Check `docs/STRUCTURE.md` to understand project organization; if missing, continue without it.
-- Keep `docs/STRUCTURE.md` current as an onboarding guide for new developers: project purpose, architecture, directory layout, key files/modules, design patterns, and how to run/build. Describe components and areas, not every file — it is a practical guide, not a full file index.
 - Before adding code, inspect the existing structure and similar solutions.
 - For unfamiliar or resumed work, also check recent git history and `agent-work/history` before planning; scout cross-cutting tasks with parallel read-only subagents.
 - When working with Python, always use the `uv` tool for dependency management and virtual environments.
@@ -25,32 +21,22 @@ Write for an ADHD reader: answer first — or the action itself (command, path, 
 
 ## Implementation Principles
 
-We are working at a lean startup, not a large corporation. Code accordingly:
 - Prefer the simplest fundamental solution for the current context over the quickest local patch. Replace obsolete code or text instead of appending parallel versions.
 - Unless the repo style dictates it, prefer a minimalistic functional programming approach over complex over-abstracted OOP.
 - Avoid enterprise bloat, boilerplate, thin wrappers, and unnecessary abstractions.
 - If an approach is not working, report and brainstorm with the user instead of forcing a brittle implementation.
-- Do not introduce new patterns or technologies unless strictly needed.
+- Do not introduce new patterns unless strictly needed. If you need to do so, discuss it with the user.
 - Keep function names direct and simple; avoid names like `enhanced` or `new`.
 - Comment only non-obvious logic; avoid changelog-style comments.
 - Skip redundant validations unless failure has real consequences.
 - Let errors surface naturally. Avoid blanket `try/except`, especially `pass`.
 - Avoid fallback mechanisms, mock data, inferred defaults, or backward compatibility layers unless explicitly requested.
 
-## Generating Documentation
-
-- When the user asks for a Markdown file (e.g., `FEATURE.md`), create detailed documentation that enables any engineer to implement independently:
-  - Leverage Markdown elements and visual diagrams, preferably Mermaid.
-  - Document why decisions were made, including trade-offs, constraints, and strategic context.
-  - Include real code snippets, usage patterns, and concrete examples.
-  - Write for maintainers six months later.
-  - Place docs close to the code and maintain consistent terminology.
-
 ## Testing
 
 - Follow **Test Driven Development**: write tests first, iterate until passing.
 - Use ephemeral tests to validate features; remove all temporary test code and artifacts when done.
-- Keep durable tests focused on current product contracts and likely regressions. Remove or loosen implementation-phase scaffold tests/files that only verified TDD progress, exact helper names, prompt substrings, or temporary internal structure once the feature is working.
+- Keep only durable tests focused on current product contracts and likely regressions. Remove implementation-phase tests/files that only verified progress or that are too specific to situations unlikely to recur.
 
 ## Tracked Work State
 
@@ -63,7 +49,11 @@ Tracked work persists across sessions under `agent-work/`:
 - `agent-work/decks/` — requested HTML briefing/explainer artifacts created for review or maintainer communication.
 - `agent-work/<name>/` — optional repo-specific non-durable planning, scratchpad, investigation, or migration artifacts when they do not fit the core directories.
 
-Keep workflow artifacts and non-durable scratch work in `agent-work/`; keep durable architecture, onboarding, and reference documentation in `docs/`. Before handoff or commit, delete `agent-work/` scratch files, temporary logs, generated previews, and one-off experiment outputs unless they remain useful for active plans, review, reproduction, evidence, requested decks, or archived history.
+Keep workflow artifacts and non-durable scratch work in `agent-work/`; keep durable architecture, onboarding, and reference documentation in `docs/`. Before handoff or commit, delete `agent-work/` temporary files unless they remain useful for active plans, review, reproduction or evidence.
+
+## Papercuts
+
+When working on a long-running task, create `agent-work/tickets/<ticket>/papercuts.md` to capture meaningful friction likely to recur in repo or harness operations—failed commands, unclear interfaces, misleading paths, or missing documentation—which can later improve the system; create no record when work goes smoothly.
 
 ### Ticket Artifact Discipline
 
@@ -73,9 +63,11 @@ Use `agent-work/tickets/<feature-id>/` sparingly:
 - Persist only artifacts needed after the turn for review, reproduction, or evidence. Consolidate text into a single `notes.md` or `validation.md` instead of many small files.
 - Before handoff or commit, delete obsolete ticket artifacts or state why the remaining artifacts are worth keeping.
 
+## Execution Workflow
+
 User-driven skill workflow: `next-feature` → `plan-md` → `execute` → `review` → `reflect` → `commit`
 
-Each workflow step ends your turn: finish the invoked step, report, and stop for user feedback. Never invoke the next workflow skill or do its work uninvoked — `READY FOR <STEP>` labels tell the user what to invoke next, not you. Chain steps only when the user explicitly asked for it in their request (e.g., "plan and execute this").
+Each workflow step ends your turn: finish the invoked step, report, and stop for user feedback. Never invoke the next workflow skill or do its work uninvoked — `READY FOR <STEP>` labels tell the user what to invoke next, not you. Chain steps only when the user explicitly asked for it in their request (e.g., "plan and execute this"). Do not execute these skills unless suggested by the user.
 
 When acting on critic feedback (`plan-critic`, `code-critic`, `docs-critic`): fix only clear, high-impact issues; ignore nits, low-confidence, or out-of-scope suggestions; re-run only after material changes. Discard any critic result that clearly did not read the real files.
 

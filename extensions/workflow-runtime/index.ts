@@ -142,6 +142,26 @@ function extractSkillTicket(text: string): string | undefined {
 	return skillCall && TICKET_ARG_PATTERN.test(skillCall) ? skillCall.toLowerCase() : undefined;
 }
 
+function deliveredSkill(text: string): { name: string; ticketId?: string } | undefined {
+	const rawName = extractSkill(text);
+	if (rawName) return { name: rawName, ticketId: extractSkillTicket(text) };
+	const name = text.match(/^<skill name="([a-z0-9-]+)"(?:\s[^>]*)?>/)?.[1];
+	if (!name) return undefined;
+	const closing = text.lastIndexOf("</skill>");
+	const arg = closing >= 0 ? text.slice(closing + "</skill>".length).trim().split(/\s+/, 1)[0] : undefined;
+	return { name, ...(arg && TICKET_ARG_PATTERN.test(arg) ? { ticketId: arg.toLowerCase() } : {}) };
+}
+
+function userMessageText(message: unknown): string | undefined {
+	if (!message || typeof message !== "object" || !("role" in message) || message.role !== "user" || !("content" in message)) return undefined;
+	if (typeof message.content === "string") return message.content;
+	if (!Array.isArray(message.content)) return undefined;
+	return message.content
+		.filter((part): part is { type: "text"; text: string } => Boolean(part && typeof part === "object" && part.type === "text" && typeof part.text === "string"))
+		.map((part) => part.text)
+		.join("\n");
+}
+
 function parseTicketArg(text: string): string | undefined {
 	return text.trim().match(TICKET_ARG_PATTERN)?.[1]?.toLowerCase();
 }
@@ -330,6 +350,7 @@ export default function workflowRuntime(
 	let currentAttention: { kind: "ready" | "question" | "blocked"; text: string } | undefined;
 	let attentionGenerationDone = -1;
 	let latestUserRequest: string | undefined;
+	let deferredWorkflowInputs: Array<{ name: string; ticketId?: string; text: string }> = [];
 	const continuationQueue = createContinuationQueue();
 
 	const publishContext = (attention?: { kind: "ready" | "question" | "blocked"; text: string }) => {
@@ -640,64 +661,102 @@ export default function workflowRuntime(
 		},
 	});
 
-	pi.on("input", async (event, ctx) => {
-		if (event.source === "extension") return { action: "continue" };
+	const processInput = async (text: string, streaming: boolean, ctx: ExtensionContext) => {
 		generation += 1;
-		latestUserRequest = event.text;
+		latestUserRequest = text;
 
-		const skillName = extractSkill(event.text);
+		const skillName = extractSkill(text);
 		if (skillName === FOCUS_SKILL) {
 			if (state.execution) {
 				ctx.ui.notify("Focus mode is already active.", "warning");
-				return { action: "handled" };
+				return { action: "handled" as const };
 			}
 			const scope = focusScope(state);
 			if (!scope) {
 				ctx.ui.notify(`Focus mode cannot start during ${state.activeStep}.`, "warning");
-				return { action: "handled" };
+				return { action: "handled" as const };
 			}
 			recoveryPending = false;
 			const result = transition(state, {
 				type: "activate-focus",
 				scope,
-				ticketId: extractSkillTicket(event.text) ?? ticketIdFrom(event.text),
+				ticketId: extractSkillTicket(text) ?? ticketIdFrom(text),
 				runId: newRunId(),
 			});
 			state = setState(pi, ctx, { ...result.state, source: "input" });
 			if (state.ticketId && state.ticketId !== ticketContext?.id) await selectTicket(ctx, state.ticketId);
 			else await refreshPlan(ctx);
 			ctx.ui.notify("Focus mode enabled.", "info");
-			return { action: "continue" };
+			return { action: "continue" as const };
 		}
 
-		const stepName = extractStep(event.text);
+		const stepName = extractStep(text);
 		if (stepName) {
 			recoveryPending = false;
 			const interrupted = state.execution
 				? transition(state, { type: "end-focus" })
 				: { state, effects: [] as RuntimeEffect[] };
-			const selectedTicket = extractSkillTicket(event.text) ?? state.ticketId;
+			const selectedTicket = extractSkillTicket(text) ?? state.ticketId;
 			state = setState(pi, ctx, startWorkflowStep(setWorkflowTicketState(interrupted.state, selectedTicket, "input"), stepName, "input"));
 			if (selectedTicket && selectedTicket !== ticketContext?.id) await selectTicket(ctx, selectedTicket);
-			else if (!selectedTicket && !pi.getSessionName()) void generateName(ctx, normalizeText(event.text, 1_500) ?? "", false);
+			else if (!selectedTicket && !pi.getSessionName()) void generateName(ctx, normalizeText(text, 1_500) ?? "", false);
 			await refreshPlan(ctx);
 			applyEffects(pi, ctx, () => state, interrupted.effects, continuationQueue);
-			return { action: "continue" };
+			return { action: "continue" as const };
 		}
 
-		if (!pi.getSessionName() && !ticketContext) void generateName(ctx, normalizeText(event.text, 1_500) ?? "", false);
+		if (!pi.getSessionName() && !ticketContext) void generateName(ctx, normalizeText(text, 1_500) ?? "", false);
 
 		if (state.execution) {
 			const recovery = recoverFocus(recoveryPending, {
 				type: "ordinary-input",
-				streaming: event.streamingBehavior !== undefined,
+				streaming,
 			});
 			recoveryPending = recovery.pending;
 			const result = transition(state, { type: "ordinary-input" });
 			state = setState(pi, ctx, result.state);
 			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
 		}
-		return { action: "continue" };
+		return { action: "continue" as const };
+	};
+
+	pi.on("input", async (event, ctx) => {
+		if (event.source === "extension") return { action: "continue" };
+		const skillName = extractSkill(event.text);
+		if (event.streamingBehavior && skillName !== undefined && (isStepName(skillName) || skillName === FOCUS_SKILL)) {
+			if (skillName === FOCUS_SKILL) {
+				if (state.execution) {
+					ctx.ui.notify("Focus mode is already active.", "warning");
+					return { action: "handled" };
+				}
+				if (!focusScope(state)) {
+					ctx.ui.notify(`Focus mode cannot start during ${state.activeStep}.`, "warning");
+					return { action: "handled" };
+				}
+				if (deferredWorkflowInputs.length > 0) {
+					ctx.ui.notify("Focus mode cannot be queued after another workflow step.", "warning");
+					return { action: "handled" };
+				}
+			}
+			deferredWorkflowInputs.push({ name: skillName, ticketId: extractSkillTicket(event.text), text: event.text });
+			return { action: "continue" };
+		}
+		if (!event.streamingBehavior) deferredWorkflowInputs = [];
+		return processInput(event.text, event.streamingBehavior !== undefined, ctx);
+	});
+
+	pi.on("message_start", async (event, ctx) => {
+		const text = userMessageText(event.message);
+		const skill = text ? deliveredSkill(text) : undefined;
+		if (!skill) return;
+		const index = deferredWorkflowInputs.findIndex((item) => item.name === skill.name && item.ticketId === skill.ticketId);
+		if (index < 0) return;
+		const [input] = deferredWorkflowInputs.splice(index, 1);
+		await processInput(input.text, true, ctx);
+	});
+
+	pi.on("agent_settled", async () => {
+		deferredWorkflowInputs = [];
 	});
 
 	pi.on("tool_execution_start", async (event, ctx) => {
@@ -781,6 +840,7 @@ export default function workflowRuntime(
 	pi.on("session_start", async (event, ctx) => {
 		generation += 1;
 		recoveryPending = false;
+		deferredWorkflowInputs = [];
 		const branch = ctx.sessionManager.getBranch();
 		const restoredContext = event.reason === "new" || event.reason === "fork" ? undefined : findLatestContext(branch);
 		currentAttention = restoredContext?.attention;
@@ -813,6 +873,7 @@ export default function workflowRuntime(
 	pi.on("session_shutdown", async () => {
 		generation += 1;
 		recoveryPending = false;
+		deferredWorkflowInputs = [];
 		syncFocusPulse(false);
 		activeTui = undefined;
 	});

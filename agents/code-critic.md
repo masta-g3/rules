@@ -36,12 +36,13 @@ Focus on **implementation craft and drift from the approved plan**.
 
 ### Bloat & Over-Engineering
 - Code that could be replaced by a simpler, smaller implementation
+- Dense `if`/`else` chains or repeated exception handling that should be replaced by simpler control flow or a fix in the owning abstraction
 - Thin wrappers around simple operations
 - Abstractions for one-time use
 - Feature flags or config for non-configurable behavior
 - Backward-compatibility shims for code that can just change
 - Validation for scenarios that can't happen
-- New utilities or patterns that duplicate or could reuse existing ones in the repo
+- New utilities or patterns that duplicate or could reuse existing ones
 
 ### Hacky Solutions
 - Ad-hoc patches instead of proper fixes
