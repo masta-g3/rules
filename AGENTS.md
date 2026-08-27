@@ -45,7 +45,7 @@ Tracked work persists across sessions under `agent-work/`:
 - `agent-work/features.yaml` — backlog and source of truth: id, status, priority, dependencies, and `plan_file`.
 - `agent-work/plans/` — active implementation plans (created by `plan-md`, updated during `execute`).
 - `agent-work/history/` — archived completed plans (moved here by `commit`; `plan_file` is updated to the archived path).
-- `agent-work/tickets/` — sparse, on-demand ticket-local artifacts needed for review or reproduction: temporary scripts, large logs, outputs, screenshots, and validation evidence.
+- `agent-work/tickets/` — sparse, on-demand ticket-local artifacts needed for review or reproduction: temporary scripts, logs, outputs, screenshots, and validation evidence.
 - `agent-work/decks/` — requested HTML briefing/explainer artifacts created for review or maintainer communication.
 - `agent-work/<name>/` — optional repo-specific non-durable planning, scratchpad, investigation, or migration artifacts when they do not fit the core directories.
 
