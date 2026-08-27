@@ -13,7 +13,7 @@ The step starts with `reviewing-implementation` as its default activity. Pi repu
 
 Own correctness, plan fidelity, and scope. `code-critic` owns the implementation-craft and simplification pass; give it the changed files and plan rather than repeating its checks.
 
-1. Identify the files changed during implementation. Exclude commit-step artifacts (plan archival and `agent-work/features.yaml` completion updates), but include explicitly planned documentation deliverables.
+1. Identify the files and tests changed during implementation. Exclude commit-step artifacts (plan archival and `agent-work/features.yaml` completion updates), but include explicitly planned documentation deliverables.
 2. Read the files and verify against the task: does the change solve it, did verification run and pass, and did scope stay within the plan? Ask whether a smaller change in the owning layer would solve the task. Flag plan overreach and edits that widen the impact surface.
 3. Check session and `agent-work` hygiene per the AGENTS.md artifact retention rules.
 4. Invoke the `code-critic` reviewer subagent with the assembled file list and the plan path. Craft review is its lane — do a light pass yourself rather than duplicating it.

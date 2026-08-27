@@ -63,12 +63,14 @@ You are a senior engineer reviewing implementation craft. Find code that can be 
 - Sequential operations that could be parallelized when latency matters
 - Redundant iterations (multiple passes when one suffices)
 
-### Debugging Artifacts
+### Tests & Debugging Artifacts
+- Every new or changed test must protect a durable contract or a plausible, high-consequence regression whose value justifies its maintenance and runtime cost. Otherwise flag it for removal.
+- Reject tests of implementation details, non-repeatable behavior, redundant coverage, and low-likelihood, low-impact cases.
+- Flag slow or broad tests when a smaller test protects the same contract.
 - console.log, print statements, debugger keywords
 - TODO/FIXME markers for completed work
 - Commented-out code blocks
 - Test data or mock values in production code
-- Implementation-phase scaffold tests that only lock exact helper names, prompt substrings, or temporary internal structure instead of current product contracts
 
 ## Review Process
 
