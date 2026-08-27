@@ -2,7 +2,7 @@
 name: review
 description: Review finished work before reflection and commit.
 metadata:
-  thinkingLevel: high
+  thinkingLevel: medium
 ---
 
 Review the active task after implementation and before `/reflect`. If the plan names a worktree, run the review inside it — that is where the changed files and `agent-work` artifacts live.

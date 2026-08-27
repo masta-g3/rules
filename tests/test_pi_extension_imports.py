@@ -15,18 +15,18 @@ SYNC_PROMPTS = REPO_ROOT / "sync-prompts.sh"
 NEXT_FEATURE_SKILL = REPO_ROOT / "skills" / "next-feature" / "SKILL.md"
 COMMIT_SKILL = REPO_ROOT / "skills" / "commit" / "SKILL.md"
 EXPECTED_SKILL_THINKING = {
-    "commit": "low",
+    "commit": "medium",
     "context-md": "high",
     "docs-health": "high",
     "epic-init": "high",
     "execute": "medium",
     "answer-style": "minimal",
     "explain-html": "high",
-    "next-feature": "minimal",
-    "plan-md": "high",
+    "next-feature": "medium",
+    "plan-md": "medium",
     "project-init": "high",
     "reflect": "medium",
-    "review": "high",
+    "review": "medium",
     "test-coverage": "high",
     "ticket-init": "low",
     "workflow-orchestrator": "medium",

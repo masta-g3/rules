@@ -3,7 +3,7 @@ name: plan-md
 description: Create and maintain a Markdown implementation plan for a feature or task.
 argument-hint: "[request]"
 metadata:
-  thinkingLevel: high
+  thinkingLevel: medium
 ---
 
 Create a detailed Markdown implementation plan for the provided request.

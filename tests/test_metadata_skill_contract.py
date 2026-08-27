@@ -43,3 +43,19 @@ def test_skills_rely_on_runtime_for_observable_activity_boundaries() -> None:
 def test_execute_does_not_publish_semantic_activity() -> None:
     source = skill("execute")
     assert "set_workflow_activity" not in source
+
+
+def test_parent_workflow_skills_use_medium_thinking() -> None:
+    for name in (
+        "next-feature",
+        "plan-md",
+        "execute",
+        "review",
+        "reflect",
+        "commit",
+        "workflow-orchestrator",
+    ):
+        assert "thinkingLevel: medium" in skill(name), name
+
+    focus = (ROOT / "pi" / "skills" / "focus" / "SKILL.md").read_text()
+    assert "thinkingLevel: medium" in focus

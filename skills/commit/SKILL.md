@@ -2,7 +2,7 @@
 name: commit
 description: Commit files from session and archive/clean-up associated files.
 metadata:
-  thinkingLevel: low
+  thinkingLevel: medium
 ---
 
 Assume the work has already been reviewed and reflected. Quick final scan for debug artifacts, prompt residue, temporary tests/scripts, generated outputs, and stale `agent-work/` scratch files before proceeding. Keep only `agent-work/` artifacts that remain useful after commit, per the AGENTS.md retention rules.
