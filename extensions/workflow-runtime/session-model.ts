@@ -2,7 +2,10 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import { complete, type UserMessage } from "@earendil-works/pi-ai/compat";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-const PREFERRED = { provider: "openai-codex", id: "gpt-5.3-codex-spark" } as const;
+const SESSION_MODELS = [
+	{ provider: "openai-codex", id: "gpt-5.3-codex-spark" },
+	{ provider: "openai-codex", id: "gpt-5.6-luna" },
+] as const;
 export type ModelAuth = { model: Model<Api>; apiKey: string; headers?: Record<string, string> };
 
 async function authFor(ctx: ExtensionContext, model: Model<Api> | undefined): Promise<ModelAuth | undefined> {
@@ -13,11 +16,12 @@ async function authFor(ctx: ExtensionContext, model: Model<Api> | undefined): Pr
 }
 
 export async function resolveSessionModels(ctx: ExtensionContext): Promise<ModelAuth[]> {
-	const preferred = await authFor(ctx, ctx.modelRegistry.find(PREFERRED.provider, PREFERRED.id));
-	const active = ctx.model && `${ctx.model.provider}/${ctx.model.id}` !== `${PREFERRED.provider}/${PREFERRED.id}`
-		? await authFor(ctx, ctx.model)
-		: undefined;
-	return [preferred, active].filter((item): item is ModelAuth => Boolean(item));
+	const models: ModelAuth[] = [];
+	for (const candidate of SESSION_MODELS) {
+		const auth = await authFor(ctx, ctx.modelRegistry.find(candidate.provider, candidate.id));
+		if (auth) models.push(auth);
+	}
+	return models;
 }
 
 export async function boundedModelCall(
@@ -42,7 +46,7 @@ export async function boundedModelCall(
 			if (response.stopReason !== "stop") continue;
 			const text = response.content.flatMap((part) => part.type === "text" ? [part.text] : []).join("\n");
 			if (text) return text;
-		} catch { /* one active-model fallback is allowed */ }
+		} catch { /* try the next bounded metadata model */ }
 	}
 	return undefined;
 }

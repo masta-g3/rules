@@ -338,8 +338,18 @@ export default function workflowRuntime(
 	dependencies: { modelCall?: ModelCall } = {},
 ): void {
 	const modelCall = dependencies.modelCall ?? boundedModelCall;
+	let metadataModelWarningShown = false;
 	const optionalModelCall: ModelCall = async (...args) => {
-		try { return await modelCall(...args); } catch { return undefined; }
+		let result: string | undefined;
+		try { result = await modelCall(...args); } catch { result = undefined; }
+		if (result === undefined && !metadataModelWarningShown) {
+			metadataModelWarningShown = true;
+			args[0].ui.notify(
+				"Session metadata unavailable. Configure gpt-5.3-codex-spark or gpt-5.6-luna with /login openai-codex.",
+				"warning",
+			);
+		}
+		return result;
 	};
 	let state: WorkflowState = {};
 	let ticketContext: TicketContext | undefined;

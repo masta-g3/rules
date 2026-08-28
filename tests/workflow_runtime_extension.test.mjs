@@ -6,7 +6,7 @@ import test from "node:test";
 
 import workflowRuntime from "../extensions/workflow-runtime/index.ts";
 import { PlanWidget } from "../extensions/workflow-runtime/plan-widget.ts";
-import { boundedModelCall } from "../extensions/workflow-runtime/session-model.ts";
+import { boundedModelCall, resolveSessionModels } from "../extensions/workflow-runtime/session-model.ts";
 import { TodoPanel } from "../extensions/workflow-runtime/todo-panel.ts";
 
 function harness(cwd, initialBranch = [], initialName, modelCall) {
@@ -364,6 +364,44 @@ test("explicit session-name refresh awaits its model result and reports", async 
     await rejected;
     assert.equal(changed.name, "External Name");
     assert.equal(changed.operations.at(-1).message, "Could not refresh the session name.");
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("session metadata models are fixed to Spark then Luna", async () => {
+  const active = { provider: "openai-codex", id: "gpt-5.6-sol" };
+  const candidates = new Map([
+    ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
+    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+  ]);
+  const authenticated = [];
+  const resolved = await resolveSessionModels({
+    model: active,
+    modelRegistry: {
+      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
+      async getApiKeyAndHeaders(model) {
+        authenticated.push(model.id);
+        return { ok: true, apiKey: "test-key" };
+      },
+    },
+  });
+
+  assert.deepEqual(resolved.map(({ model }) => model.id), ["gpt-5.3-codex-spark", "gpt-5.6-luna"]);
+  assert.deepEqual(authenticated, ["gpt-5.3-codex-spark", "gpt-5.6-luna"]);
+  assert.equal(authenticated.includes(active.id), false);
+});
+
+test("optional model operations warn once when fixed metadata models fail", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], undefined, async () => undefined);
+    await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
+    await settle();
+    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
+    await settle();
+
+    const warnings = runtime.operations.filter((item) => item.kind === "notify" && item.level === "warning" && item.message.includes("gpt-5.6-luna"));
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0].message, /\/login openai-codex/);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
