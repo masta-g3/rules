@@ -66,6 +66,7 @@ You are a senior engineer reviewing implementation craft. Find code that can be 
 ### Tests & Debugging Artifacts
 - Every new or changed test must protect a durable contract or a plausible, high-consequence regression whose value justifies its maintenance and runtime cost. Otherwise flag it for removal.
 - Reject tests of implementation details, non-repeatable behavior, redundant coverage, and low-likelihood, low-impact cases.
+- Tuatological tests are considered harmful.
 - Flag slow or broad tests when a smaller test protects the same contract.
 - console.log, print statements, debugger keywords
 - TODO/FIXME markers for completed work
