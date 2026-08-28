@@ -15,7 +15,7 @@ The parent agent remains the orchestrator. Subagents execute exactly one workflo
 - Workflow skills available in the active harness: `next-feature`, `plan-md`, `execute`, `review`, `reflect`, `commit`.
 - A persistent subagent mechanism, preferably `pi-tmux-subagents`, that supports:
   - launching one child per ticket;
-  - sending follow-up prompts to the same child session;
+  - sending follow-up prompts and user answers to the same child session;
   - waiting for a specific follow-up turn to complete;
   - reading child output/results;
   - optional allowlisted nested specialist launches from the child, when the phase skill or parent prompt explicitly calls for them;
@@ -40,22 +40,38 @@ Use when the user names a ticket or asks to try the automation on the next ticke
 1. Select the ticket:
    - If the user supplied an ID, inspect it with `$SKILLS_ROOT/_lib/features_yaml.sh get <id> --output json`.
    - Otherwise run `$SKILLS_ROOT/_lib/features_yaml.sh next --output json` and use the recommended feature.
-2. Verify the worktree is safe. Stop if unrelated changes make the commit boundary unsafe.
-3. Launch one persistent child for the ticket with `autoStopOnComplete: false` when using `tmux_subagent`. Enable nested specialists only when needed with `allowNestedSubagents`, `nestedAgentAllowlist`, and `maxNestedDepth`.
-4. Send exactly one phase prompt at a time:
+2. Verify the current checkout is safe. Stop if unrelated changes make the commit boundary unsafe.
+3. Resolve the worktree decision before launching the child:
+   - ask whether to use a worktree unless the user already decided;
+   - if approved, confirm the start branch and PR target;
+   - create `agent-work/worktrees/<ticket-id>/<repo-name>/` on branch `<ticket-id>`;
+   - ensure `agent-work/worktrees/` is ignored and copy required untracked local configuration.
+4. Launch one persistent child for the ticket with:
+   - `cwd` set to the approved worktree, or the current checkout when no worktree was approved;
+   - `autoStopOnComplete: false`;
+   - nested specialists enabled only when needed through a narrow allowlist.
+5. Send exactly one phase prompt at a time:
    - `plan-md` for `<ticket-id>`; require `READY FOR EXECUTE`.
    - `execute` for `<ticket-id>` and `agent-work/plans/<ticket-id>.md`; require `READY FOR REVIEW`.
    - `review`; require `READY FOR REFLECT`.
    - `reflect`; require `READY FOR COMMIT`.
-   - `commit`; require `WORKFLOW COMPLETE` and a commit hash.
-5. Stop the child after completion or blockage.
-6. Report only the final outcome unless the user asked for live updates or a stop condition occurs.
+   - `commit`; require `WORKFLOW COMPLETE` or `WORKFLOW COMPLETE — PENDING PR MERGE`, plus a commit hash.
+6. During `plan-md`, relay expected interview questions to the user one at a time:
+   - keep the child alive while waiting;
+   - send the user's answer back to the same child;
+   - continue until planning succeeds or a real blocker occurs.
+7. After planning, verify that the plan's `Worktree`, `Start branch`, and `PR target` match the approved preflight decisions.
+8. Run parent Git inspections in the child's recorded checkout.
+9. Stop the child after completion or blockage.
+10. Report only the final outcome unless the user asked for live updates or a stop condition occurs.
 
 To process several tickets, repeat this mode per next actionable feature (new child per ticket) within the boundary the user set — epic prefix, ticket count, or stop-on-first-failure — then summarize completed, blocked, and remaining work.
 
+`WORKFLOW COMPLETE — PENDING PR MERGE` completes the commit turn. Report the open PR and retained worktree as pending cleanup; do not report the ticket as blocked.
+
 ## Parallel tickets
 
-Only when the user explicitly asks to run independent tickets in parallel, follow `references/parallel-worktrees.md` in this skill directory: worktree isolation, prompt boundaries, extra inspection gates, and the merge-back procedure.
+Only when the user explicitly asks to run independent tickets in parallel, follow `references/parallel-worktrees.md` in this skill directory: worktree isolation, prompt boundaries, extra inspection gates, and PR closeout.
 
 ## Preferred `tmux_subagent` control path
 
@@ -93,6 +109,8 @@ Each phase prompt to the child must include:
 - validation expectations;
 - instruction not to stage unrelated files;
 - required final label;
+- confirmed worktree, start-branch, and PR-target decisions;
+- for `plan-md`, instruction to ask only unresolved interview questions, one per turn, and wait for the answer;
 - whether nested specialist subagents are allowed for this phase, the allowed agent names, and the requirement to report nested agent used/skipped, job ID/result path, and feedback accepted/rejected.
 
 Example phase boundary:
@@ -112,6 +130,8 @@ Before advancing, the parent checks:
 - no blocker/question was reported;
 - child output and changed files still align with the approved plan and user intent;
 - `git status --short` has only expected files plus known ignored/local artifacts;
+- Git status was inspected in the checkout recorded by the plan;
+- the recorded worktree, start branch, and PR target match the approved decisions;
 - validation evidence is adequate for the phase;
 - hardware/domain claims follow project rules;
 - commit phase produced a commit hash and left no staged ticket files.
@@ -122,7 +142,8 @@ If the label is missing or inconsistent, inspect the child transcript/result bef
 
 Stop the workflow and notify the user when:
 
-- the child asks a product, scope, architecture, hardware/domain, or commit-boundary question;
+- the child asks a product, scope, architecture, hardware/domain, or commit-boundary question that cannot be resolved through the expected `plan-md` interview;
+- the user cancels or cannot answer a required planning question;
 - tests or baseline validation fail and the fix is not clearly within the approved ticket scope;
 - the worktree contains unrelated changes that make staging/commit unsafe;
 - dependencies are blocked or no actionable tickets remain;
@@ -132,6 +153,8 @@ Stop the workflow and notify the user when:
 - the requested ticket boundary or user-defined limit is reached.
 
 Do not stop just to provide routine progress updates.
+
+An expected `plan-md` interview question pauses the phase; it does not block the workflow or terminate the child.
 
 ## Domain-specific validation tools
 
@@ -143,7 +166,7 @@ Do not require every child to report availability for unrelated tools. Ask about
 
 - Use one persistent child per ticket.
 - Reuse that child for every phase of that ticket via `send(..., wait: true)` when available.
-- Kill/stop the child after `WORKFLOW COMPLETE`, `BLOCKED`, `FAILED`, or unsafe drift.
+- Kill/stop the child after either workflow-complete label, `BLOCKED`, `FAILED`, or unsafe drift.
 - Do not let children orchestrate tickets or workflow phases through nested subagents.
 - Children may launch only explicitly allowed nested specialist agents for the current phase. Nested agents must not stage, commit, merge, push, or modify files unless the phase prompt explicitly allows it.
 - Require the child to report whether each expected nested specialist was used or skipped, plus the nested job ID/result path and which feedback was accepted/rejected.
@@ -155,6 +178,7 @@ Report:
 - ticket ID;
 - final status;
 - commit hash if complete;
+- PR URL and pending cleanup state when the PR is not yet merged;
 - validation summary;
 - blocked question or follow-up if any.
 

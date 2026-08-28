@@ -55,7 +55,7 @@ At the end of each phase, ensure clean, reviewable state — no half-implemented
 
 ### Output
 
-For successful execution, include a `Summary:` line with 1-2 sentences or a bullet list of what was done, and any minor plan adjustments before the handoff label.
+For successful execution, include a `Summary:` list with 2–5 bullets grouping the implemented behavior and notable reuse or replacement of existing code. Include material plan adjustments, then end with the verification run and result. Avoid a file-by-file changelog.
 - **READY FOR REVIEW** — all phases done and ready for `/review`
 
 Otherwise:

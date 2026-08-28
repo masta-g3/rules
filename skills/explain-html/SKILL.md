@@ -18,7 +18,8 @@ Create a polished, grounded visual explanation—not an implementation plan or a
 
    Start with one strong view; add more only when progressive detail genuinely helps.
 4. **Build the file.** `assets/explain-deck-template.html` is a known-good scaffold for the deck format — reuse or adapt its mechanics (theme tokens, keyboard nav, print CSS) freely, but take the visual direction from the design pass, not from the preset swaps. `references/component-library.md` offers proven content shapes for any layout; `references/explanation-patterns.md` covers narrative structure. Inline all CSS/JS, escape code snippets, keep the file offline-safe.
-5. **Validate the artifact and its explanation.** Confirm valid HTML and the quality floor below. Ask a fresh subagent to view the rendered result as an audience member: what did it understand, is it correct, and what felt confusing? Fix communication failures; report if reader validation was unavailable.
+5. **Remove writing slop.** Only after the complete HTML file exists, invoke the `unslop` skill and apply it to the document's visible prose. Never invoke it before producing the file. Preserve technical meaning, exact identifiers, and code samples.
+6. **Validate the artifact and its explanation.** Confirm valid HTML and the quality floor below. Ask a fresh subagent to view the rendered result as an audience member: what did it understand, is it correct, and what felt confusing? Fix communication failures; report if reader validation was unavailable.
 
 ## Quality Floor
 

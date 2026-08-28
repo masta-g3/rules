@@ -29,6 +29,7 @@ EXPECTED_SKILL_THINKING = {
     "review": "medium",
     "test-coverage": "high",
     "ticket-init": "low",
+    "unslop": "minimal",
     "workflow-orchestrator": "medium",
 }
 VALID_THINKING_LEVELS = {"off", "minimal", "low", "medium", "high", "xhigh"}

@@ -29,7 +29,7 @@ Do not:
 
 ### Output
 
-For successful review, call `set_workflow_activity` with `review-complete` when available, then include a `Summary:` line with 1-2 sentences or a bullet list covering the review result, fixes applied, and verification rerun. Include any documentation or reflection candidates before the handoff label.
+For successful review, call `set_workflow_activity` with `review-complete` when available, then include a `Summary:` list with 2–5 bullets grouping the material corrections and simplifications. Note code, tests, fallbacks, or duplicate paths removed and LOC reduced when meaningful. End with the verification rerun and result. Omit change details when no changes were needed. Include any documentation or reflection candidates before the handoff label.
 - **READY FOR REFLECT** — no actionable review issues remain
 
 Otherwise:

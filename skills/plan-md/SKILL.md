@@ -14,9 +14,11 @@ The step starts with `inspecting-code`. Pi publishes `clarifying-requirements` a
 
 Open the interview by asking whether to isolate this work in a git worktree; the answer shapes where every later step runs. If approved, inspect the current and default branches. Ask which branch should seed the worktree, then which should receive the PR; recommend the default branch for both. Then investigate the codebase to resolve discoverable facts, and interview the user about the decisions that remain. Ask one decision question at a time, include your recommended answer and rationale, and wait for feedback before continuing. Use very simple and straightforward language. Resolve dependent decisions in order until scope, approach, dependencies, product direction, domain concepts, boundaries, and trade-offs are mutually understood. Do not batch questions or carry unresolved assumptions into the plan. Write the plan only after the user confirms shared understanding; never implement it during this skill.
 
+Do not re-ask a worktree, start-branch, or PR-target decision that the user explicitly confirmed in the current request or that a parent orchestrator supplies as confirmed user input.
+
 ### Worktree (Only If The User Approved One)
 
-Create one worktree per repository the plan will touch, under `agent-work/worktrees/<feature-id>/<repo-name>/`, branched as `<feature-id>` from the approved start branch:
+Create one worktree per repository the plan will touch, under `agent-work/worktrees/<feature-id>/<repo-name>/`, branched as `<feature-id>` from the approved start branch. If a parent orchestrator supplied an existing approved worktree at that path, verify its branch and base, then reuse it instead of creating it again:
 
 ```bash
 git worktree add agent-work/worktrees/<feature-id>/<repo-name> -b <feature-id> <start-branch>
