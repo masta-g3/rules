@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session metadata badge mockup</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f2f4f7;
+    --surface: #ffffff;
+    --surface-raised: #f8fafc;
+    --rule: #d7dce4;
+    --ink: #1b2029;
+    --muted: #5d6675;
+    --accent: #2f5d93;
+    --accent-soft: #e3eaf4;
+    --warn: #805a0f;
+    --warn-soft: #fff0c9;
+    --danger: #923a35;
+    --danger-soft: #f9dedb;
+    --disabled: #6a7280;
+    --shadow: 0 16px 44px rgb(29 38 52 / 12%);
+    --s1: 0.25rem;
+    --s2: 0.5rem;
+    --s3: 0.75rem;
+    --s4: 1rem;
+    --s5: 1.5rem;
+    --s6: 2.5rem;
+    --s7: 4rem;
+    --r1: 0.35rem;
+    --r2: 0.7rem;
+    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-md: 1rem;
+    --text-lg: clamp(1.6rem, 4vw, 2.75rem);
+    --line: 1.5;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151c;
+      --surface: #1a1f29;
+      --surface-raised: #202632;
+      --rule: #343d4b;
+      --ink: #d9deea;
+      --muted: #98a2b4;
+      --accent: #8ab3e0;
+      --accent-soft: #253348;
+      --warn: #d8aa55;
+      --warn-soft: #3d321d;
+      --danger: #df8279;
+      --danger-soft: #422727;
+      --disabled: #8a94a6;
+      --shadow: 0 18px 48px rgb(0 0 0 / 30%);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: var(--line);
+  }
+
+  button { font: inherit; }
+
+  .page {
+    width: min(72rem, calc(100% - 2 * var(--s5)));
+    margin: 0 auto;
+    padding: var(--s7) 0;
+  }
+
+  .kicker {
+    margin: 0 0 var(--s2);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    max-width: 18ch;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: var(--text-lg);
+    line-height: 1.08;
+    letter-spacing: -0.04em;
+  }
+
+  .lead {
+    max-width: 64ch;
+    margin: var(--s4) 0 0;
+    color: var(--muted);
+    font-size: var(--text-md);
+  }
+
+  .terminal {
+    position: relative;
+    margin-top: var(--s6);
+    overflow: visible;
+    border: 1px solid var(--rule);
+    border-radius: var(--r2);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+
+  .terminal__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 2.6rem;
+    padding: 0 var(--s4);
+    border-bottom: 1px solid var(--rule);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: var(--text-xs);
+  }
+
+  .window-dots { letter-spacing: 0.25em; }
+
+  .terminal__body {
+    min-height: 18rem;
+    padding: var(--s5);
+    overflow-x: auto;
+    background: var(--surface);
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    line-height: 1.7;
+    white-space: nowrap;
+  }
+
+  .prompt { color: var(--accent); }
+  .ghost { color: var(--muted); }
+
+  .statusline {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    min-width: 54rem;
+    margin-top: 7rem;
+    padding-top: var(--s3);
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+  }
+
+  .workflow { color: var(--ink); }
+  .separator { color: var(--rule); }
+
+  .badge-wrap { position: relative; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s1);
+    min-width: 4.2rem;
+    padding: var(--s1) var(--s2);
+    border: 1px solid transparent;
+    border-radius: var(--r1);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+  }
+
+  .badge:hover { background: var(--accent-soft); }
+  .badge:focus-visible,
+  .state-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .badge__mark {
+    display: inline-grid;
+    width: 1.2em;
+    place-items: center;
+    font-weight: 800;
+  }
+
+  .badge[data-state="working"] { color: var(--accent); }
+  .badge[data-state="degraded"] { color: var(--warn); background: var(--warn-soft); }
+  .badge[data-state="auth"] { color: var(--danger); background: var(--danger-soft); }
+  .badge[data-state="disabled"] { color: var(--disabled); }
+
+  .badge[data-state="working"] .badge__mark {
+    animation: pulse 1.4s steps(2, end) infinite;
+  }
+
+  @keyframes pulse { 50% { opacity: 0.28; } }
+
+  .tooltip {
+    position: absolute;
+    z-index: 2;
+    right: 0;
+    bottom: calc(100% + var(--s3));
+    width: min(23rem, calc(100vw - 4 * var(--s4)));
+    padding: var(--s4);
+    border: 1px solid var(--rule);
+    border-radius: var(--r1);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--text-sm);
+    white-space: normal;
+  }
+
+  .tooltip::after {
+    position: absolute;
+    right: var(--s4);
+    bottom: calc(-1 * var(--s2));
+    width: var(--s3);
+    height: var(--s3);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface-raised);
+    content: "";
+    transform: rotate(45deg);
+  }
+
+  .tooltip[hidden] { display: none; }
+
+  .tooltip__title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s4);
+    margin-bottom: var(--s2);
+    font-family: var(--mono);
+    font-weight: 700;
+  }
+
+  .tooltip__time { color: var(--muted); font-size: var(--text-xs); font-weight: 400; }
+  .tooltip p { margin: 0; color: var(--muted); }
+  .tooltip__command { margin-top: var(--s3); color: var(--accent); font-family: var(--mono); font-size: var(--text-xs); }
+
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--s2);
+    margin-top: var(--s5);
+  }
+
+  .state-button {
+    min-height: 3.4rem;
+    padding: var(--s2) var(--s3);
+    border: 1px solid var(--rule);
+    border-radius: var(--r1);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .state-button:hover { border-color: var(--accent); }
+  .state-button[aria-pressed="true"] { border-color: var(--accent); color: var(--ink); box-shadow: inset 0 -2px var(--accent); }
+  .state-button strong { display: block; color: inherit; font-family: var(--mono); font-size: var(--text-sm); }
+  .state-button[data-preview="working"] strong { color: var(--accent); }
+  .state-button[data-preview="degraded"] strong { color: var(--warn); }
+  .state-button[data-preview="auth"] strong { color: var(--danger); }
+  .state-button[data-preview="disabled"] strong { color: var(--disabled); }
+  .state-button span { display: block; margin-top: var(--s1); font-size: var(--text-xs); }
+
+  .decision {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(16rem, 0.75fr);
+    gap: var(--s6);
+    margin-top: var(--s6);
+    padding-top: var(--s6);
+    border-top: 1px solid var(--rule);
+  }
+
+  .decision h2 {
+    margin: 0 0 var(--s3);
+    font-family: var(--mono);
+    font-size: 1.25rem;
+  }
+
+  .decision p { max-width: 62ch; margin: 0; color: var(--muted); }
+
+  .legend {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--s2) var(--s3);
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .legend dt { color: var(--ink); font-family: var(--mono); font-weight: 700; }
+  .legend dd { margin: 0; color: var(--muted); }
+
+  .print-states { display: none; }
+
+  @media (max-width: 48rem) {
+    .page { width: min(100% - 2 * var(--s4), 72rem); padding: var(--s6) 0; }
+    .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .decision { grid-template-columns: 1fr; gap: var(--s5); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .badge[data-state="working"] .badge__mark { animation: none; }
+  }
+
+  @media print {
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --surface: #ffffff;
+      --surface-raised: #ffffff;
+      --ink: #111318;
+      --muted: #4c5563;
+      --rule: #c4cad3;
+      --accent: #244e7d;
+      --accent-soft: #edf2f8;
+      --warn: #76510c;
+      --warn-soft: #fff4d9;
+      --danger: #87332f;
+      --danger-soft: #fbe7e5;
+      --disabled: #5f6876;
+      --shadow: none;
+    }
+    .page { width: 100%; padding: 0; }
+    .terminal { box-shadow: none; }
+    .controls { display: none; }
+    .print-states { display: block; margin-top: var(--s4); color: var(--muted); font-size: var(--text-sm); }
+    .badge[data-state="working"] .badge__mark { animation: none; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <header>
+    <p class="kicker">UI mockup · proposed</p>
+    <h1>Session metadata badge</h1>
+    <p class="lead">A quiet status-line badge shows whether the extension is active and whether its latest metadata request worked. It does not claim that the model has a live connection.</p>
+  </header>
+
+  <section aria-label="Interactive terminal mockup">
+    <div class="terminal">
+      <div class="terminal__bar">
+        <span class="window-dots" aria-hidden="true">● ● ●</span>
+        <span>pi · workflow-runtime</span>
+      </div>
+      <div class="terminal__body">
+        <div><span class="prompt">›</span> review the plan diff</div>
+        <div class="ghost">Reading plan and checking implementation…</div>
+        <div class="statusline">
+          <span class="workflow">◉ Plan ─ ◉ Execute ─ ◉ Review ─ ○ Reflect ─ ○ Commit</span>
+          <span class="separator" aria-hidden="true">·</span>
+          <span>engine-003</span>
+          <span class="separator" aria-hidden="true">·</span>
+          <span class="badge-wrap">
+            <button class="badge" id="metadata-badge" data-state="ready" type="button" aria-expanded="true" aria-controls="metadata-tooltip" aria-describedby="metadata-tooltip">
+              <span class="badge__mark" aria-hidden="true">◇</span>
+              <span class="badge__label">meta</span>
+            </button>
+            <span class="tooltip" id="metadata-tooltip" role="tooltip">
+              <span class="tooltip__title">
+                <span id="tooltip-title">Extension active</span>
+                <span class="tooltip__time" id="tooltip-time">4m ago</span>
+              </span>
+              <p id="tooltip-body">Metadata generated with Luna in 2.2 seconds. No live model connection is held.</p>
+              <span class="tooltip__command">↵ /session-metadata-status</span>
+            </span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls" role="group" aria-label="Preview badge states">
+      <button class="state-button" type="button" data-preview="ready" aria-pressed="true"><strong>◇ meta</strong><span>Active</span></button>
+      <button class="state-button" type="button" data-preview="working" aria-pressed="false"><strong>◆ meta</strong><span>Generating</span></button>
+      <button class="state-button" type="button" data-preview="degraded" aria-pressed="false"><strong>◇! meta</strong><span>Metadata unavailable</span></button>
+      <button class="state-button" type="button" data-preview="auth" aria-pressed="false"><strong>◇× meta</strong><span>Authentication</span></button>
+      <button class="state-button" type="button" data-preview="disabled" aria-pressed="false"><strong>◇· meta</strong><span>Disabled</span></button>
+    </div>
+    <p class="print-states">State variants: ◇ meta active · ◆ meta generating · ◇! meta unavailable · ◇× meta authentication failure · ◇· meta disabled.</p>
+  </section>
+
+  <section class="decision" aria-labelledby="decision-title">
+    <div>
+      <p class="kicker">Recommendation</p>
+      <h2 id="decision-title">Keep the healthy state neutral</h2>
+      <p>The badge stays dim when the extension works. Amber means the metadata model timed out or is unsupported. Red is reserved for authentication failure. The glyph changes with the color, so the state remains clear in a monochrome terminal.</p>
+    </div>
+    <dl class="legend">
+      <dt>◇ meta</dt><dd>Extension active</dd>
+      <dt>◆ meta</dt><dd>Metadata request running</dd>
+      <dt>◇! meta</dt><dd>Request failed or timed out</dd>
+      <dt>◇× meta</dt><dd>Authentication failed</dd>
+      <dt>◇· meta</dt><dd>Extension disabled</dd>
+    </dl>
+  </section>
+</main>
+
+<script>
+  const states = {
+    ready: {
+      mark: "◇",
+      title: "Extension active",
+      time: "4m ago",
+      body: "Metadata generated with Luna in 2.2 seconds. No live model connection is held."
+    },
+    working: {
+      mark: "◆",
+      title: "Generating metadata",
+      time: "1.4s",
+      body: "Luna is generating a session name. The request has a 5-second limit."
+    },
+    degraded: {
+      mark: "◇!",
+      title: "Metadata unavailable",
+      time: "12s ago",
+      body: "The latest metadata request timed out. The extension remains active."
+    },
+    auth: {
+      mark: "◇×",
+      title: "Authentication failed",
+      time: "not available",
+      body: "OpenAI Codex credentials are missing or rejected. Run /login openai-codex."
+    },
+    disabled: {
+      mark: "◇·",
+      title: "Extension disabled",
+      time: "off",
+      body: "Session metadata generation is disabled. No model requests will run."
+    }
+  };
+
+  const badge = document.querySelector("#metadata-badge");
+  const tooltip = document.querySelector("#metadata-tooltip");
+  const mark = badge.querySelector(".badge__mark");
+  const title = document.querySelector("#tooltip-title");
+  const time = document.querySelector("#tooltip-time");
+  const body = document.querySelector("#tooltip-body");
+  const buttons = [...document.querySelectorAll("[data-preview]")];
+
+  function showState(name) {
+    const state = states[name];
+    badge.dataset.state = name;
+    mark.textContent = state.mark;
+    title.textContent = state.title;
+    time.textContent = state.time;
+    body.textContent = state.body;
+    tooltip.hidden = false;
+    badge.setAttribute("aria-expanded", "true");
+    badge.setAttribute("aria-label", `${state.title}. ${state.body}`);
+    buttons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.preview === name)));
+  }
+
+  buttons.forEach((button) => button.addEventListener("click", () => showState(button.dataset.preview)));
+
+  badge.addEventListener("click", () => {
+    const willOpen = tooltip.hidden;
+    tooltip.hidden = !willOpen;
+    badge.setAttribute("aria-expanded", String(willOpen));
+  });
+
+  badge.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      tooltip.hidden = true;
+      badge.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  showState("ready");
+</script>
+</body>
+</html>

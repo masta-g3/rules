@@ -6,7 +6,7 @@ import test from "node:test";
 
 import workflowRuntime from "../extensions/workflow-runtime/index.ts";
 import { PlanWidget } from "../extensions/workflow-runtime/plan-widget.ts";
-import { boundedModelCall, resolveSessionModels } from "../extensions/workflow-runtime/session-model.ts";
+import { createSessionModelCall, resolveSessionModels } from "../extensions/workflow-runtime/session-model.ts";
 import { TodoPanel } from "../extensions/workflow-runtime/todo-panel.ts";
 
 function harness(cwd, initialBranch = [], initialName, modelCall) {
@@ -16,11 +16,16 @@ function harness(cwd, initialBranch = [], initialName, modelCall) {
   const tools = new Map();
   const branch = structuredClone(initialBranch);
   const operations = [];
+  const statuses = new Map();
   const widgets = new Map();
   let name = initialName;
   const ui = {
     theme: { fg: (_token, text) => text, bg: (_token, text) => text, bold: (text) => text },
     setWidget(id, factory) { if (factory) widgets.set(id, factory); else widgets.delete(id); },
+    setStatus(id, text) {
+      if (text === undefined) statuses.delete(id); else statuses.set(id, text);
+      operations.push({ kind: "status", id, text });
+    },
     notify(message, level) { operations.push({ kind: "notify", message, level }); },
     getEditorText() { return ""; },
     async custom() { operations.push({ kind: "custom" }); },
@@ -70,6 +75,7 @@ function harness(cwd, initialBranch = [], initialName, modelCall) {
     operations,
     ctx,
     get name() { return name; },
+    status(id) { return statuses.get(id); },
     externalName(value) { name = value; },
     async emit(event, payload = {}) {
       let result;
@@ -85,12 +91,32 @@ function harness(cwd, initialBranch = [], initialName, modelCall) {
   };
 }
 
+function metadataSuccess(text, model = "test-model", latencyMs = 1) {
+  return {
+    outcome: "success",
+    text,
+    model,
+    latencyMs,
+    attempts: [{ model, latencyMs, outcome: "success" }],
+    skippedModels: [],
+  };
+}
+
 function delayedModel() {
   const calls = [];
   return {
     calls,
     call(_ctx, prompt, input) {
-      return new Promise((resolve) => calls.push({ prompt, input, resolve }));
+      return new Promise((resolve, reject) => calls.push({
+        prompt,
+        input,
+        resolve(value) {
+          Promise.resolve(value).then(
+            (result) => resolve(typeof result === "string" ? metadataSuccess(result) : result),
+            reject,
+          );
+        },
+      }));
     },
   };
 }
@@ -131,7 +157,7 @@ test("runtime registers commands, shortcuts, and guarded producer tools", async 
   const cwd = await project();
   try {
     const runtime = harness(cwd, [], "Existing");
-    assert.deepEqual([...runtime.commands.keys()].sort(), ["session-name", "wf-clear", "wf-ticket", "wf-todos"]);
+    assert.deepEqual([...runtime.commands.keys()].sort(), ["session-metadata-status", "session-name", "wf-clear", "wf-ticket", "wf-todos"]);
     assert.ok(runtime.shortcuts.has("ctrl+shift+right"));
     assert.equal(runtime.shortcuts.size, 2);
     for (const tool of ["set_session_name", "set_workflow_activity", "set_workflow_ticket", "complete_workflow"]) assert.ok(runtime.tools.has(tool));
@@ -390,18 +416,258 @@ test("session metadata models are fixed to Spark then Luna", async () => {
   assert.equal(authenticated.includes(active.id), false);
 });
 
-test("optional model operations warn once when fixed metadata models fail", async () => {
+test("metadata calls disable reasoning, use five seconds, and skip unsupported models", async () => {
+  const candidates = new Map([
+    ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
+    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+  ]);
+  const options = [];
+  let clock = 0;
+  const call = createSessionModelCall({
+    now: () => clock,
+    async complete(model, _context, requestOptions) {
+      options.push({ model: model.id, ...requestOptions });
+      clock += 100;
+      if (model.id === "gpt-5.3-codex-spark") {
+        return { stopReason: "error", errorMessage: "not supported with a ChatGPT account", content: [] };
+      }
+      return { stopReason: "stop", content: [{ type: "text", text: "Metadata Runtime" }] };
+    },
+  });
+  const ctx = {
+    modelRegistry: {
+      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
+      async getApiKeyAndHeaders() { return { ok: true, apiKey: "test-key" }; },
+    },
+  };
+
+  const first = await call(ctx, "prompt", "input", 64);
+  assert.equal(first.outcome, "success");
+  assert.equal(first.model, "gpt-5.6-luna");
+  assert.deepEqual(first.attempts.map((attempt) => [attempt.model, attempt.failure?.kind ?? attempt.outcome]), [
+    ["gpt-5.3-codex-spark", "unsupported"],
+    ["gpt-5.6-luna", "success"],
+  ]);
+  assert.ok(options.every((item) => item.reasoningEffort === "none" && item.timeoutMs === 5_000));
+
+  options.length = 0;
+  const second = await call(ctx, "prompt", "input", 64);
+  assert.equal(second.outcome, "success");
+  assert.deepEqual(options.map((item) => item.model), ["gpt-5.6-luna"]);
+  assert.deepEqual(second.skippedModels, ["gpt-5.3-codex-spark"]);
+
+  call.reset();
+  options.length = 0;
+  const afterReset = await call(ctx, "prompt", "input", 64);
+  assert.equal(afterReset.outcome, "success");
+  assert.deepEqual(options.map((item) => item.model), ["gpt-5.3-codex-spark", "gpt-5.6-luna"]);
+});
+
+test("a reset isolates unsupported-model state from an older in-flight call", async () => {
+  const candidates = new Map([
+    ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
+    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+  ]);
+  const attempted = [];
+  let finishOldSpark;
+  let holdSpark = true;
+  const call = createSessionModelCall({
+    async complete(model) {
+      attempted.push(model.id);
+      if (model.id === "gpt-5.3-codex-spark" && holdSpark) {
+        holdSpark = false;
+        return new Promise((resolve) => { finishOldSpark = resolve; });
+      }
+      if (model.id === "gpt-5.3-codex-spark") return { stopReason: "stop", content: [{ type: "text", text: "Fresh Spark" }] };
+      return { stopReason: "stop", content: [{ type: "text", text: "Luna Fallback" }] };
+    },
+  });
+  const ctx = {
+    modelRegistry: {
+      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
+      async getApiKeyAndHeaders() { return { ok: true, apiKey: "test-key" }; },
+    },
+  };
+
+  const oldCall = call(ctx, "prompt", "input", 64);
+  await settle();
+  call.reset();
+  finishOldSpark({ stopReason: "error", errorMessage: "not supported with a ChatGPT account", content: [] });
+  await oldCall;
+
+  attempted.length = 0;
+  const nextCall = await call(ctx, "prompt", "input", 64);
+  assert.equal(nextCall.model, "gpt-5.3-codex-spark");
+  assert.deepEqual(attempted, ["gpt-5.3-codex-spark"]);
+});
+
+test("metadata model resolution distinguishes missing authentication", async () => {
+  const candidates = new Map([
+    ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
+    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+  ]);
+  const call = createSessionModelCall({ complete: async () => assert.fail("completion must not run") });
+  const result = await call({
+    modelRegistry: {
+      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
+      async getApiKeyAndHeaders() { return { ok: false }; },
+    },
+  }, "prompt", "input", 64);
+
+  assert.equal(result.outcome, "failure");
+  assert.equal(result.failure.kind, "authentication");
+  assert.deepEqual(result.skippedModels, []);
+});
+
+test("metadata status badge and command report timeout without login advice", async () => {
   const cwd = await project();
   try {
-    const runtime = harness(cwd, [], undefined, async () => undefined);
+    const runtime = harness(cwd, [], undefined, async () => ({
+      outcome: "failure",
+      failure: { kind: "timeout", message: "Request timed out after 5000ms" },
+      model: "gpt-5.6-luna",
+      latencyMs: 5_000,
+      attempts: [{ model: "gpt-5.6-luna", latencyMs: 5_000, outcome: "failure", failure: { kind: "timeout", message: "Request timed out after 5000ms" } }],
+      skippedModels: ["gpt-5.3-codex-spark"],
+    }));
+    await runtime.emit("session_start", { reason: "new" });
+    assert.match(runtime.status("session-metadata"), /◇ meta/);
+
     await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
     await settle();
-    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
+    assert.match(runtime.status("session-metadata"), /◇! meta/);
+
+    const warning = runtime.operations.find((item) => item.kind === "notify" && item.level === "warning");
+    assert.match(warning.message, /timed out/i);
+    assert.doesNotMatch(warning.message, /\/login/);
+
+    await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
+    const report = runtime.operations.at(-1).message;
+    assert.match(report, /gpt-5\.6-luna/);
+    assert.match(report, /5000 ms/);
+    assert.match(report, /timeout/i);
+    assert.match(report, /gpt-5\.3-codex-spark/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("authentication failures use the auth badge and login advice", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], undefined, async () => ({
+      outcome: "failure",
+      failure: { kind: "authentication", message: "OpenAI Codex authentication is unavailable" },
+      latencyMs: 0,
+      attempts: [],
+      skippedModels: [],
+    }));
+    await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
+    await settle();
+    assert.match(runtime.status("session-metadata"), /◇× meta/);
+    const warning = runtime.operations.find((item) => item.kind === "notify" && item.level === "warning");
+    assert.match(warning.message, /\/login openai-codex/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("invalidated metadata work restores the last settled badge state", async () => {
+  const cwd = await project();
+  try {
+    const delayed = delayedModel();
+    const runtime = harness(cwd, [], undefined, delayed.call);
+    await runtime.emit("session_start", { reason: "new" });
+    await runtime.emit("input", { source: "interactive", text: "Start naming this session" });
+    assert.match(runtime.status("session-metadata"), /◆ meta/);
+
+    await runtime.emit("input", { source: "interactive", text: "This newer input invalidates naming" });
+    assert.equal(delayed.calls.length, 1);
+    delayed.calls[0].resolve("Stale Name");
     await settle();
 
-    const warnings = runtime.operations.filter((item) => item.kind === "notify" && item.level === "warning" && item.message.includes("gpt-5.6-luna"));
-    assert.equal(warnings.length, 1);
-    assert.match(warnings[0].message, /\/login openai-codex/);
+    assert.match(runtime.status("session-metadata"), /◇ meta/);
+    await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
+    assert.match(runtime.operations.at(-1).message, /No metadata request has run/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("invalidating newer work restores a valid older settled result", async () => {
+  const cwd = await project();
+  try {
+    const delayed = delayedModel();
+    const runtime = harness(cwd, [], undefined, delayed.call);
+    await runtime.emit("session_start", { reason: "new" });
+    await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
+    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
+    await settle();
+    assert.equal(delayed.calls.length, 2);
+
+    delayed.calls[0].resolve("Settled Name");
+    await settle();
+    assert.match(runtime.status("session-metadata"), /◆ meta/);
+
+    await runtime.emit("input", { source: "interactive", text: "Invalidate the pending attention request" });
+    delayed.calls[1].resolve('{"kind":"ready","text":"Stale attention","confidence":0.9}');
+    await settle();
+
+    assert.match(runtime.status("session-metadata"), /◇ meta/);
+    await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
+    assert.match(runtime.operations.at(-1).message, /Parsed result: Settled Name/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("session shutdown prevents stale metadata from restoring the badge", async () => {
+  const cwd = await project();
+  try {
+    const delayed = delayedModel();
+    const runtime = harness(cwd, [], undefined, delayed.call);
+    await runtime.emit("session_start", { reason: "new" });
+    await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
+    await runtime.emit("session_shutdown", { reason: "quit" });
+    assert.equal(runtime.status("session-metadata"), undefined);
+
+    delayed.calls[0].resolve("Late Name");
+    await settle();
+    assert.equal(runtime.status("session-metadata"), undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("an older metadata request cannot overwrite the latest badge state", async () => {
+  const cwd = await project();
+  try {
+    const delayed = delayedModel();
+    const runtime = harness(cwd, [], undefined, delayed.call);
+    await runtime.emit("session_start", { reason: "new" });
+    await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
+    assert.equal(delayed.calls.length, 1);
+    assert.match(runtime.status("session-metadata"), /◆ meta/);
+    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
+    await settle();
+    assert.equal(delayed.calls.length, 2);
+
+    delayed.calls[1].resolve('{"kind":"ready","text":"Review the patch","confidence":0.9}');
+    await settle();
+    assert.match(runtime.status("session-metadata"), /◇ meta/);
+
+    delayed.calls[0].resolve({
+      outcome: "failure",
+      failure: { kind: "timeout", message: "Late timeout" },
+      model: "gpt-5.6-luna",
+      latencyMs: 5_000,
+      attempts: [],
+      skippedModels: [],
+    });
+    await settle();
+    assert.match(runtime.status("session-metadata"), /◇ meta/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("metadata status records parse failures separately from model failures", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], undefined, async () => metadataSuccess("This response has too many title words"));
+    await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
+    await settle();
+    assert.match(runtime.status("session-metadata"), /◇! meta/);
+    await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
+    assert.match(runtime.operations.at(-1).message, /parse/i);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -411,14 +677,16 @@ test("optional model operations quietly absorb resolver and injected call failur
   const recordUnhandled = (reason) => unhandled.push(reason);
   process.on("unhandledRejection", recordUnhandled);
   try {
-    const resolution = await boundedModelCall({
+    const call = createSessionModelCall();
+    const resolution = await call({
       model: undefined,
       modelRegistry: {
         find() { throw new Error("registry unavailable"); },
         async getApiKeyAndHeaders() { throw new Error("auth unavailable"); },
       },
     }, "prompt", "input", 64);
-    assert.equal(resolution, undefined);
+    assert.equal(resolution.outcome, "failure");
+    assert.equal(resolution.failure.kind, "provider");
 
     const naming = delayedModel();
     const unnamed = harness(cwd, [], undefined, naming.call);

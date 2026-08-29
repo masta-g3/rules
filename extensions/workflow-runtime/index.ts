@@ -42,7 +42,12 @@ import {
 	type TicketContext,
 	type TranscriptEntry,
 } from "./session-context.ts";
-import { boundedModelCall } from "./session-model.ts";
+import {
+	createSessionModelCall,
+	type MetadataCallResult,
+	type MetadataFailureKind,
+	type SessionModelCall,
+} from "./session-model.ts";
 import { applyPlanWidget } from "./plan-widget.ts";
 import { readWorkflowPlan } from "./workflow-plan.ts";
 import { TodoPanel, TODO_PANEL_OVERLAY_OPTIONS, TODO_PANEL_SHORTCUT } from "./todo-panel.ts";
@@ -331,26 +336,47 @@ function applyEffects(
 	}
 }
 
-type ModelCall = typeof boundedModelCall;
+type MetadataOperation = "session name" | "attention";
+type MetadataStatus = {
+	state: "ready" | "working" | "success" | "failure";
+	operation?: MetadataOperation;
+	result?: MetadataCallResult;
+	failureKind?: MetadataFailureKind | "parse";
+	parsedResult?: string;
+};
+
+const METADATA_STATUS_ID = "session-metadata";
+
+function metadataFailureNotice(kind: MetadataFailureKind | "parse"): string {
+	if (kind === "authentication") return "Session metadata authentication failed. Run /login openai-codex.";
+	if (kind === "unsupported") return "Session metadata unavailable. The configured model is unsupported for this account.";
+	if (kind === "timeout") return "Session metadata request timed out. The extension remains active.";
+	if (kind === "parse") return "Session metadata returned an invalid result. Run /session-metadata-status for details.";
+	return "Session metadata request failed. Run /session-metadata-status for details.";
+}
+
+function metadataStatusReport(status: MetadataStatus): string {
+	if (status.state === "ready") return "Session metadata extension: active\nNo metadata request has run in this session.";
+	if (status.state === "working") return `Session metadata: generating ${status.operation ?? "metadata"}`;
+	const result = status.result;
+	const lines = [
+		`Session metadata: ${status.state === "success" ? "success" : `${status.failureKind ?? "unknown"} failure`}`,
+		status.operation ? `Operation: ${status.operation}` : undefined,
+		result?.model ? `Model: ${result.model}` : undefined,
+		result ? `Latency: ${result.latencyMs} ms` : undefined,
+		status.parsedResult ? `Parsed result: ${status.parsedResult}` : undefined,
+		result?.failure?.message ? `Error: ${result.failure.message}` : undefined,
+		result?.attempts.length ? `Attempts: ${result.attempts.map((attempt) => `${attempt.model} ${attempt.failure?.kind ?? attempt.outcome} (${attempt.latencyMs} ms)`).join(", ")}` : undefined,
+		result?.skippedModels.length ? `Skipped: ${result.skippedModels.join(", ")}` : undefined,
+	];
+	return lines.filter((line): line is string => Boolean(line)).join("\n");
+}
 
 export default function workflowRuntime(
 	pi: ExtensionAPI,
-	dependencies: { modelCall?: ModelCall } = {},
+	dependencies: { modelCall?: SessionModelCall } = {},
 ): void {
-	const modelCall = dependencies.modelCall ?? boundedModelCall;
-	let metadataModelWarningShown = false;
-	const optionalModelCall: ModelCall = async (...args) => {
-		let result: string | undefined;
-		try { result = await modelCall(...args); } catch { result = undefined; }
-		if (result === undefined && !metadataModelWarningShown) {
-			metadataModelWarningShown = true;
-			args[0].ui.notify(
-				"Session metadata unavailable. Configure gpt-5.3-codex-spark or gpt-5.6-luna with /login openai-codex.",
-				"warning",
-			);
-		}
-		return result;
-	};
+	const modelCall = dependencies.modelCall ?? createSessionModelCall();
 	let state: WorkflowState = {};
 	let ticketContext: TicketContext | undefined;
 	let recoveryPending = false;
@@ -361,7 +387,98 @@ export default function workflowRuntime(
 	let attentionGenerationDone = -1;
 	let latestUserRequest: string | undefined;
 	let deferredWorkflowInputs: Array<{ name: string; ticketId?: string; text: string }> = [];
+	let metadataStatus: MetadataStatus = { state: "ready" };
+	let settledMetadataStatus = metadataStatus;
+	let metadataRequest = 0;
+	let settledMetadataRequest = 0;
+	let lastMetadataWarning: MetadataFailureKind | "parse" | undefined;
 	const continuationQueue = createContinuationQueue();
+
+	const applyMetadataStatus = (ctx: ExtensionContext) => {
+		if (!ctx.hasUI) return;
+		const theme = ctx.ui.theme;
+		const text = metadataStatus.state === "working"
+			? theme.fg("accent", "◆ meta")
+			: metadataStatus.state !== "failure"
+				? theme.fg("dim", "◇ meta")
+				: metadataStatus.failureKind === "authentication"
+					? theme.fg("error", "◇× meta")
+					: theme.fg("warning", "◇! meta");
+		ctx.ui.setStatus(METADATA_STATUS_ID, text);
+	};
+
+	const rememberMetadataStatus = (requestId: number, status: MetadataStatus) => {
+		if (requestId <= settledMetadataRequest) return;
+		settledMetadataRequest = requestId;
+		settledMetadataStatus = status;
+	};
+
+	const callMetadata = async <T>(
+		ctx: ExtensionContext,
+		operation: MetadataOperation,
+		systemPrompt: string,
+		input: string,
+		maxTokens: 64 | 128,
+		parse: (raw: string) => T | undefined,
+	): Promise<T | undefined> => {
+		const requestGeneration = generation;
+		const requestId = ++metadataRequest;
+		metadataStatus = { state: "working", operation };
+		applyMetadataStatus(ctx);
+		let result: MetadataCallResult;
+		try {
+			result = await modelCall(ctx, systemPrompt, input, maxTokens);
+		} catch (error) {
+			result = {
+				outcome: "failure",
+				latencyMs: 0,
+				failure: { kind: "provider", message: error instanceof Error ? error.message : String(error) },
+				attempts: [],
+				skippedModels: [],
+			};
+		}
+		if (requestGeneration !== generation) {
+			if (requestId === metadataRequest) {
+				metadataStatus = settledMetadataStatus;
+				applyMetadataStatus(ctx);
+			}
+			return undefined;
+		}
+		const isLatestRequest = requestId === metadataRequest;
+		if (result.outcome === "failure") {
+			const failureKind = result.failure?.kind ?? "provider";
+			const nextStatus: MetadataStatus = { state: "failure", operation, result, failureKind };
+			rememberMetadataStatus(requestId, nextStatus);
+			if (isLatestRequest) {
+				metadataStatus = nextStatus;
+				applyMetadataStatus(ctx);
+				if (lastMetadataWarning !== failureKind) ctx.ui.notify(metadataFailureNotice(failureKind), "warning");
+				lastMetadataWarning = failureKind;
+			}
+			return undefined;
+		}
+		const parsed = parse(result.text ?? "");
+		if (parsed === undefined) {
+			const nextStatus: MetadataStatus = { state: "failure", operation, result, failureKind: "parse" };
+			rememberMetadataStatus(requestId, nextStatus);
+			if (isLatestRequest) {
+				metadataStatus = nextStatus;
+				applyMetadataStatus(ctx);
+				if (lastMetadataWarning !== "parse") ctx.ui.notify(metadataFailureNotice("parse"), "warning");
+				lastMetadataWarning = "parse";
+			}
+			return undefined;
+		}
+		const parsedResult = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+		const nextStatus: MetadataStatus = { state: "success", operation, result, parsedResult };
+		rememberMetadataStatus(requestId, nextStatus);
+		if (isLatestRequest) {
+			metadataStatus = nextStatus;
+			lastMetadataWarning = undefined;
+			applyMetadataStatus(ctx);
+		}
+		return parsed;
+	};
 
 	const publishContext = (attention?: { kind: "ready" | "question" | "blocked"; text: string }) => {
 		pi.appendEntry(CONTEXT_ENTRY_TYPE, contextSnapshot(ticketContext, attention));
@@ -401,7 +518,7 @@ export default function workflowRuntime(
 			const source = ticketNamingInput(ticketContext, recentTranscript(ctx.sessionManager.getBranch() as TranscriptEntry[]));
 			const initialName = pi.getSessionName();
 			const applyGeneratedName = async () => {
-				const title = sanitizeSessionName(await optionalModelCall(ctx, NAMING_PROMPT, source, 64) ?? "");
+				const title = await callMetadata(ctx, "session name", NAMING_PROMPT, source, 64, sanitizeSessionName);
 				if (requestGeneration !== generation || pi.getSessionName() !== initialName) return false;
 				pi.setSessionName(title ?? ticketId);
 				return true;
@@ -418,7 +535,7 @@ export default function workflowRuntime(
 		if (!explicit) automaticNamingStarted = true;
 		const requestGeneration = explicit ? ++generation : generation;
 		const initialName = pi.getSessionName();
-		const name = sanitizeSessionName(await optionalModelCall(ctx, NAMING_PROMPT, source, 64) ?? "");
+		const name = await callMetadata(ctx, "session name", NAMING_PROMPT, source, 64, sanitizeSessionName);
 		if (!name || requestGeneration !== generation || pi.getSessionName() !== initialName) return false;
 		if (explicit) { ticketContext = undefined; publishContext(); }
 		pi.setSessionName(name);
@@ -466,6 +583,11 @@ export default function workflowRuntime(
 			state = clearState(pi, ctx);
 			ctx.ui.notify("Workflow indicator cleared.", "info");
 		},
+	});
+
+	pi.registerCommand("session-metadata-status", {
+		description: "Show the latest session metadata model attempt",
+		handler: async (_args, ctx) => ctx.ui.notify(metadataStatusReport(metadataStatus), "info"),
 	});
 
 	pi.registerCommand("session-name", {
@@ -807,7 +929,7 @@ export default function workflowRuntime(
 		if (attentionGenerationDone === requestGeneration || stopReason !== "stop" || !input) return;
 		attentionGenerationDone = requestGeneration;
 		void (async () => {
-			const accepted = parseAttention(await optionalModelCall(ctx, ATTENTION_PROMPT, input, 128) ?? "");
+			const accepted = await callMetadata(ctx, "attention", ATTENTION_PROMPT, input, 128, parseAttention);
 			if (requestGeneration !== generation) return;
 			if (accepted) {
 				currentAttention = accepted;
@@ -849,6 +971,13 @@ export default function workflowRuntime(
 
 	pi.on("session_start", async (event, ctx) => {
 		generation += 1;
+		metadataRequest += 1;
+		settledMetadataRequest = metadataRequest;
+		modelCall.reset?.();
+		metadataStatus = { state: "ready" };
+		settledMetadataStatus = metadataStatus;
+		lastMetadataWarning = undefined;
+		applyMetadataStatus(ctx);
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
 		const branch = ctx.sessionManager.getBranch();
@@ -880,10 +1009,12 @@ export default function workflowRuntime(
 		}
 	});
 
-	pi.on("session_shutdown", async () => {
+	pi.on("session_shutdown", async (_event, ctx) => {
 		generation += 1;
+		metadataRequest += 1;
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
+		if (ctx.hasUI) ctx.ui.setStatus(METADATA_STATUS_ID, undefined);
 		syncFocusPulse(false);
 		activeTui = undefined;
 	});
