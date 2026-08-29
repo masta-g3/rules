@@ -36,6 +36,9 @@ Read the plan file provided. Evaluate against these criteria:
 ### Scope
 - Are all affected files identified?
 - Could fewer files/functions achieve the same result?
+- Does the plan replace obsolete behavior, or leave old and new paths in parallel?
+- Can any planned file, helper, abstraction, dependency, state, branch, test, or phase be removed without weakening the requested outcome?
+- Does each planned test protect a durable contract or a plausible high-consequence regression?
 - Does the plan handle critical failure modes, empty inputs, and boundary conditions?
 - Could the same result be achieved with fewer abstractions, layers, branches, files, or state? If so, propose the concrete simpler approach.
 - Does it add bloat (excessive error handling, unused abstractions, over-engineering)?
@@ -60,6 +63,7 @@ PLAN ISSUES:
 
 ## Rules
 
+- **Subtraction first.** Report deletable work and reuse opportunities before missing additions.
 - **No praise.** Don't compliment what's good.
 - **No bloat.** Don't suggest adding things (tests, docs, error handling) unless they're missing and critical, and don't nitpick minor preferences.
 - **Be specific.** Reference exact files, functions, line numbers.

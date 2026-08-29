@@ -21,6 +21,7 @@
 
 ## Implementation Principles
 
+- Apply via negativa: first ask what can be removed, simplified, or left undone. Add code, abstractions, dependencies, tests, or documentation only when subtraction cannot solve the problem.
 - Prefer the simplest fundamental solution for the current context over the quickest local patch. Replace obsolete code or text instead of appending parallel versions.
 - Unless the repo style dictates it, prefer a minimalistic functional programming approach over complex over-abstracted OOP.
 - Avoid enterprise bloat, boilerplate, thin wrappers, and unnecessary abstractions.
