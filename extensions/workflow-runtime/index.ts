@@ -93,6 +93,11 @@ type RuntimeEventDetails = {
 	state: WorkflowState;
 };
 
+type MetadataIndicatorState = {
+	state: "ready" | "working" | "success" | "failure";
+	failureKind?: MetadataFailureKind | "parse";
+};
+
 let activeTui: TUI | undefined;
 let focusPulseOn = true;
 let focusPulseTimer: ReturnType<typeof setInterval> | undefined;
@@ -203,18 +208,6 @@ function persistState(pi: ExtensionAPI, state: WorkflowState): void {
 	pi.appendEntry(ENTRY_TYPE, withWorkflowDefinition(state));
 }
 
-function setState(pi: ExtensionAPI, ctx: ExtensionContext, nextState: WorkflowState): WorkflowState {
-	const state = { ...nextState, updatedAt: Date.now() };
-	persistState(pi, state);
-	applyWidget(ctx, state);
-	applyPlanWidget(ctx, state.plan);
-	return state;
-}
-
-function clearState(pi: ExtensionAPI, ctx: ExtensionContext): WorkflowState {
-	return setState(pi, ctx, {});
-}
-
 function renderTicket(theme: ExtensionContext["ui"]["theme"], ticketId?: string): string {
 	return ticketId ? `${theme.fg(TOKENS.rail, " · ")}${theme.fg(TOKENS.ticket, ticketId)}` : "";
 }
@@ -257,38 +250,45 @@ function renderRail(state: WorkflowState, theme: ExtensionContext["ui"]["theme"]
 	return { full, compact };
 }
 
-function renderIndicator(width: number, state: WorkflowState, theme: ExtensionContext["ui"]["theme"]): string {
+function renderMetadataBadge(theme: ExtensionContext["ui"]["theme"], metadata: MetadataIndicatorState): string {
+	if (metadata.state === "working") return theme.fg("accent", "◆ meta");
+	if (metadata.state !== "failure") return theme.fg("dim", "◇ meta");
+	return metadata.failureKind === "authentication"
+		? theme.fg("error", "◇× meta")
+		: theme.fg("warning", "◇! meta");
+}
+
+function renderIndicator(
+	width: number,
+	state: WorkflowState,
+	metadata: MetadataIndicatorState,
+	theme: ExtensionContext["ui"]["theme"],
+): string {
 	const rail = renderRail(state, theme);
-	if (!rail.full) return "";
+	const badge = renderMetadataBadge(theme, metadata);
+	if (!rail.full) return truncateToWidth(badge, width);
 
 	const ticket = renderTicket(theme, state.ticketId);
-	const full = `${rail.full}${ticket}`;
+	const suffix = `${theme.fg(TOKENS.rail, " · ")}${badge}`;
+	const full = `${rail.full}${ticket}${suffix}`;
 	if (visibleWidth(full) <= width) return full;
 
-	const compact = `${rail.compact}${ticket}`;
+	const compact = `${rail.compact}${ticket}${suffix}`;
 	if (visibleWidth(compact) <= width) return compact;
 
-	if (ticket) {
-		const compactTicket = truncateToWidth(ticket, Math.max(0, width - visibleWidth(rail.compact)));
-		const compactWithTicket = `${rail.compact}${compactTicket}`;
-		if (visibleWidth(compactWithTicket) <= width) return compactWithTicket;
-	}
+	const compactWithBadge = `${rail.compact}${suffix}`;
+	if (visibleWidth(compactWithBadge) <= width) return compactWithBadge;
 
 	return truncateToWidth(rail.compact, width);
 }
 
-function applyWidget(ctx: ExtensionContext, state: WorkflowState): void {
+function applyWidget(ctx: ExtensionContext, state: WorkflowState, metadata: MetadataIndicatorState): void {
 	syncFocusPulse(state.execution?.mode === "focus");
-	if (!state.activeStep && !state.execution) {
-		ctx.ui.setWidget(ENTRY_TYPE, undefined);
-		return;
-	}
-
 	ctx.ui.setWidget(ENTRY_TYPE, (tui, theme) => {
 		activeTui = tui;
 		return {
 			render(width: number): string[] {
-				const line = renderIndicator(width, state, theme);
+				const line = renderIndicator(width, state, metadata, theme);
 				return line ? [line] : [];
 			},
 			invalidate(): void {},
@@ -337,11 +337,9 @@ function applyEffects(
 }
 
 type MetadataOperation = "session name" | "attention";
-type MetadataStatus = {
-	state: "ready" | "working" | "success" | "failure";
+type MetadataStatus = MetadataIndicatorState & {
 	operation?: MetadataOperation;
 	result?: MetadataCallResult;
-	failureKind?: MetadataFailureKind | "parse";
 	parsedResult?: string;
 };
 
@@ -396,16 +394,18 @@ export default function workflowRuntime(
 
 	const applyMetadataStatus = (ctx: ExtensionContext) => {
 		if (!ctx.hasUI) return;
-		const theme = ctx.ui.theme;
-		const text = metadataStatus.state === "working"
-			? theme.fg("accent", "◆ meta")
-			: metadataStatus.state !== "failure"
-				? theme.fg("dim", "◇ meta")
-				: metadataStatus.failureKind === "authentication"
-					? theme.fg("error", "◇× meta")
-					: theme.fg("warning", "◇! meta");
-		ctx.ui.setStatus(METADATA_STATUS_ID, text);
+		applyWidget(ctx, state, metadataStatus);
 	};
+
+	const setState = (pi: ExtensionAPI, ctx: ExtensionContext, nextState: WorkflowState): WorkflowState => {
+		const updated = { ...nextState, updatedAt: Date.now() };
+		persistState(pi, updated);
+		applyWidget(ctx, updated, metadataStatus);
+		applyPlanWidget(ctx, updated.plan);
+		return updated;
+	};
+
+	const clearState = (pi: ExtensionAPI, ctx: ExtensionContext): WorkflowState => setState(pi, ctx, {});
 
 	const rememberMetadataStatus = (requestId: number, status: MetadataStatus) => {
 		if (requestId <= settledMetadataRequest) return;
@@ -965,7 +965,7 @@ export default function workflowRuntime(
 		}
 		const result = transition(state, { type: "session-compact", reason: event.reason });
 		state = result.state;
-		applyWidget(ctx, state);
+		applyWidget(ctx, state, metadataStatus);
 		applyPlanWidget(ctx, state.plan);
 	});
 
@@ -977,6 +977,7 @@ export default function workflowRuntime(
 		metadataStatus = { state: "ready" };
 		settledMetadataStatus = metadataStatus;
 		lastMetadataWarning = undefined;
+		if (ctx.hasUI) ctx.ui.setStatus(METADATA_STATUS_ID, undefined);
 		applyMetadataStatus(ctx);
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
@@ -999,7 +1000,7 @@ export default function workflowRuntime(
 			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
 		} else {
 			state = result.state;
-			applyWidget(ctx, state);
+			applyWidget(ctx, state, metadataStatus);
 			applyPlanWidget(ctx, state.plan);
 		}
 		if (event.reason !== "new" && event.reason !== "fork") {
@@ -1014,7 +1015,10 @@ export default function workflowRuntime(
 		metadataRequest += 1;
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
-		if (ctx.hasUI) ctx.ui.setStatus(METADATA_STATUS_ID, undefined);
+		if (ctx.hasUI) {
+			ctx.ui.setStatus(METADATA_STATUS_ID, undefined);
+			ctx.ui.setWidget(ENTRY_TYPE, undefined);
+		}
 		syncFocusPulse(false);
 		activeTui = undefined;
 	});

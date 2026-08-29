@@ -531,11 +531,12 @@ test("metadata status badge and command report timeout without login advice", as
       skippedModels: ["gpt-5.3-codex-spark"],
     }));
     await runtime.emit("session_start", { reason: "new" });
-    assert.match(runtime.status("session-metadata"), /◇ meta/);
+    assert.equal(runtime.status("session-metadata"), undefined);
+    assert.match(runtime.renderWorkflow(80), /◇ meta/);
 
     await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
     await settle();
-    assert.match(runtime.status("session-metadata"), /◇! meta/);
+    assert.match(runtime.renderWorkflow(80), /◇! meta/);
 
     const warning = runtime.operations.find((item) => item.kind === "notify" && item.level === "warning");
     assert.match(warning.message, /timed out/i);
@@ -562,7 +563,7 @@ test("authentication failures use the auth badge and login advice", async () => 
     }));
     await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
     await settle();
-    assert.match(runtime.status("session-metadata"), /◇× meta/);
+    assert.match(runtime.renderWorkflow(80), /◇× meta/);
     const warning = runtime.operations.find((item) => item.kind === "notify" && item.level === "warning");
     assert.match(warning.message, /\/login openai-codex/);
   } finally { await rm(cwd, { recursive: true, force: true }); }
@@ -575,14 +576,14 @@ test("invalidated metadata work restores the last settled badge state", async ()
     const runtime = harness(cwd, [], undefined, delayed.call);
     await runtime.emit("session_start", { reason: "new" });
     await runtime.emit("input", { source: "interactive", text: "Start naming this session" });
-    assert.match(runtime.status("session-metadata"), /◆ meta/);
+    assert.match(runtime.renderWorkflow(80), /◆ meta/);
 
     await runtime.emit("input", { source: "interactive", text: "This newer input invalidates naming" });
     assert.equal(delayed.calls.length, 1);
     delayed.calls[0].resolve("Stale Name");
     await settle();
 
-    assert.match(runtime.status("session-metadata"), /◇ meta/);
+    assert.match(runtime.renderWorkflow(80), /◇ meta/);
     await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
     assert.match(runtime.operations.at(-1).message, /No metadata request has run/);
   } finally { await rm(cwd, { recursive: true, force: true }); }
@@ -601,13 +602,13 @@ test("invalidating newer work restores a valid older settled result", async () =
 
     delayed.calls[0].resolve("Settled Name");
     await settle();
-    assert.match(runtime.status("session-metadata"), /◆ meta/);
+    assert.match(runtime.renderWorkflow(80), /◆ meta/);
 
     await runtime.emit("input", { source: "interactive", text: "Invalidate the pending attention request" });
     delayed.calls[1].resolve('{"kind":"ready","text":"Stale attention","confidence":0.9}');
     await settle();
 
-    assert.match(runtime.status("session-metadata"), /◇ meta/);
+    assert.match(runtime.renderWorkflow(80), /◇ meta/);
     await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
     assert.match(runtime.operations.at(-1).message, /Parsed result: Settled Name/);
   } finally { await rm(cwd, { recursive: true, force: true }); }
@@ -621,11 +622,11 @@ test("session shutdown prevents stale metadata from restoring the badge", async 
     await runtime.emit("session_start", { reason: "new" });
     await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
     await runtime.emit("session_shutdown", { reason: "quit" });
-    assert.equal(runtime.status("session-metadata"), undefined);
+    assert.equal(runtime.renderWorkflow(80), undefined);
 
     delayed.calls[0].resolve("Late Name");
     await settle();
-    assert.equal(runtime.status("session-metadata"), undefined);
+    assert.equal(runtime.renderWorkflow(80), undefined);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -637,14 +638,14 @@ test("an older metadata request cannot overwrite the latest badge state", async 
     await runtime.emit("session_start", { reason: "new" });
     await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
     assert.equal(delayed.calls.length, 1);
-    assert.match(runtime.status("session-metadata"), /◆ meta/);
+    assert.match(runtime.renderWorkflow(80), /◆ meta/);
     await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
     await settle();
     assert.equal(delayed.calls.length, 2);
 
     delayed.calls[1].resolve('{"kind":"ready","text":"Review the patch","confidence":0.9}');
     await settle();
-    assert.match(runtime.status("session-metadata"), /◇ meta/);
+    assert.match(runtime.renderWorkflow(80), /◇ meta/);
 
     delayed.calls[0].resolve({
       outcome: "failure",
@@ -655,7 +656,7 @@ test("an older metadata request cannot overwrite the latest badge state", async 
       skippedModels: [],
     });
     await settle();
-    assert.match(runtime.status("session-metadata"), /◇ meta/);
+    assert.match(runtime.renderWorkflow(80), /◇ meta/);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -665,7 +666,7 @@ test("metadata status records parse failures separately from model failures", as
     const runtime = harness(cwd, [], undefined, async () => metadataSuccess("This response has too many title words"));
     await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
     await settle();
-    assert.match(runtime.status("session-metadata"), /◇! meta/);
+    assert.match(runtime.renderWorkflow(80), /◇! meta/);
     await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
     assert.match(runtime.operations.at(-1).message, /parse/i);
   } finally { await rm(cwd, { recursive: true, force: true }); }
@@ -926,13 +927,13 @@ test("workflow widget uses positional full and bounded narrow markers", async ()
   try {
     const runtime = harness(cwd, [], "Metadata redesign");
     await runtime.emit("input", { source: "interactive", text: "/skill:review" });
-    assert.match(runtime.renderWorkflow(80), /^✓ Plan ─ ✓ Execute ─ ◉ Review ─ · Reflect ─ · Commit$/);
+    assert.match(runtime.renderWorkflow(80), /^✓ Plan ─ ✓ Execute ─ ◉ Review ─ · Reflect ─ · Commit · ◇ meta$/);
     assert.equal(runtime.renderWorkflow(8), "3/5 ◉ RV");
     await runtime.emit("input", { source: "interactive", text: "/skill:execute" });
-    assert.match(runtime.renderWorkflow(80), /^✓ Plan ─ ◉ Execute ─ · Review ─ · Reflect ─ · Commit$/);
+    assert.match(runtime.renderWorkflow(80), /^✓ Plan ─ ◉ Execute ─ · Review ─ · Reflect ─ · Commit · ◇ meta$/);
     await runtime.emit("input", { source: "interactive", text: "/skill:review" });
     await runtime.tools.get("set_workflow_activity").execute("done", { activityId: "review-complete" }, undefined, undefined, runtime.ctx);
-    assert.match(runtime.renderWorkflow(80), /^✓ Plan ─ ✓ Execute ─ ✓ Review ─ · Reflect ─ · Commit$/);
+    assert.match(runtime.renderWorkflow(80), /^✓ Plan ─ ✓ Execute ─ ✓ Review ─ · Reflect ─ · Commit · ◇ meta$/);
     assert.equal(runtime.renderWorkflow(8), "3/5 ✓ RV");
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
