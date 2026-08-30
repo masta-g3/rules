@@ -660,6 +660,19 @@ test("an older metadata request cannot overwrite the latest badge state", async 
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
+test("a valid null attention result is not a parse failure", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Existing", async () => metadataSuccess("null"));
+    await runtime.emit("input", { source: "interactive", text: "Explain the current state" });
+    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "The extension is active." }] });
+    await settle();
+    assert.match(runtime.renderWorkflow(80), /◇ meta/);
+    await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
+    assert.match(runtime.operations.at(-1).message, /success/i);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
 test("metadata status records parse failures separately from model failures", async () => {
   const cwd = await project();
   try {

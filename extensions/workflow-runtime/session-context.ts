@@ -181,9 +181,10 @@ export function sanitizeSessionName(raw: string): string | undefined {
 	return name.split(/\s+/).map((word) => word ? word[0]!.toLocaleUpperCase() + word.slice(1).toLocaleLowerCase() : word).join(" ");
 }
 
-export function parseAttention(raw: string): SessionAttention | undefined {
+export function parseAttention(raw: string): SessionAttention | null | undefined {
 	let value: unknown;
 	try { value = JSON.parse(raw.trim()); } catch { return undefined; }
+	if (value === null) return null;
 	if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
 	const item = value as Record<string, unknown>;
 	if (!(["ready", "question", "blocked"] as unknown[]).includes(item.kind)) return undefined;

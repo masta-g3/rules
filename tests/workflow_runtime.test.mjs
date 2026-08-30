@@ -120,6 +120,7 @@ test("session context bounds transcript, names, and attention", () => {
   assert.equal(sanitizeSessionName('"metadata redesign"'), "Metadata Redesign");
   assert.equal(sanitizeSessionName("four word session name"), undefined);
   assert.deepEqual(parseAttention('{"kind":"ready","text":"Review the patch","confidence":0.8}'), { kind: "ready", text: "Review the patch" });
+  assert.equal(parseAttention("null"), null);
   assert.equal(parseAttention('{"kind":"ready","text":"Maybe","confidence":0.4}'), undefined);
   assert.ok(attentionInput("request", "done", { id: "x-001", description: "Outcome" }, "Plan ready").includes("Current context"));
   const snapshot = { version: 1, updatedAt: 7, ticket: { id: "x-001", subtitle: "Scan context", future: true }, attention: { kind: "ready", text: "Review it" }, future: true };
