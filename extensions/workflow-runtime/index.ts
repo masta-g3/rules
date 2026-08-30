@@ -34,11 +34,14 @@ import {
 	normalizeText,
 	parseAttention,
 	parseContextSnapshot,
+	questionAttention,
 	readTicketContext,
 	recentTranscript,
 	sanitizeSessionName,
+	stableRequestId,
 	ticketNamingInput,
 	type PiAgentHubContextV1,
+	type SessionAttention,
 	type TicketContext,
 	type TranscriptEntry,
 } from "./session-context.ts";
@@ -381,7 +384,7 @@ export default function workflowRuntime(
 	let lastAdvanceShortcutAt = 0;
 	let generation = 0;
 	let automaticNamingStarted = false;
-	let currentAttention: { kind: "ready" | "question" | "blocked"; text: string } | undefined;
+	let currentAttention: SessionAttention | undefined;
 	let attentionGenerationDone = -1;
 	let latestUserRequest: string | undefined;
 	let deferredWorkflowInputs: Array<{ name: string; ticketId?: string; text: string }> = [];
@@ -480,7 +483,7 @@ export default function workflowRuntime(
 		return parsed;
 	};
 
-	const publishContext = (attention?: { kind: "ready" | "question" | "blocked"; text: string }) => {
+	const publishContext = (attention?: SessionAttention) => {
 		pi.appendEntry(CONTEXT_ENTRY_TYPE, contextSnapshot(ticketContext, attention));
 	};
 
@@ -892,8 +895,13 @@ export default function workflowRuntime(
 	});
 
 	pi.on("tool_execution_start", async (event, ctx) => {
-		if (state.activeStep === "plan-md" && event.toolName === "ask_user_question") {
-			state = setState(pi, ctx, setWorkflowActivity(state, "clarifying-requirements"));
+		if (event.toolName === "ask_user_question") {
+			const attention = questionAttention(event.toolCallId, event.args);
+			if (attention) {
+				currentAttention = attention;
+				publishContext(attention);
+			}
+			if (state.activeStep === "plan-md") state = setState(pi, ctx, setWorkflowActivity(state, "clarifying-requirements"));
 			return;
 		}
 		if (event.toolName !== "tmux_subagent") return;
@@ -906,7 +914,14 @@ export default function workflowRuntime(
 		if (activity) state = setState(pi, ctx, setWorkflowActivity(state, activity));
 	});
 
-	pi.on("tool_execution_end", async (_event, ctx) => {
+	pi.on("tool_execution_end", async (event, ctx) => {
+		if (event.toolName === "ask_user_question") {
+			const requestId = stableRequestId(event.toolCallId);
+			if (requestId && currentAttention?.kind === "question" && currentAttention.requestId === requestId) {
+				currentAttention = undefined;
+				publishContext();
+			}
+		}
 		if (state.activeStep && ticketContext?.planFile) await refreshPlan(ctx);
 	});
 
@@ -983,7 +998,9 @@ export default function workflowRuntime(
 		deferredWorkflowInputs = [];
 		const branch = ctx.sessionManager.getBranch();
 		const restoredContext = event.reason === "new" || event.reason === "fork" ? undefined : findLatestContext(branch);
-		currentAttention = restoredContext?.attention;
+		const restoredRequestQuestion = restoredContext?.attention?.kind === "question" && restoredContext.attention.requestId !== undefined;
+		currentAttention = restoredRequestQuestion ? undefined : restoredContext?.attention;
+		if (restoredRequestQuestion) pi.appendEntry(CONTEXT_ENTRY_TYPE, contextSnapshot(restoredContext?.ticket));
 		const restored = event.reason === "new" ? { state: {} } : findLatestState(branch);
 		const result = transition(restored.state, { type: "session-boundary", reason: event.reason });
 		const normalizeDefinition = shouldNormalizeWorkflowDefinition(
