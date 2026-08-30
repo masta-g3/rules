@@ -792,6 +792,81 @@ test("final-turn attention is detached and stale after new input", async () => {
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
+test("structured question starts publish bounded attention and matching completion clears it", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Existing");
+    const first = {
+      toolCallId: "provider-call-one",
+      toolName: "ask_user_question",
+      args: { questions: [{ question: "Which rollout should we use?", options: [{ label: "Do not publish this" }] }] },
+    };
+    await runtime.emit("tool_execution_start", first);
+    const firstAttention = runtime.latest("pi-agent-hub-context").attention;
+    assert.equal(firstAttention.kind, "question");
+    assert.equal(firstAttention.text, "Which rollout should we use?");
+    assert.equal(firstAttention.requestId.length, 64);
+    assert.equal(JSON.stringify(firstAttention).includes("Do not publish this"), false);
+
+    const contexts = runtime.branch.filter((entry) => entry.customType === "pi-agent-hub-context").length;
+    await runtime.emit("tool_execution_start", { toolCallId: "invalid", toolName: "ask_user_question", args: { questions: [] } });
+    await runtime.emit("tool_execution_start", { toolCallId: "missing", toolName: "ask_user_question" });
+    assert.equal(runtime.branch.filter((entry) => entry.customType === "pi-agent-hub-context").length, contexts);
+
+    await runtime.emit("tool_execution_start", {
+      toolCallId: "provider-call-two",
+      toolName: "ask_user_question",
+      args: { questions: [{ question: "Choose a replacement?" }, { question: "And timing?" }] },
+    });
+    const secondAttention = runtime.latest("pi-agent-hub-context").attention;
+    assert.equal(secondAttention.text, "Choose a replacement? (+1 more)");
+    assert.notEqual(secondAttention.requestId, firstAttention.requestId);
+
+    await runtime.emit("tool_execution_end", { toolCallId: first.toolCallId, toolName: "ask_user_question", isError: false });
+    assert.deepEqual(runtime.latest("pi-agent-hub-context").attention, secondAttention);
+    await runtime.emit("tool_execution_end", { toolCallId: "provider-call-two", toolName: "ask_user_question", isError: true });
+    assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("Plan question starts retain clarification activity and question attention", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    await runtime.emit("input", { source: "interactive", text: "/skill:plan-md meta-001" });
+    await runtime.emit("tool_execution_start", {
+      toolCallId: "plan-question",
+      toolName: "ask_user_question",
+      args: { questions: [{ question: "Confirm the scope?" }] },
+    });
+    assert.equal(runtime.latest("workflow-runtime").activity.id, "clarifying-requirements");
+    assert.deepEqual(runtime.latest("pi-agent-hub-context").attention.kind, "question");
+    await runtime.emit("tool_execution_end", { toolCallId: "plan-question", toolName: "ask_user_question", isError: false });
+    assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("session start clears only restored request-backed question attention", async () => {
+  const cwd = await project();
+  try {
+    const cases = [
+      [{ requestId: "r".repeat(64), kind: "question", text: "Stale questionnaire" }, undefined],
+      [{ kind: "question", text: "Historical question" }, { kind: "question", text: "Historical question" }],
+      [{ requestId: "b".repeat(64), kind: "blocked", text: "Still blocked" }, { requestId: "b".repeat(64), kind: "blocked", text: "Still blocked" }],
+      [{ kind: "ready", text: "Review this" }, { kind: "ready", text: "Review this" }],
+    ];
+    for (const [attention, expected] of cases) {
+      const runtime = harness(cwd, [{
+        type: "custom",
+        customType: "pi-agent-hub-context",
+        data: { version: 1, updatedAt: 10, attention },
+      }], "Existing");
+      await runtime.emit("session_start", { reason: "resume" });
+      assert.deepEqual(runtime.latest("pi-agent-hub-context").attention, expected);
+    }
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
 test("tool starts automate only exact plan questions and critic launches", async () => {
   const cwd = await project();
   try {

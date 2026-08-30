@@ -29,7 +29,9 @@ import {
   effectiveProjectCwd,
   parseAttention,
   parseContextSnapshot,
+  questionAttention,
   readTicketContext,
+  stableRequestId,
   recentTranscript,
   sanitizeSessionName,
 } from "../extensions/workflow-runtime/session-context.ts";
@@ -128,6 +130,47 @@ test("session context bounds transcript, names, and attention", () => {
   assert.equal(parseContextSnapshot({ ...snapshot, version: 2 }), undefined);
   assert.equal(parseContextSnapshot({ ...snapshot, attention: { kind: "ready", text: "x".repeat(97) } }), undefined);
   assert.deepEqual(contextSnapshot({ id: "x-001", title: "Ignored", subtitle: "Scan context" }, undefined, 7), { version: 1, updatedAt: 7, ticket: { id: "x-001", subtitle: "Scan context" } });
+});
+
+test("question attention has bounded deterministic request identity and summary", () => {
+  assert.equal(stableRequestId("call_123"), "2ce6deda1dec6b4c566f38ac5241867b7e29965901ddcdf87d05cb025e1896af");
+  assert.equal(stableRequestId("call_123"), stableRequestId("call_123"));
+  assert.notEqual(stableRequestId("call_123"), stableRequestId("call_124"));
+
+  assert.deepEqual(questionAttention("call_123", {
+    questions: [
+      { question: "  Choose\n\tthe\u0000 rollout?  ", options: [{ label: "Private option", description: "Never publish" }], multiple: true },
+      { question: "Second question" },
+      { question: "Third question" },
+    ],
+  }), {
+    requestId: stableRequestId("call_123"),
+    kind: "question",
+    text: "Choose the rollout? (+2 more)",
+  });
+
+  const bounded = questionAttention("long-call", {
+    questions: [{ question: "x".repeat(200) }, { question: "another" }],
+  });
+  assert.equal([...bounded.text].length, 96);
+  assert.ok(bounded.text.endsWith(" (+1 more)"));
+  assert.equal(bounded.text.includes("another"), false);
+
+  for (const [id, args] of [[undefined, { questions: [{ question: "Valid" }] }], ["", { questions: [{ question: "Valid" }] }], ["id", undefined], ["id", {}], ["id", { questions: [] }], ["id", { questions: [{ question: " \n " }] }]]) {
+    assert.equal(questionAttention(id, args), undefined);
+  }
+});
+
+test("context request IDs round trip only within the 64-character contract", () => {
+  const attention = { requestId: "r".repeat(64), kind: "question", text: "Choose a rollout" };
+  assert.deepEqual(
+    parseContextSnapshot(contextSnapshot({ id: "x-001" }, attention, 9)),
+    { version: 1, updatedAt: 9, ticket: { id: "x-001" }, attention },
+  );
+  const base = { version: 1, updatedAt: 9, attention: { kind: "question", text: "Choose a rollout" } };
+  assert.equal(parseContextSnapshot({ ...base, attention: { ...base.attention, requestId: "r".repeat(65) } }), undefined);
+  assert.equal(parseContextSnapshot({ ...base, attention: { ...base.attention, requestId: "bad\nid" } }), undefined);
+  assert.deepEqual(parseContextSnapshot(base)?.attention, { kind: "question", text: "Choose a rollout" });
 });
 
 test("ticket context resolves canonical fields and legacy plan title", async () => {

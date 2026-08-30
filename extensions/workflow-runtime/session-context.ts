@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve, sep } from "node:path";
 
@@ -7,6 +8,7 @@ export const MAX_TITLE = 32;
 export const MAX_SUBTITLE = 64;
 export const MAX_DESCRIPTION = 240;
 export const MAX_ATTENTION = 96;
+export const MAX_REQUEST_ID = 64;
 const MAX_PROJECT_CWD = 4_096;
 
 export function effectiveProjectCwd(cwd: string, primaryCwd = process.env.PI_AGENT_HUB_PRIMARY_CWD): string {
@@ -15,7 +17,7 @@ export function effectiveProjectCwd(cwd: string, primaryCwd = process.env.PI_AGE
 		: cwd;
 }
 
-export type SessionAttention = { kind: "ready" | "question" | "blocked"; text: string };
+export type SessionAttention = { requestId?: string; kind: "ready" | "question" | "blocked"; text: string };
 export type TicketContext = { id: string; title?: string; subtitle?: string; description?: string; planFile?: string };
 export type PiAgentHubContextV1 = {
 	version: 1;
@@ -41,6 +43,25 @@ export function normalizeText(value: unknown, max: number): string | undefined {
 	if (typeof value !== "string") return undefined;
 	const text = value.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim();
 	return text ? [...text].slice(0, max).join("") : undefined;
+}
+
+export function stableRequestId(toolCallId: unknown): string | undefined {
+	if (typeof toolCallId !== "string" || !toolCallId) return undefined;
+	return createHash("sha256").update(toolCallId).digest("hex");
+}
+
+export function questionAttention(toolCallId: unknown, args: unknown): SessionAttention | undefined {
+	const requestId = stableRequestId(toolCallId);
+	if (!requestId || !args || typeof args !== "object" || Array.isArray(args)) return undefined;
+	const questions = (args as Record<string, unknown>).questions;
+	if (!Array.isArray(questions) || questions.length === 0) return undefined;
+	const first = questions[0];
+	if (!first || typeof first !== "object" || Array.isArray(first)) return undefined;
+	const more = questions.length - 1;
+	const suffix = more > 0 ? ` (+${more} more)` : "";
+	const question = normalizeText((first as Record<string, unknown>).question, MAX_ATTENTION - [...suffix].length);
+	if (!question) return undefined;
+	return { requestId, kind: "question", text: `${question}${suffix}` };
 }
 
 function unquote(value: string): string {
@@ -129,9 +150,11 @@ export function parseContextSnapshot(value: unknown): PiAgentHubContextV1 | unde
 		if (!item.attention || typeof item.attention !== "object" || Array.isArray(item.attention)) return undefined;
 		const raw = item.attention as Record<string, unknown>;
 		if (!(["ready", "question", "blocked"] as unknown[]).includes(raw.kind)) return undefined;
+		const requestId = raw.requestId === undefined ? undefined : normalizeText(raw.requestId, MAX_REQUEST_ID);
+		if (raw.requestId !== undefined && (!requestId || requestId !== raw.requestId)) return undefined;
 		const text = normalizeText(raw.text, MAX_ATTENTION);
 		if (!text || text !== raw.text) return undefined;
-		attention = { kind: raw.kind as SessionAttention["kind"], text };
+		attention = { ...(requestId ? { requestId } : {}), kind: raw.kind as SessionAttention["kind"], text };
 	}
 	return { version: 1, updatedAt: item.updatedAt, ...(ticket ? { ticket } : {}), ...(attention ? { attention } : {}) };
 }
