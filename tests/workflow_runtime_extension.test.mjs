@@ -157,7 +157,7 @@ test("runtime registers commands, shortcuts, and guarded producer tools", async 
   const cwd = await project();
   try {
     const runtime = harness(cwd, [], "Existing");
-    assert.deepEqual([...runtime.commands.keys()].sort(), ["session-metadata-status", "session-name", "wf-clear", "wf-ticket", "wf-todos"]);
+    assert.deepEqual([...runtime.commands.keys()].sort(), ["session-metadata-disable", "session-metadata-enable", "session-metadata-status", "session-name", "wf-clear", "wf-ticket", "wf-todos"]);
     assert.ok(runtime.shortcuts.has("ctrl+shift+right"));
     assert.equal(runtime.shortcuts.size, 2);
     for (const tool of ["set_session_name", "set_workflow_activity", "set_workflow_ticket", "complete_workflow"]) assert.ok(runtime.tools.has(tool));
@@ -519,6 +519,48 @@ test("metadata model resolution distinguishes missing authentication", async () 
   assert.deepEqual(result.skippedModels, []);
 });
 
+test("session metadata commands disable calls and allow re-enabling", async () => {
+  const cwd = await project();
+  try {
+    const delayed = delayedModel();
+    const runtime = harness(cwd, [], undefined, delayed.call);
+    await runtime.emit("session_start", { reason: "new" });
+
+    await runtime.commands.get("session-metadata-disable").handler("", runtime.ctx);
+    assert.match(runtime.renderWorkflow(80), /◇– meta/);
+    await runtime.emit("input", { source: "interactive", text: "Do not name this session" });
+    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
+    await settle();
+    assert.equal(delayed.calls.length, 0);
+
+    await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
+    assert.match(runtime.operations.at(-1).message, /disabled/i);
+
+    await runtime.commands.get("session-metadata-enable").handler("", runtime.ctx);
+    assert.match(runtime.renderWorkflow(80), /◇ meta/);
+    await runtime.emit("input", { source: "interactive", text: "Name this session now" });
+    assert.equal(delayed.calls.length, 1);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("disabling session metadata invalidates an in-flight result", async () => {
+  const cwd = await project();
+  try {
+    const delayed = delayedModel();
+    const runtime = harness(cwd, [], undefined, delayed.call);
+    await runtime.emit("input", { source: "interactive", text: "Start naming this session" });
+    assert.equal(delayed.calls.length, 1);
+
+    await runtime.commands.get("session-metadata-disable").handler("", runtime.ctx);
+    await runtime.commands.get("session-metadata-enable").handler("", runtime.ctx);
+    delayed.calls[0].resolve("Stale Name");
+    await settle();
+
+    assert.equal(runtime.name, undefined);
+    assert.match(runtime.renderWorkflow(80), /◇ meta/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
 test("metadata status badge and command report timeout without login advice", async () => {
   const cwd = await project();
   try {
@@ -681,7 +723,30 @@ test("metadata status records parse failures separately from model failures", as
     await settle();
     assert.match(runtime.renderWorkflow(80), /◇! meta/);
     await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
-    assert.match(runtime.operations.at(-1).message, /parse/i);
+    const report = runtime.operations.at(-1).message;
+    assert.match(report, /parse/i);
+    assert.match(report, /Operation: session name/);
+    assert.match(report, /Expected: 1–3 words, at most 32 characters, using letters and numbers only/);
+    assert.match(report, /Received: This response has too many title words/);
+    assert.match(report, /No user action is required/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("attention parse status shows its contract and bounds rejected output", async () => {
+  const cwd = await project();
+  try {
+    const rejected = `not-json ${"x".repeat(600)}`;
+    const runtime = harness(cwd, [], "Existing", async () => metadataSuccess(rejected));
+    await runtime.emit("input", { source: "interactive", text: "Finish this operation" });
+    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
+    await settle();
+
+    await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
+    const report = runtime.operations.at(-1).message;
+    assert.match(report, /Operation: attention/);
+    assert.match(report, /Expected: null or JSON with kind, text, and confidence/);
+    assert.match(report, /Received: not-json/);
+    assert.ok(report.length < 1_000);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 

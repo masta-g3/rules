@@ -97,7 +97,7 @@ type RuntimeEventDetails = {
 };
 
 type MetadataIndicatorState = {
-	state: "ready" | "working" | "success" | "failure";
+	state: "disabled" | "ready" | "working" | "success" | "failure";
 	failureKind?: MetadataFailureKind | "parse";
 };
 
@@ -254,6 +254,7 @@ function renderRail(state: WorkflowState, theme: ExtensionContext["ui"]["theme"]
 }
 
 function renderMetadataBadge(theme: ExtensionContext["ui"]["theme"], metadata: MetadataIndicatorState): string {
+	if (metadata.state === "disabled") return theme.fg("dim", "◇– meta");
 	if (metadata.state === "working") return theme.fg("accent", "◆ meta");
 	if (metadata.state !== "failure") return theme.fg("dim", "◇ meta");
 	return metadata.failureKind === "authentication"
@@ -347,6 +348,22 @@ type MetadataStatus = MetadataIndicatorState & {
 };
 
 const METADATA_STATUS_ID = "session-metadata";
+const MAX_REJECTED_METADATA = 320;
+
+function rejectedMetadataText(raw: string | undefined): string {
+	const text = normalizeText(raw, MAX_REJECTED_METADATA + 1);
+	if (!text) return "(empty response)";
+	const characters = [...text];
+	return characters.length > MAX_REJECTED_METADATA
+		? `${characters.slice(0, MAX_REJECTED_METADATA).join("")}…`
+		: text;
+}
+
+function metadataParseContract(operation: MetadataOperation | undefined): string {
+	return operation === "attention"
+		? "null or JSON with kind, text, and confidence"
+		: "1–3 words, at most 32 characters, using letters and numbers only";
+}
 
 function metadataFailureNotice(kind: MetadataFailureKind | "parse"): string {
 	if (kind === "authentication") return "Session metadata authentication failed. Run /login openai-codex.";
@@ -357,6 +374,7 @@ function metadataFailureNotice(kind: MetadataFailureKind | "parse"): string {
 }
 
 function metadataStatusReport(status: MetadataStatus): string {
+	if (status.state === "disabled") return "Session metadata extension: disabled\nSession naming and attention model calls are off for this session.";
 	if (status.state === "ready") return "Session metadata extension: active\nNo metadata request has run in this session.";
 	if (status.state === "working") return `Session metadata: generating ${status.operation ?? "metadata"}`;
 	const result = status.result;
@@ -366,6 +384,10 @@ function metadataStatusReport(status: MetadataStatus): string {
 		result?.model ? `Model: ${result.model}` : undefined,
 		result ? `Latency: ${result.latencyMs} ms` : undefined,
 		status.parsedResult ? `Parsed result: ${status.parsedResult}` : undefined,
+		status.failureKind === "parse" ? `Reason: The model response did not match the ${status.operation ?? "metadata"} contract.` : undefined,
+		status.failureKind === "parse" ? `Expected: ${metadataParseContract(status.operation)}` : undefined,
+		status.failureKind === "parse" ? `Received: ${rejectedMetadataText(result?.text)}` : undefined,
+		status.failureKind === "parse" ? "Action: No user action is required. Retry the operation; persistent failures need a prompt or parser fix." : undefined,
 		result?.failure?.message ? `Error: ${result.failure.message}` : undefined,
 		result?.attempts.length ? `Attempts: ${result.attempts.map((attempt) => `${attempt.model} ${attempt.failure?.kind ?? attempt.outcome} (${attempt.latencyMs} ms)`).join(", ")}` : undefined,
 		result?.skippedModels.length ? `Skipped: ${result.skippedModels.join(", ")}` : undefined,
@@ -388,8 +410,10 @@ export default function workflowRuntime(
 	let attentionGenerationDone = -1;
 	let latestUserRequest: string | undefined;
 	let deferredWorkflowInputs: Array<{ name: string; ticketId?: string; text: string }> = [];
+	let metadataEnabled = true;
 	let metadataStatus: MetadataStatus = { state: "ready" };
 	let settledMetadataStatus = metadataStatus;
+	let metadataEpoch = 0;
 	let metadataRequest = 0;
 	let settledMetadataRequest = 0;
 	let lastMetadataWarning: MetadataFailureKind | "parse" | undefined;
@@ -424,7 +448,9 @@ export default function workflowRuntime(
 		maxTokens: 64 | 128,
 		parse: (raw: string) => T | undefined,
 	): Promise<T | undefined> => {
+		if (!metadataEnabled) return undefined;
 		const requestGeneration = generation;
+		const requestEpoch = metadataEpoch;
 		const requestId = ++metadataRequest;
 		metadataStatus = { state: "working", operation };
 		applyMetadataStatus(ctx);
@@ -440,6 +466,7 @@ export default function workflowRuntime(
 				skippedModels: [],
 			};
 		}
+		if (!metadataEnabled || requestEpoch !== metadataEpoch) return undefined;
 		if (requestGeneration !== generation) {
 			if (requestId === metadataRequest) {
 				metadataStatus = settledMetadataStatus;
@@ -534,7 +561,7 @@ export default function workflowRuntime(
 	};
 
 	const generateName = async (ctx: ExtensionContext, source: string, explicit: boolean) => {
-		if (!source || (!explicit && automaticNamingStarted)) return false;
+		if (!metadataEnabled || !source || (!explicit && automaticNamingStarted)) return false;
 		if (!explicit) automaticNamingStarted = true;
 		const requestGeneration = explicit ? ++generation : generation;
 		const initialName = pi.getSessionName();
@@ -588,6 +615,33 @@ export default function workflowRuntime(
 		},
 	});
 
+	pi.registerCommand("session-metadata-disable", {
+		description: "Disable session naming and attention model calls",
+		handler: async (_args, ctx) => {
+			if (!metadataEnabled) return ctx.ui.notify("Session metadata is already disabled.", "info");
+			metadataEnabled = false;
+			metadataEpoch += 1;
+			metadataRequest += 1;
+			settledMetadataRequest = metadataRequest;
+			metadataStatus = { state: "disabled" };
+			settledMetadataStatus = metadataStatus;
+			applyMetadataStatus(ctx);
+			ctx.ui.notify("Session metadata disabled for this session.", "info");
+		},
+	});
+
+	pi.registerCommand("session-metadata-enable", {
+		description: "Enable session naming and attention model calls",
+		handler: async (_args, ctx) => {
+			if (metadataEnabled) return ctx.ui.notify("Session metadata is already enabled.", "info");
+			metadataEnabled = true;
+			metadataStatus = { state: "ready" };
+			settledMetadataStatus = metadataStatus;
+			applyMetadataStatus(ctx);
+			ctx.ui.notify("Session metadata enabled for this session.", "info");
+		},
+	});
+
 	pi.registerCommand("session-metadata-status", {
 		description: "Show the latest session metadata model attempt",
 		handler: async (_args, ctx) => ctx.ui.notify(metadataStatusReport(metadataStatus), "info"),
@@ -597,6 +651,7 @@ export default function workflowRuntime(
 		description: "Regenerate the native Pi session name (usage: /session-name refresh)",
 		handler: async (args, ctx) => {
 			if (args.trim() !== "refresh") return ctx.ui.notify("Usage: /session-name refresh", "warning");
+			if (!metadataEnabled) return ctx.ui.notify("Session metadata is disabled. Run /session-metadata-enable first.", "warning");
 			if (ticketContext) {
 				const ticketId = ticketContext.id;
 				const ok = await selectTicket(ctx, ticketId, true, currentAttention, true);
@@ -986,6 +1041,8 @@ export default function workflowRuntime(
 
 	pi.on("session_start", async (event, ctx) => {
 		generation += 1;
+		metadataEnabled = true;
+		metadataEpoch += 1;
 		metadataRequest += 1;
 		settledMetadataRequest = metadataRequest;
 		modelCall.reset?.();
