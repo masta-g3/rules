@@ -11,11 +11,13 @@ Update durable documentation and agent guidance after implementation has passed 
 
 The step starts with `reviewing-guidance` as its default activity.
 
-1. Inspect the active plan, review output, the conversation with the user, `git status --short`, and changed files.
+Reflection captures durable decision-making context, not project state. Record only stable guidance that future maintainers cannot reliably infer from the code and that would change a future decision. Omit temporary status, pending work, session history, and implementation details.
+
+1. Inspect the active plan, review output, the conversation with the user and the sesion logs.
 2. Identify the highest-value durable documentation gaps by asking: what missing context could cause future users, maintainers, or agents to make wrong decisions, and who would act differently if it were documented? Route each gap to its owner:
    - project purpose, target user, project type, project stage, operating assumptions, or shared terminology → `CONTEXT.md`
    - users/operators → `README.md`
-   - human developers learning architecture/layout/core patterns → `docs/STRUCTURE.md`
+   - high level developers learning architecture/layout/core patterns → `docs/STRUCTURE.md`
    - product/API/design truth → the relevant domain doc
    - recurring agent mistakes, user corrections, review findings, or counterintuitive workflow pitfalls → the project-local `AGENTS.md`
    - repeatable project workflows already encoded in project-local skills or agent configuration → update the owning file; do not create new skills or modify user-global configuration unless explicitly requested

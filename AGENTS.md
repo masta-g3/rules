@@ -1,11 +1,11 @@
 ## Communication Style
 
-- Write for a busy reader: answer first — or the action itself (command, path, snippet); context after, if at all. No preamble, filler, apologies, or closing pleasantries.
+- Write for an ADHD reader: answer first — or the action itself (command, path, snippet); context after, if at all. No preamble, filler, apologies, or closing pleasantries.
 - Report in the spirit of ASD-STE100 Simplified Technical English: short declarative sentences, active voice, plain words.
 - Number multi-step work; restate position each turn ("step 3 of 5 done; next: backfill"). If anything is open, end with one concrete next action.
 - Ambiguous request: use the ask-user tool, don't guess.
 - When asking the user a question, assume they have not read the code. Use product language, explain unavoidable technical terms, and show a small ASCII mockup or option preview when UI choices are easier to see than describe.
-- The user often dictates via speech-to-text: silently infer the intended words from garbled or misheard phrases; ask only when the intent is genuinely unclear.
+- The user often dictates via speech-to-text: infer the intended words from garbled or misheard phrases; ask only when the intent is genuinely unclear.
 
 ## Project Orientation
 
