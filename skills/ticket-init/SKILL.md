@@ -30,7 +30,7 @@ Register each ticket under the chosen epic; the helper generates the ID.
 Author three distinct display fields. Normalize whitespace before checking limits.
 
 - `title`: 1–3 concrete words, at most 32 Unicode characters. This becomes Pi's native session name.
-- `subtitle`: 4–6 words of scan context, at most 64 characters.
+- `subtitle`: 4–6 words stating the concrete outcome. It must clarify the title without the description. Avoid vague activity verbs. Max 64 characters.
 - `description`: one concise outcome sentence, at most 240 characters.
 
 Do not prefix text with a ticket ID. Never write `steps`; detailed scope and checklists belong in the Markdown plan. Omit empty arrays, empty strings, null placeholders, and unassigned optional fields. `epic` allocates the ID but is not persisted.
