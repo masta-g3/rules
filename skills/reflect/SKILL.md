@@ -11,7 +11,7 @@ Update durable documentation and agent guidance after implementation has passed 
 
 The step starts with `reviewing-guidance` as its default activity.
 
-Reflection captures durable decision-making context, not project state. Record only stable guidance that future maintainers cannot reliably infer from the code and that would change a future decision. Omit temporary status, pending work, session history, and implementation details.
+Reflection is a conservative, scoped pass. Record only stable guidance that future maintainers cannot infer from the code and that changes future decisions. Review only documents and sections related to the current work. Before adding text, delete, shorten, generalize, or replace stale, duplicated, over-specific, or obsolete guidance. Omit temporary status, pending work, session history, and implementation details.
 
 1. Inspect the active plan, review output, the conversation with the user and the sesion logs.
 2. Identify the highest-value durable documentation gaps by asking: what missing context could cause future users, maintainers, or agents to make wrong decisions, and who would act differently if it were documented? Route each gap to its owner:
