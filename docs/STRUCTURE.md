@@ -30,7 +30,8 @@ rules/
 │   ├── review/
 │   ├── test-coverage/
 │   ├── ticket-init/
-│   └── workflow-orchestrator/
+│   ├── workflow-orchestrator/
+│   └── write-pr/
 ├── agents/             # Shared reviewer subagents synced to supported harnesses
 ├── extensions/         # Pi-only runtime extensions synced to ~/.pi/agent/extensions/
 ├── pi/                 # Pi-only prompt assets

@@ -78,4 +78,4 @@ For plans involving architectural decisions, multi-file changes, or complex logi
 
 ### Output
 
-For successful planning, call `set_workflow_activity` with `plan-ready` when available, report the plan path, include a `Summary:` line with 1-2 sentences on the planned approach, then end with `READY FOR EXECUTE`. If planning is blocked, report `BLOCKED — <reason>`.
+For successful planning, call `set_workflow_activity` with `plan-ready` when available, report the plan path, include a `Summary:` line with a couple of lines summarizing the steps of the planned approach, then end with `READY FOR EXECUTE`. If planning is blocked, report `BLOCKED — <reason>`.

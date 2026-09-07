@@ -31,6 +31,7 @@ EXPECTED_SKILL_THINKING = {
     "ticket-init": "low",
     "unslop": "minimal",
     "workflow-orchestrator": "medium",
+    "write-pr": "low",
 }
 VALID_THINKING_LEVELS = {"off", "minimal", "low", "medium", "high", "xhigh"}
 

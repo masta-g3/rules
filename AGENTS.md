@@ -1,11 +1,12 @@
-## Communication Style
+## Communication Style & User Interaction
 
-- Write for an ADHD reader: answer first — or the action itself (command, path, snippet); context after, if at all. No preamble, filler, apologies, or closing pleasantries.
+- Write for an ADHD reader: answer first — or the action itself (command, path, snippet); context after, if at all.
 - Report in the spirit of ASD-STE100 Simplified Technical English: short declarative sentences, active voice, plain words.
 - Number multi-step work; restate position each turn ("step 3 of 5 done; next: backfill"). If anything is open, end with one concrete next action.
 - Ambiguous request: use the ask-user tool, don't guess.
 - When asking the user a question, assume they have not read the code. Use product language, explain unavoidable technical terms, and show a small ASCII mockup or option preview when UI choices are easier to see than describe.
 - The user often dictates via speech-to-text: infer the intended words from garbled or misheard phrases; ask only when the intent is genuinely unclear.
+- When the user's prompt indicates a request for action, such as "can you...", "I want to...", "help me..." and similar expressions, treat these as instructions to do the work and take action. Do not stop at acknowledging capability (e.g. "Yes…"), proposing a plan, or offering to continue. Do not settle for a partial or "helpful enough" solution that does not fully satisfy the user's task to save time, effort or tokens. If a task requires sustained work, complete all the necessary work until the intended outcome is fulfilled.
 
 ## Project Orientation
 
@@ -22,23 +23,21 @@
 
 ## Implementation Principles
 
-- Apply via negativa: first ask what can be removed, simplified, or left undone. Add code, abstractions, dependencies, tests, or documentation only when subtraction cannot solve the problem.
-- Prefer the simplest fundamental solution for the current context over the quickest local patch. Replace obsolete code or text instead of appending parallel versions.
-- Unless the repo style dictates it, prefer a minimalistic functional programming approach over complex over-abstracted OOP.
-- Avoid enterprise bloat, boilerplate, thin wrappers, and unnecessary abstractions.
-- If an approach is not working, report and brainstorm with the user instead of forcing a brittle implementation.
-- Do not introduce new patterns unless strictly needed. If you need to do so, discuss it with the user.
-- Keep function names direct and simple; avoid names like `enhanced` or `new`.
-- Comment only non-obvious logic; avoid changelog-style comments.
-- Skip redundant validations unless failure has real consequences.
-- Let errors surface naturally. Avoid blanket `try/except`, especially `pass`.
-- Avoid fallback mechanisms, mock data, inferred defaults, or backward compatibility layers unless explicitly requested.
+- Prefer subtraction and the simplest solution that meets the requirement. Remove obsolete code instead of adding parallel abstractions.
+- Avoid unnecessary patterns, abstractions, dependencies, boilerplate, and enterprise-style structure. Use functional code when it fits the existing project style.
+- If the simple approach fails, stop and discuss the trade-offs instead of forcing a brittle solution.
+- Introduce new patterns only when necessary; discuss them first.
+- Use direct function names. Avoid names such as `enhanced` or `new`.
+- Comment only non-obvious logic. Do not add changelog-style comments.
+- Add validation only when failure has meaningful consequences. Let ordinary errors surface naturally; avoid blanket `try/except` blocks.
+- Do not add fallbacks, mock data, inferred defaults, or compatibility layers unless explicitly requested.
 
 ## Testing
 
 - Follow **Test Driven Development**: write tests first, iterate until passing.
 - Use ephemeral tests to validate features; remove all temporary test code and artifacts when done.
-- Keep only durable tests focused on current product contracts and likely regressions. Remove implementation-phase tests/files that only verified progress or that are too specific to situations unlikely to recur.
+- Do not write tests for reversible, low-impact changes that mirror the implementation. If you do choose to verify your work with tests, make sure that the tests are meaningful and necessary to verify implementation.
+- Run tests appropriate to the change and complete required checks. Once those pass, broaden or repeat testing only when new changes, failures, or unresolved concerns justify it; otherwise, continue toward completing the task.
 
 ## Tracked Work State
 
