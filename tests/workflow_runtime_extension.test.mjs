@@ -131,6 +131,143 @@ async function project() {
   return cwd;
 }
 
+const FORK_COMPACT_ENV = "PI_AGENT_HUB_FORK_COMPACT";
+const RESET_CAPABILITY = Symbol.for("pi-agent-hub.workflow-reset.v1");
+
+async function withForkCompactAttempt(attemptId, run) {
+  const previous = process.env[FORK_COMPACT_ENV];
+  process.env[FORK_COMPACT_ENV] = attemptId;
+  try {
+    return await run();
+  } finally {
+    if (previous === undefined) delete process.env[FORK_COMPACT_ENV];
+    else process.env[FORK_COMPACT_ENV] = previous;
+    delete globalThis[RESET_CAPABILITY];
+  }
+}
+
+test("compact-fork startup clears inherited producer state before its exact receipt", async () => {
+  const cwd = await project();
+  const attemptId = "4ebbf00d-35f9-49a2-b513-a79b3432e402";
+  try {
+    await withForkCompactAttempt(attemptId, async () => {
+      const runtime = harness(cwd, [
+        { type: "custom", customType: "workflow-runtime", data: {
+          activeStep: "execute", ticketId: "meta-001", currentStepComplete: true,
+          activity: { id: "implementation", label: "Implementing" },
+          plan: { tasks: { completed: 1, total: 2 } },
+          execution: { mode: "focus", scope: "execute", runId: "old-run", turnsCompleted: 2 },
+        } },
+        { type: "custom", customType: "pi-agent-hub-context", data: {
+          version: 1, updatedAt: 10,
+          ticket: { id: "meta-001", subtitle: "Old task", description: "Old description" },
+          attention: { kind: "blocked", text: "Old blocker" },
+        } },
+      ], "Metadata redesign");
+
+      assert.equal(process.env[FORK_COMPACT_ENV], attemptId);
+      assert.equal(globalThis[RESET_CAPABILITY]?.version, 1);
+      // Another extension may consume the shared launch marker in its startup handler first.
+      delete process.env[FORK_COMPACT_ENV];
+      await runtime.emit("session_start", { reason: "startup" });
+
+      assert.equal(process.env[FORK_COMPACT_ENV], undefined);
+      assert.equal(runtime.latest("workflow-runtime").activeStep, undefined);
+      assert.equal(runtime.latest("workflow-runtime").ticketId, undefined);
+      assert.equal(runtime.latest("workflow-runtime").execution, undefined);
+      assert.equal(runtime.latest("workflow-runtime").plan, undefined);
+      assert.equal(runtime.latest("pi-agent-hub-context").ticket, undefined);
+      assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
+      assert.deepEqual(runtime.latest("workflow-runtime-reset"), { version: 1, id: attemptId, status: "ready" });
+      const resetAppends = runtime.operations.filter((item) => item.kind === "append").slice(-3);
+      assert.deepEqual(resetAppends.map((item) => item.customType), [
+        "pi-agent-hub-context", "workflow-runtime", "workflow-runtime-reset",
+      ]);
+      assert.equal(runtime.name, "Metadata redesign");
+
+      const receiptCount = runtime.branch.filter((entry) => entry.customType === "workflow-runtime-reset").length;
+      await runtime.emit("session_start", { reason: "resume" });
+      assert.equal(runtime.branch.filter((entry) => entry.customType === "workflow-runtime-reset").length, receiptCount);
+      await runtime.emit("session_shutdown", { reason: "quit" });
+      assert.equal(globalThis[RESET_CAPABILITY], undefined);
+    });
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("compact-fork startup rejects malformed and oversized attempt tokens", async () => {
+  const cwd = await project();
+  try {
+    for (const token of ["1", "bad token has spaces", "x".repeat(81)]) {
+      await withForkCompactAttempt(token, async () => {
+        const runtime = harness(cwd, [{ type: "custom", customType: "workflow-runtime", data: { activeStep: "execute", ticketId: "meta-001" } }]);
+        await runtime.emit("session_start", { reason: "startup" });
+        assert.equal(runtime.latest("workflow-runtime-reset"), undefined);
+        await runtime.emit("session_shutdown", { reason: "quit" });
+      });
+    }
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("compact-fork reset rejects stale asynchronous metadata results", async () => {
+  const cwd = await project();
+  const delayed = delayedModel();
+  try {
+    await withForkCompactAttempt("f32fc683-cf3d-4af0-b97a-02d02ba09999", async () => {
+      const runtime = harness(cwd, [], undefined, delayed.call);
+      await runtime.emit("input", { source: "interactive", text: "Please name this session." });
+      assert.equal(delayed.calls.length, 1);
+
+      await runtime.emit("session_start", { reason: "startup" });
+      delayed.calls[0].resolve("Stale inherited name");
+      await settle();
+
+      assert.equal(runtime.name, undefined);
+      assert.equal(runtime.latest("pi-agent-hub-context").ticket, undefined);
+      assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
+      assert.equal(runtime.latest("workflow-runtime").execution, undefined);
+    });
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("failed reset receipt cannot reuse its launch token on another session boundary", async () => {
+  const cwd = await project();
+  try {
+    await withForkCompactAttempt("f32fc683-cf3d-4af0-b97a-02d02ba09998", async () => {
+      const runtime = harness(cwd);
+      const append = runtime.branch.push;
+      runtime.branch.push = function(entry) {
+        if (entry.customType === "workflow-runtime-reset") throw new Error("receipt write failed");
+        return append.call(this, entry);
+      };
+      await assert.rejects(() => runtime.emit("session_start", { reason: "startup" }), /receipt write failed/);
+      runtime.branch.push = append;
+      runtime.branch.push({ type: "custom", customType: "workflow-runtime", data: { activeStep: "review", ticketId: "other-001" } });
+      await runtime.emit("session_start", { reason: "resume" });
+      assert.equal(runtime.latest("workflow-runtime").ticketId, "other-001");
+      assert.equal(runtime.latest("workflow-runtime-reset"), undefined);
+      await runtime.emit("session_shutdown", { reason: "quit" });
+    });
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("capability cleanup respects a later producer registration", async () => {
+  const cwd = await project();
+  try {
+    const first = harness(cwd);
+    const firstCapability = globalThis[RESET_CAPABILITY];
+    const second = harness(cwd);
+    const secondCapability = globalThis[RESET_CAPABILITY];
+    assert.notEqual(firstCapability, secondCapability);
+    await first.emit("session_shutdown", { reason: "quit" });
+    assert.equal(globalThis[RESET_CAPABILITY], secondCapability);
+    await second.emit("session_shutdown", { reason: "quit" });
+    assert.equal(globalThis[RESET_CAPABILITY], undefined);
+  } finally {
+    delete globalThis[RESET_CAPABILITY];
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test("plan widget and todo drawer remain bounded and read only", () => {
   const theme = { fg: (_token, text) => text, bold: (text) => text };
   const projection = { phase: { index: 1, count: 2, title: "Foundation" }, tasks: { completed: 1, total: 3 }, nextStep: "Add tests" };
