@@ -57,6 +57,10 @@ import { TodoPanel, TODO_PANEL_OVERLAY_OPTIONS, TODO_PANEL_SHORTCUT } from "./to
 
 const ENTRY_TYPE = "workflow-runtime";
 const EVENT_TYPE = "workflow-runtime-event";
+const RESET_ENTRY_TYPE = "workflow-runtime-reset";
+const FORK_COMPACT_ENV = "PI_AGENT_HUB_FORK_COMPACT";
+const RESET_CAPABILITY = Symbol.for("pi-agent-hub.workflow-reset.v1");
+const FORK_COMPACT_ATTEMPT = /^[A-Za-z0-9_-]{16,80}$/;
 const SKILL_PREFIX = /^\/skill:([a-z0-9-]+)(?:\s|$)/;
 const FOCUS_SKILL = "focus";
 const TICKET_PATTERN = /\b([a-z][a-z0-9-]*-\d{3})\b/i;
@@ -400,6 +404,14 @@ export default function workflowRuntime(
 	dependencies: { modelCall?: SessionModelCall } = {},
 ): void {
 	const modelCall = dependencies.modelCall ?? createSessionModelCall();
+	const rawForkCompactAttempt = process.env[FORK_COMPACT_ENV];
+	const forkCompactAttempt = rawForkCompactAttempt && FORK_COMPACT_ATTEMPT.test(rawForkCompactAttempt)
+		? rawForkCompactAttempt
+		: undefined;
+	const capability = { version: 1 as const };
+	const capabilities = globalThis as typeof globalThis & Record<PropertyKey, unknown>;
+	capabilities[RESET_CAPABILITY] = capability;
+	let forkCompactHandled = false;
 	let state: WorkflowState = {};
 	let ticketContext: TicketContext | undefined;
 	let recoveryPending = false;
@@ -1040,6 +1052,9 @@ export default function workflowRuntime(
 	});
 
 	pi.on("session_start", async (event, ctx) => {
+		const compactForkStartup = forkCompactAttempt !== undefined && !forkCompactHandled;
+		if (compactForkStartup) forkCompactHandled = true;
+		if (rawForkCompactAttempt !== undefined) delete process.env[FORK_COMPACT_ENV];
 		generation += 1;
 		metadataEnabled = true;
 		metadataEpoch += 1;
@@ -1054,28 +1069,35 @@ export default function workflowRuntime(
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
 		const branch = ctx.sessionManager.getBranch();
-		const restoredContext = event.reason === "new" || event.reason === "fork" ? undefined : findLatestContext(branch);
+		const startsEmpty = compactForkStartup || event.reason === "new" || event.reason === "fork";
+		const restoredContext = startsEmpty ? undefined : findLatestContext(branch);
 		const restoredRequestQuestion = restoredContext?.attention?.kind === "question" && restoredContext.attention.requestId !== undefined;
 		currentAttention = restoredRequestQuestion ? undefined : restoredContext?.attention;
 		if (restoredRequestQuestion) pi.appendEntry(CONTEXT_ENTRY_TYPE, contextSnapshot(restoredContext?.ticket));
 		const restored = event.reason === "new" ? { state: {} } : findLatestState(branch);
-		const result = transition(restored.state, { type: "session-boundary", reason: event.reason });
+		const boundaryReason = compactForkStartup ? "fork" : event.reason;
+		const result = transition(restored.state, { type: "session-boundary", reason: boundaryReason });
 		const normalizeDefinition = shouldNormalizeWorkflowDefinition(
 			{ ...restored.state, steps: restored.steps },
-			event.reason,
+			boundaryReason,
 		);
-		if (event.reason === "new" || event.reason === "fork") {
+		if (startsEmpty) {
 			automaticNamingStarted = false;
+			if (compactForkStartup) latestUserRequest = undefined;
 			ticketContext = undefined;
-			if (event.reason === "fork") publishContext();
+			if (compactForkStartup || event.reason === "fork") publishContext();
 		}
-		if (event.reason === "fork" || result.effects.length || normalizeDefinition) {
+		if (compactForkStartup || event.reason === "fork" || result.effects.length || normalizeDefinition) {
 			state = setState(pi, ctx, result.state);
 			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
 		} else {
 			state = result.state;
 			applyWidget(ctx, state, metadataStatus);
 			applyPlanWidget(ctx, state.plan);
+		}
+		if (compactForkStartup) {
+			pi.appendEntry(RESET_ENTRY_TYPE, { version: 1, id: forkCompactAttempt, status: "ready" });
+			return;
 		}
 		if (event.reason !== "new" && event.reason !== "fork") {
 			const ticketId = state.ticketId ?? restoredContext?.ticket?.id;
@@ -1095,5 +1117,6 @@ export default function workflowRuntime(
 		}
 		syncFocusPulse(false);
 		activeTui = undefined;
+		if (capabilities[RESET_CAPABILITY] === capability) delete capabilities[RESET_CAPABILITY];
 	});
 }
