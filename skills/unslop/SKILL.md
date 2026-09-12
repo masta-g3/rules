@@ -1,8 +1,6 @@
 ---
 name: unslop
-description: Cut AI tells from any writing. Must always apply.
-metadata:
-  thinkingLevel: minimal
+description: Cut AI tells from prose, presentations, PRs, and similar long-form writing.
 ---
 
 # Unslop

@@ -1,8 +1,6 @@
 ---
 name: docs-health
 description: Assess durable documentation health, propose focused fixes, implement on confirmation.
-metadata:
-  thinkingLevel: high
 ---
 
 Assess durable documentation health and propose focused edits that would help future readers act correctly.

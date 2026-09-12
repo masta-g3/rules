@@ -1,8 +1,6 @@
 ---
 name: write-pr
 description: Use when writing or editing a pull request title or body.
-metadata:
-  thinkingLevel: low
 ---
 
 Title: one sentence, imperative, describing the objective. Body: bullets and visuals, no essays. Pick the smallest view that makes the key point clear.

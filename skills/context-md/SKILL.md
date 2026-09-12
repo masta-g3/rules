@@ -2,8 +2,6 @@
 name: context-md
 description: Create or refresh root CONTEXT.md for an existing project by investigating the repo, forming context hypotheses, and interviewing the user.
 argument-hint: "[optional focus]"
-metadata:
-  thinkingLevel: high
 ---
 
 Create or update only root `CONTEXT.md`. Do not scaffold the project, create tickets, or update unrelated docs.

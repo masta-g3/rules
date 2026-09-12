@@ -3,8 +3,6 @@ name: ticket-init
 description: Add one or more tickets to agent-work/features.yaml.
 argument-hint: "[ticket description(s) in natural language]"
 disable-model-invocation: true
-metadata:
-  thinkingLevel: low
 ---
 
 Given the provided ticket request(s), add one or more feature entries to `agent-work/features.yaml`.

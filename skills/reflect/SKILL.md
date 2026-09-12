@@ -1,45 +1,43 @@
 ---
 name: reflect
 description: Reflect on reviewed work and update durable docs or agent guidance before commit.
-metadata:
-  thinkingLevel: medium
 ---
 
-Update durable documentation and agent guidance after implementation has passed review, so docs describe the final reviewed result.
+After implementation passes review, update durable docs and agent guidance to match the reviewed result.
 
 ### Process
 
 The step starts with `reviewing-guidance` as its default activity.
 
-Reflection is a conservative, scoped pass. Record only stable guidance that future maintainers cannot infer from the code and that changes future decisions. Review only documents and sections related to the current work. Before adding text, delete, shorten, generalize, or replace stale, duplicated, over-specific, or obsolete guidance. Omit temporary status, pending work, session history, and implementation details.
+Review only docs and sections related to the current work. Keep guidance only if it changes future decisions, remains useful, and cannot be inferred from the code. Before adding text, remove duplicates and delete or rewrite outdated or overly specific guidance. Leave out temporary status, pending work, session history, and implementation details.
 
-1. Inspect the active plan, review output, the conversation with the user and the sesion logs.
-2. Identify the highest-value durable documentation gaps by asking: what missing context could cause future users, maintainers, or agents to make wrong decisions, and who would act differently if it were documented? Route each gap to its owner:
+1. Read the active plan, review output, user conversation, and session logs.
+2. Find missing context that could lead users, maintainers, or agents to make wrong decisions. Prioritize gaps by who would act differently with that context. Update the file that owns it:
    - project purpose, target user, project type, project stage, operating assumptions, or shared terminology → `CONTEXT.md`
-   - users/operators → `README.md`
-   - high level developers learning architecture/layout/core patterns → `docs/STRUCTURE.md`
-   - product/API/design truth → the relevant domain doc
-   - recurring agent mistakes, user corrections, review findings, or counterintuitive workflow pitfalls → the project-local `AGENTS.md`
-   - repeatable project workflows already encoded in project-local skills or agent configuration → update the owning file; do not create new skills or modify user-global configuration unless explicitly requested
-3. For non-trivial durable doc/guidance edits, call `updating-guidance` when available before edits, then invoke the `docs-critic` subagent. Skip when there are no edits or only tiny mechanical fixes such as typos, links, paths, or formatting. Act on its feedback per the AGENTS.md critic rule; deleting the update is acceptable when the critique shows it is not worth keeping.
+   - user or operator instructions → `README.md`
+   - architecture, layout, or core patterns for developers → `docs/STRUCTURE.md`
+   - product behavior, API contracts, or design decisions → the relevant domain doc
+   - recurring agent mistakes, user corrections, review findings, or unexpected workflow pitfalls → the project-local `AGENTS.md`
+   - repeatable project workflows already defined in local skills or agent configuration → the owning file. Do not create skills or change user-global configuration unless explicitly requested.
+3. For substantive edits, call `updating-guidance` when available before editing. Then invoke the `docs-critic` subagent. Skip both for no edits or minor fixes to typos, links, paths, or formatting. Follow the critic rule in `AGENTS.md`. Delete an update if the critique shows it is not worth keeping.
 
-### Editing Rules
+### Editing rules
 
-- Add only the delta that will change future behavior. Prefer editing, replacing, or deleting stale text over appending, and never duplicate what a doc already says.
-- Docs describe current state, not history — no migration, compatibility, or "previously..." notes unless a public contract or operator action depends on them.
-- If a learning fits both a domain doc and `AGENTS.md`, put the full truth in the domain doc and add a short `AGENTS.md` pointer only if agents are likely to miss it.
-- Treat project-local `AGENTS.md` as compact task-execution guardrails, not an append-only memory log: edit, merge, tighten, move to `docs/STRUCTURE.md`, or delete existing guidance before adding a rule.
-- Update `CONTEXT.md` only when project meaning, audience, stage, assumptions, or terminology changes — never for implementation summaries, change history, or general programming terms.
-- Before non-mechanical edits to `CONTEXT.md` or the project-local `AGENTS.md`, batch the proposed changes into one confirmation, unless the user explicitly requested them in the current conversation. Prefer the harness's structured question tool; ask with a concise message only when the tool is unavailable or nuanced feedback is needed.
+- Add only what will change future behavior. Revise or delete stale text before appending. Do not repeat what a doc already says.
+- Describe current state, not history. Include migration, compatibility, or "previously..." notes only when a public contract or operator action depends on them.
+- If guidance fits both a domain doc and `AGENTS.md`, put the details in the domain doc. Add a short pointer in `AGENTS.md` only if agents are likely to miss it.
+- Keep project-local `AGENTS.md` focused on task execution, not session memory. Before adding a rule, edit, merge, shorten, delete, or move existing guidance to `docs/STRUCTURE.md` as appropriate.
+- Update `CONTEXT.md` only when project meaning, audience, stage, assumptions, or terminology changes. Do not add implementation summaries, change history, or general programming terms.
+- Before substantive edits to `CONTEXT.md` or project-local `AGENTS.md`, ask for confirmation of all proposed changes together. Skip confirmation only if the user explicitly requested those changes in the current conversation. Use the harness's structured question tool. Use a concise message only if the tool is unavailable or the question needs nuanced feedback.
 
 ### Boundaries
 
-Only update durable docs/guidance. Do not change code, tracked state, archives, or commits. Do not add docs just to summarize the implementation. Workflow artifacts belong in `agent-work/`; `docs/` is for durable documentation.
+Update only durable docs and agent guidance. Do not change code, tracked state, archives, or commits. Do not add docs just to summarize the implementation. Keep workflow artifacts in `agent-work/` and durable documentation in `docs/`.
 
 ### Output
 
 Before a successful report, call `set_workflow_activity` with `reflection-complete` when available. Report one of:
 
-- `READY FOR COMMIT` — include a `Summary:` line with 1-2 sentences on docs/guidance updated before the handoff label, then list docs updated
-- `NO REFLECTION UPDATES — READY FOR COMMIT` — include a `Summary:` line with 1-2 sentences explaining why no durable updates were needed before the handoff label
-- `REFLECTION BLOCKED` — explain the decision needed
+- `READY FOR COMMIT`. Before the label, include a `Summary:` line with 1-2 sentences describing the updates. After the label, list the docs changed.
+- `NO REFLECTION UPDATES — READY FOR COMMIT`. Before the label, include a `Summary:` line with 1-2 sentences explaining why no durable updates were needed.
+- `REFLECTION BLOCKED`. Explain the decision needed.

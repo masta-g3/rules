@@ -1,8 +1,6 @@
 ---
 name: next-feature
 description: Select the next feature to implement from agent-work/features.yaml.
-metadata:
-  thinkingLevel: medium
 ---
 
 ### 1. Review State

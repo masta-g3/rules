@@ -1,8 +1,6 @@
 ---
 name: focus
 description: Autonomous mode for long-running bounded work until completion or a real blocker.
-metadata:
-  thinkingLevel: medium
 ---
 
 `focus` continues an approved, bounded task likely to span multiple turns without immediate user input.

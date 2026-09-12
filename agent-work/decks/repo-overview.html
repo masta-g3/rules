@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Agent rules · Repository overview</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --paper:#edeff1; --surface:#f7f8f9; --ink:#14181c; --muted:#59636b; --rule:#c9d0d6;
+  --gate:#2a3bc8; --gate-bg:#e1e5fb;
+  --body:system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  --s1:4px; --s2:8px; --s3:12px; --s4:20px; --s5:32px; --s6:56px; --s7:88px;
+  --small:.8rem; --text:clamp(1rem,.9rem + .3vw,1.2rem); --sub:clamp(1.3rem,1rem + .7vw,1.8rem);
+  --title:clamp(2rem,1.1rem + 3.2vw,4.5rem); --line:1px; --focus:3px;
+  --width:1240px; --pad:clamp(20px,5vw,88px); --nav-height:64px;
+}
+@media(prefers-color-scheme:dark){:root{--paper:#10151a;--surface:#171d23;--ink:#e8edf2;--muted:#98a5af;--rule:#2a333b;--gate:#93a4ff;--gate-bg:#1b2340}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:var(--nav-height)}
+body{margin:0;background:var(--paper);color:var(--ink);font:var(--text)/1.5 var(--body)}
+h1,h2,h3,p,ol,ul{margin:0}h1,h2{font:500 var(--title)/1.1 var(--mono);letter-spacing:-.04em;max-width:22ch;text-wrap:balance}
+h3{font-size:var(--sub);font-weight:600}code,.eyebrow,.index,.step-name{font-family:var(--mono)}
+a{color:inherit;text-underline-offset:var(--s1)}a:focus-visible{outline:var(--focus) solid var(--gate);outline-offset:var(--s1)}
+.topbar{position:sticky;top:0;z-index:2;min-height:var(--nav-height);display:flex;justify-content:space-between;align-items:center;gap:var(--s4);padding:var(--s3) var(--pad);background:var(--paper);border-bottom:var(--line) solid var(--rule);font:var(--small)/1.4 var(--mono)}
+.brand{text-decoration:none}.nav{display:flex;gap:var(--s2)}.nav a{padding:var(--s2) var(--s3);text-decoration:none;border-bottom:var(--line) solid transparent}.nav a[aria-current="location"]{border-color:var(--ink);font-weight:700}
+.skip{position:fixed;top:var(--s2);left:var(--s2);z-index:5;padding:var(--s3);background:var(--surface);transform:translateY(-200%)}.skip:focus{transform:none}
+.slide{min-height:calc(100svh - var(--nav-height));padding:var(--s6) var(--pad);display:flex;align-items:center;border-bottom:var(--line) solid var(--rule);scroll-margin-top:var(--nav-height)}
+.inner{width:100%;max-width:var(--width);margin:auto;display:grid;gap:var(--s5)}
+.eyebrow{font-size:var(--small);color:var(--muted);display:flex;gap:var(--s4)}
+.lead{max-width:62ch;color:var(--muted)}.caption{color:var(--muted);font-size:var(--small)}
+.example{display:grid;grid-template-columns:1fr 1.5fr;gap:var(--s6);border-top:var(--line) solid var(--rule);padding-top:var(--s5)}
+.request{display:grid;align-content:start;gap:var(--s4)}.request blockquote{margin:0;font-size:var(--sub);max-width:24ch}
+.outcomes{list-style:none;padding:0;display:grid;gap:var(--s4)}.outcomes li{display:grid;grid-template-columns:var(--s5) 1fr;gap:var(--s4);padding-bottom:var(--s4);border-bottom:var(--line) solid var(--rule)}.index{color:var(--muted)}.outcomes strong{font-weight:600}.outcomes p{color:var(--muted)}
+.rail{list-style:none;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s4)}
+.rail li{background:var(--surface);display:grid;gap:var(--s3);padding:var(--s4)}.step-head{display:flex;justify-content:space-between;gap:var(--s2)}.step-name{font-weight:600}.gloss{color:var(--muted)}
+.gate{color:var(--gate);background:var(--gate-bg);padding:var(--s2) var(--s3);border-left:var(--s1) solid var(--gate);font:var(--small)/1.5 var(--mono)}
+.map{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:var(--line) solid var(--rule);border-bottom:var(--line) solid var(--rule)}.map article{padding:var(--s5) var(--s4);display:grid;align-content:start;gap:var(--s4)}.map article+article{border-left:var(--line) solid var(--rule)}.files{list-style:none;padding:0;display:grid;gap:var(--s3);font-size:var(--small)}code{overflow-wrap:anywhere}.files small{display:block;color:var(--muted);font:var(--small)/1.5 var(--body)}
+.start{list-style:none;padding:0}.start li{display:grid;grid-template-columns:var(--s5) 1fr 1fr;gap:var(--s4);padding:var(--s5) 0;border-top:var(--line) solid var(--rule)}.start p{color:var(--muted)}
+.takeaway{font-size:var(--sub);max-width:48ch}.footer{display:flex;justify-content:space-between;gap:var(--s4);color:var(--muted);font-size:var(--small)}
+@media(max-width:760px){.brand span{display:none}.slide{padding:var(--s5) var(--pad)}.example,.map{grid-template-columns:1fr;gap:var(--s4)}.rail{grid-template-columns:1fr}.map article{padding:var(--s4) 0}.map article+article{border-left:0;border-top:var(--line) solid var(--rule)}.start li{grid-template-columns:var(--s5) 1fr}.start p{grid-column:2}.footer{flex-direction:column}.nav a{padding:var(--s2)}h1,h2{letter-spacing:-.03em}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{ :root{color-scheme:light;--paper:white;--surface:white;--ink:#14181c;--muted:#59636b;--rule:#c9d0d6;--gate:#2a3bc8;--gate-bg:#e1e5fb;--title:32pt;--text:11pt;--sub:16pt;--small:9pt;--s6:32px;--pad:20px}.topbar,.skip,.footer a{display:none}.slide{min-height:0;break-after:page;border:0;display:block; padding:var(--pad)}.slide:last-child{break-after:auto}.inner{gap:var(--s5)}.rail{grid-template-columns:repeat(3,minmax(0,1fr))}.map{grid-template-columns:repeat(3,minmax(0,1fr))}.map article+article{border-left:var(--line) solid var(--rule);border-top:0}.example{grid-template-columns:1fr 1.5fr}.start li{grid-template-columns:var(--s5) 1fr 1fr}.start p{grid-column:auto}}
+</style>
+</head>
+<body>
+<a class="skip" href="#overview">Skip to overview</a>
+<header class="topbar"><a class="brand" href="#overview">Agent rules <span>/ repo overview</span></a><nav class="nav" aria-label="Slides"><a href="#overview" aria-label="Slide 1: Purpose" aria-current="location">01</a><a href="#workflow" aria-label="Slide 2: Workflow">02</a><a href="#files" aria-label="Slide 3: Files">03</a><a href="#start" aria-label="Slide 4: Start here">04</a></nav></header>
+<main>
+<section class="slide" id="overview" aria-labelledby="title"><div class="inner">
+<p class="eyebrow"><span>01 / Purpose</span><span>For maintainers and contributors</span></p>
+<h1 id="title">Shared instructions for AI coding work.</h1>
+<p class="lead">This repo defines how agents plan, build, review, and record changes in your projects.</p>
+<div class="example"><div class="request"><p class="caption">Example task in your project</p><blockquote>"Add dark mode. Plan it before changing code."</blockquote><p class="caption">The app lives in your project, not here.</p></div>
+<ol class="outcomes"><li><span class="index">01</span><div><strong>A plan you can inspect</strong><p>Scope and checks before implementation.</p></div></li><li><span class="index">02</span><div><strong>A change you can review</strong><p>Code and verification against the plan.</p></div></li><li><span class="index">03</span><div><strong>A record you can resume</strong><p>Task state and plans in <code>agent-work/</code>.</p></div></li></ol></div>
+<div class="footer"><span>Skills supply instructions. Helpers and extensions support them.</span><a href="#workflow">Next: workflow →</a></div>
+</div></section>
+<section class="slide" id="workflow" aria-labelledby="workflow-title"><div class="inner">
+<p class="eyebrow">02 / Workflow</p><h2 id="workflow-title">Each step stops for you.</h2>
+<p class="lead">For tracked work, follow this sequence. A handoff label names the next step; it does not run it.</p>
+<ol class="rail">
+<li><div class="step-head"><span class="step-name">next-feature</span><span class="index">1</span></div><p class="gloss">Choose a ticket</p><p class="gate">READY FOR PLAN</p></li>
+<li><div class="step-head"><span class="step-name">plan-md</span><span class="index">2</span></div><p class="gloss">Define scope and checks</p><p class="gate">READY FOR EXECUTE</p></li>
+<li><div class="step-head"><span class="step-name">execute</span><span class="index">3</span></div><p class="gloss">Implement and verify</p><p class="gate">READY FOR REVIEW</p></li>
+<li><div class="step-head"><span class="step-name">review</span><span class="index">4</span></div><p class="gloss">Check the implementation</p><p class="gate">READY FOR REFLECT</p></li>
+<li><div class="step-head"><span class="step-name">reflect</span><span class="index">5</span></div><p class="gloss">Edit lasting guidance if needed</p><p class="gate">READY FOR COMMIT</p></li>
+<li><div class="step-head"><span class="step-name">commit</span><span class="index">6</span></div><p class="gloss">Commit and close out</p><p class="caption">WORKFLOW COMPLETE</p></li>
+</ol>
+<div class="footer"><span>Default: user-gated. Chaining or orchestration requires an explicit request.</span><a href="#files">Next: files →</a></div>
+</div></section>
+<section class="slide" id="files" aria-labelledby="files-title"><div class="inner">
+<p class="eyebrow">03 / Repo map</p><h2 id="files-title">Instructions, tools, task records.</h2>
+<div class="map">
+<article><h3>Instructions</h3><ul class="files"><li><code>AGENTS.md</code><small>Rules for agent behavior</small></li><li><code>skills/*/SKILL.md</code><small>Steps for each named task</small></li><li><code>agents/</code><small>Specialist reviewer instructions</small></li></ul></article>
+<article><h3>Tools</h3><ul class="files"><li><code>sync-prompts.sh</code><small>Deploy instructions and extensions</small></li><li><code>skills/_lib/</code><small>Shared workflow helpers</small></li><li><code>extensions/</code><small>Pi runtime behavior</small></li></ul></article>
+<article><h3>Task records</h3><ul class="files"><li><code>agent-work/features.yaml</code><small>Tickets and status</small></li><li><code>agent-work/plans/</code><small>Active plans</small></li><li><code>agent-work/history/</code><small>Completed plans</small></li></ul></article>
+</div>
+<p class="takeaway">Project knowledge belongs in <code>CONTEXT.md</code> and <code>docs/</code>. Task records stay in <code>agent-work/</code>.</p>
+<div class="footer"><span>Selected paths, not a full directory listing.</span><a href="#start">Next: start here →</a></div>
+</div></section>
+<section class="slide" id="start" aria-labelledby="start-title"><div class="inner">
+<p class="eyebrow">04 / Use it</p><h2 id="start-title">Sync once. Invoke each step.</h2>
+<ol class="start"><li><span class="index">01</span><div><code>./sync-prompts.sh</code></div><p>Run from this repo to deploy to Claude, Cursor, and Pi.</p></li><li><span class="index">02</span><div>In your project, ask:<br><q>Use plan-md to plan dark mode.</q></div><p>Start with a concrete task. Use <code>next-feature</code> when choosing from a backlog.</p></li><li><span class="index">03</span><div>Read the result.<br>Request the next step.</div><p>For example, ask to use <code>execute</code> after approving the plan.</p></li></ol>
+<p class="takeaway">Edit the source here. Sync again to deploy changes.</p>
+<div class="footer"><span>Pi: use <code>/reload</code> in an existing session after syncing.</span><a href="#overview">Back to purpose ↑</a></div>
+</div></section>
+</main>
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const links = [...document.querySelectorAll('.nav a')];
+function currentIndex() {
+  const offset = document.querySelector('.topbar').getBoundingClientRect().height;
+  return slides.reduce((best, slide, index) => Math.abs(slide.getBoundingClientRect().top - offset) < Math.abs(slides[best].getBoundingClientRect().top - offset) ? index : best, 0);
+}
+function updateNav() { const active = currentIndex(); links.forEach((link, index) => { if(index === active) link.setAttribute('aria-current','location'); else link.removeAttribute('aria-current'); }); }
+window.addEventListener('scroll', updateNav, { passive:true });
+window.addEventListener('resize', updateNav);
+document.addEventListener('keydown', event => {
+  if(event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.target.closest('input,textarea,select,button,a,[contenteditable]')) return;
+  const moves = {ArrowRight:1, ArrowLeft:-1};
+  if(!(event.key in moves)) return;
+  event.preventDefault();
+  const index = Math.max(0, Math.min(slides.length - 1, currentIndex() + moves[event.key]));
+  slides[index].scrollIntoView({block:'start'});
+});
+updateNav();
+</script>
+</body>
+</html>

@@ -1,8 +1,6 @@
 ---
 name: workflow-orchestrator
 description: Parent-controlled ticket workflow automation using persistent subagents, one ticket at a time or in parallel isolated worktrees.
-metadata:
-  thinkingLevel: medium
 ---
 
 Use this skill when the user explicitly asks the parent agent to manage the feature workflow automatically instead of waiting for manual invocation of each step.

@@ -1,8 +1,6 @@
 ---
 name: explain-html
 description: "Create a self-contained HTML explainer for knowledge or proposed work: codebase structure, concepts, features, flows, plans, changes, and technical decisions. Use for visual explanations and briefings, not implementation task lists."
-metadata:
-  thinkingLevel: high
 ---
 
 Create a polished, grounded visual explanation—not an implementation plan or a slide rendering of source material. The deliverable is one self-contained `.html` file for a defined audience. Explain existing reality, proposed change, or project knowledge; omit planning machinery unless requested.
