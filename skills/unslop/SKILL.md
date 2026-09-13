@@ -1,6 +1,6 @@
 ---
 name: unslop
-description: Cut AI tells from prose, presentations, PRs, and similar long-form writing.
+description: Apply after drafting long-form documents, presentations, PR descriptions, or similar prose.
 ---
 
 # Unslop
