@@ -194,10 +194,31 @@ test("compact-fork startup clears inherited producer state before its exact rece
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
+test("Hub boolean compact-fork startup releases the inherited ticket name", async () => {
+  const cwd = await project();
+  try {
+    await withForkCompactAttempt("1", async () => {
+      const runtime = harness(cwd, [
+        { type: "custom", customType: "workflow-runtime", data: { activeStep: "execute", ticketId: "meta-001" } },
+        { type: "custom", customType: "pi-agent-hub-context", data: { version: 1, updatedAt: 10, ticket: { id: "meta-001" } } },
+      ], "Metadata redesign");
+      delete process.env[FORK_COMPACT_ENV];
+      await runtime.emit("session_start", { reason: "startup" });
+      assert.equal(runtime.latest("workflow-runtime").ticketId, undefined);
+      assert.equal(runtime.latest("pi-agent-hub-context").ticket, undefined);
+      assert.equal(runtime.latest("workflow-runtime-reset"), undefined);
+      await runtime.tools.get("set_session_name").execute("name", { name: "Fork discussion" });
+      await runtime.emit("session_start", { reason: "reload" });
+      assert.equal(runtime.latest("pi-agent-hub-context").ticket, undefined);
+      assert.equal(runtime.name, "Fork discussion");
+    });
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
 test("compact-fork startup rejects malformed and oversized attempt tokens", async () => {
   const cwd = await project();
   try {
-    for (const token of ["1", "bad token has spaces", "x".repeat(81)]) {
+    for (const token of ["0", "bad token has spaces", "x".repeat(81)]) {
       await withForkCompactAttempt(token, async () => {
         const runtime = harness(cwd, [{ type: "custom", customType: "workflow-runtime", data: { activeStep: "execute", ticketId: "meta-001" } }]);
         await runtime.emit("session_start", { reason: "startup" });
@@ -323,6 +344,73 @@ test("ticket context precedes native name, ordinary turns stay stable, and plan 
     await runtime.emit("tool_execution_end", { toolName: "edit" });
     assert.deepEqual(runtime.latest("workflow-runtime").plan.tasks, { completed: 1, total: 2 });
     assert.equal(runtime.latest("workflow-runtime").plan.nextStep, "Add tests");
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("ticket names reject exact-name overrides and survive stage changes and refresh", async () => {
+  const cwd = await project();
+  const delayed = delayedModel();
+  try {
+    const runtime = harness(cwd, [], undefined, delayed.call);
+    await runtime.tools.get("set_workflow_ticket").execute("ticket", { ticketId: "meta-001" }, undefined, undefined, runtime.ctx);
+    await assert.rejects(runtime.tools.get("set_session_name").execute("name", { name: "Reviewing the implementation" }), /meta-001.*ticket title/i);
+    assert.equal(runtime.name, "Metadata redesign");
+    await runtime.tools.get("set_session_name").execute("name", { name: "Metadata redesign" });
+    await runtime.emit("input", { source: "interactive", text: "/skill:review meta-001" });
+    assert.equal(runtime.latest("workflow-runtime").activeStep, "review");
+    assert.equal(runtime.name, "Metadata redesign");
+    await runtime.commands.get("session-metadata-disable").handler("", runtime.ctx);
+    await runtime.commands.get("session-name").handler("refresh", runtime.ctx);
+    assert.equal(runtime.name, "Metadata redesign");
+    assert.match(runtime.operations.at(-1).message, /refreshed from meta-001/);
+    assert.equal(delayed.calls.length, 0);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("native and external rename events restore the linked title without repeated writes", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd);
+    await runtime.commands.get("wf-ticket").handler("meta-001", runtime.ctx);
+    const context = runtime.latest("pi-agent-hub-context");
+    runtime.externalName("A different topic");
+    await runtime.emit("session_info_changed", { name: "A different topic" });
+    assert.equal(runtime.name, "Metadata redesign");
+    const writes = runtime.operations.filter((operation) => operation.kind === "name").length;
+    await runtime.emit("session_info_changed", { name: "Metadata redesign" });
+    assert.equal(runtime.operations.filter((operation) => operation.kind === "name").length, writes);
+    assert.deepEqual(runtime.latest("pi-agent-hub-context"), context);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("resume restores the ticket title even if a prior session renamed it", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [{ type: "custom", customType: "workflow-runtime", data: { activeStep: "execute", ticketId: "meta-001" } }], "Temporary stage name");
+    await runtime.emit("session_start", { reason: "resume" });
+    assert.equal(runtime.name, "Metadata redesign");
+    await assert.rejects(runtime.tools.get("set_session_name").execute("name", { name: "Another stage" }), /ticket title/i);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("fork releases the child name and keeps the original ticket name protected", async () => {
+  const cwd = await project();
+  try {
+    const original = harness(cwd);
+    await original.commands.get("wf-ticket").handler("meta-001", original.ctx);
+    const fork = harness(cwd, original.branch, original.name, async () => metadataSuccess("Different discussion"));
+    await fork.emit("session_start", { reason: "fork" });
+    assert.equal(fork.latest("pi-agent-hub-context").ticket, undefined);
+    await fork.tools.get("set_session_name").execute("name", { name: "Side discussion" });
+    assert.equal(fork.name, "Side discussion");
+    fork.externalName("Manual discussion name");
+    await fork.emit("session_info_changed", { name: "Manual discussion name" });
+    assert.equal(fork.name, "Manual discussion name");
+    fork.branch.push({ type: "message", message: { role: "user", content: "Discuss another approach" } });
+    await fork.commands.get("session-name").handler("refresh", fork.ctx);
+    assert.equal(fork.name, "Different Discussion");
+    assert.equal(original.name, "Metadata redesign");
+    await assert.rejects(original.tools.get("set_session_name").execute("name", { name: "Child name" }), /ticket title/i);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -495,6 +583,31 @@ test("title-less explicit tickets name from ticket and conversation context", as
     delayed.calls[0].resolve("Legacy Metadata");
     await settle();
     assert.equal(runtime.name, "Legacy Metadata");
+    await runtime.commands.get("session-name").handler("refresh", runtime.ctx);
+    assert.equal(delayed.calls.length, 1);
+    assert.equal(runtime.name, "Legacy Metadata");
+    await assert.rejects(runtime.tools.get("set_session_name").execute("name", { name: "Stage update" }), /ticket title/i);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("title-less tickets protect their name while generation is pending", async () => {
+  const cwd = await project();
+  const delayed = delayedModel();
+  try {
+    await writeFile(join(cwd, "agent-work/features.yaml"), "- id: legacy-001\n  subtitle: Keep the task name stable\n");
+    const runtime = harness(cwd, [], "Previous discussion", delayed.call);
+    await runtime.commands.get("wf-ticket").handler("legacy-001", runtime.ctx);
+    assert.equal(delayed.calls.length, 1);
+    assert.equal(runtime.name, "legacy-001");
+    runtime.externalName("Review stage");
+    await runtime.emit("session_info_changed", { name: "Review stage" });
+    assert.equal(runtime.name, "legacy-001");
+    delayed.calls[0].resolve("Legacy Work");
+    await settle();
+    assert.equal(runtime.name, "Legacy Work");
+    runtime.externalName("Another stage");
+    await runtime.emit("session_info_changed", { name: "Another stage" });
+    assert.equal(runtime.name, "Legacy Work");
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -514,16 +627,12 @@ test("explicit session-name refresh awaits its model result and reports", async 
     assert.equal(runtime.operations.at(-1).message, "Session name refreshed.");
 
     const stale = delayedModel();
-    const changed = harness(cwd, [], "Old Name", stale.call);
-    await changed.commands.get("wf-ticket").handler("missing-001", changed.ctx);
-    await settle();
-    stale.calls[0].resolve("Missing Ticket");
-    await settle();
+    const changed = harness(cwd, branch, "Old Name", stale.call);
     const rejected = changed.commands.get("session-name").handler("refresh", changed.ctx);
-    for (let attempt = 0; attempt < 10 && stale.calls.length < 2; attempt++) await settle();
-    assert.equal(stale.calls.length, 2);
+    await settle();
+    assert.equal(stale.calls.length, 1);
     changed.externalName("External Name");
-    stale.calls[1].resolve("Stale Generated Name");
+    stale.calls[0].resolve("Stale Generated Name");
     await rejected;
     assert.equal(changed.name, "External Name");
     assert.equal(changed.operations.at(-1).message, "Could not refresh the session name.");

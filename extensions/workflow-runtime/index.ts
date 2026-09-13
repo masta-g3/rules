@@ -414,6 +414,7 @@ export default function workflowRuntime(
 	let forkCompactHandled = false;
 	let state: WorkflowState = {};
 	let ticketContext: TicketContext | undefined;
+	let ticketName: string | undefined;
 	let recoveryPending = false;
 	let lastAdvanceShortcutAt = 0;
 	let generation = 0;
@@ -549,20 +550,25 @@ export default function workflowRuntime(
 		const requestGeneration = ++generation;
 		const selected = await readTicketContext(effectiveProjectCwd(ctx.cwd), ticketId) ?? { id: ticketId };
 		if (requestGeneration !== generation) return false;
+		const previousTicketName = ticketContext?.id === ticketId ? ticketName : undefined;
 		ticketContext = selected;
+		ticketName = selected.title ?? previousTicketName ?? (!rename ? pi.getSessionName() : undefined);
 		currentAttention = attention;
 		publishContext(attention);
 		let nameApplied = false;
-		if (rename && ticketContext.title) {
-			pi.setSessionName(ticketContext.title);
+		if (ticketName) {
+			if (pi.getSessionName() !== ticketName) pi.setSessionName(ticketName);
 			nameApplied = true;
 		} else if (rename) {
+			ticketName = ticketId;
+			pi.setSessionName(ticketName);
 			const source = ticketNamingInput(ticketContext, recentTranscript(ctx.sessionManager.getBranch() as TranscriptEntry[]));
 			const initialName = pi.getSessionName();
 			const applyGeneratedName = async () => {
 				const title = await callMetadata(ctx, "session name", NAMING_PROMPT, source, 64, sanitizeSessionName);
 				if (requestGeneration !== generation || pi.getSessionName() !== initialName) return false;
-				pi.setSessionName(title ?? ticketId);
+				ticketName = title ?? ticketId;
+				pi.setSessionName(ticketName);
 				return true;
 			};
 			if (awaitGeneratedName) nameApplied = await applyGeneratedName();
@@ -579,7 +585,7 @@ export default function workflowRuntime(
 		const initialName = pi.getSessionName();
 		const name = await callMetadata(ctx, "session name", NAMING_PROMPT, source, 64, sanitizeSessionName);
 		if (!name || requestGeneration !== generation || pi.getSessionName() !== initialName) return false;
-		if (explicit) { ticketContext = undefined; publishContext(); }
+		if (explicit) { ticketContext = undefined; ticketName = undefined; publishContext(); }
 		pi.setSessionName(name);
 		return true;
 	};
@@ -663,12 +669,12 @@ export default function workflowRuntime(
 		description: "Regenerate the native Pi session name (usage: /session-name refresh)",
 		handler: async (args, ctx) => {
 			if (args.trim() !== "refresh") return ctx.ui.notify("Usage: /session-name refresh", "warning");
-			if (!metadataEnabled) return ctx.ui.notify("Session metadata is disabled. Run /session-metadata-enable first.", "warning");
 			if (ticketContext) {
 				const ticketId = ticketContext.id;
 				const ok = await selectTicket(ctx, ticketId, true, currentAttention, true);
 				return ctx.ui.notify(ok ? `Session name refreshed from ${ticketId}.` : "Could not refresh the session name.", ok ? "info" : "warning");
 			}
+			if (!metadataEnabled) return ctx.ui.notify("Session metadata is disabled. Run /session-metadata-enable first.", "warning");
 			const ok = await generateName(ctx, recentTranscript(ctx.sessionManager.getBranch() as TranscriptEntry[]), true);
 			ctx.ui.notify(ok ? "Session name refreshed." : "Could not refresh the session name.", ok ? "info" : "warning");
 		},
@@ -687,9 +693,12 @@ export default function workflowRuntime(
 	pi.registerTool({
 		name: "set_session_name",
 		label: "Set Session Name",
-		description: "Set the exact native Pi session name.",
+		description: "Set the exact native Pi session name. Linked sessions keep their ticket title; unlink the ticket before renaming.",
 		parameters: Type.Object({ name: Type.String({ minLength: 1 }) }),
 		async execute(_id, params) {
+			if (ticketContext && params.name !== ticketName) {
+				throw new Error(`Session is linked to ${ticketContext.id} and keeps its ticket title. Unlink the ticket before renaming.`);
+			}
 			pi.setSessionName(params.name);
 			generation += 1;
 			return { content: [{ type: "text", text: `Session named: ${params.name}` }], details: { name: params.name } };
@@ -1051,8 +1060,14 @@ export default function workflowRuntime(
 		applyPlanWidget(ctx, state.plan);
 	});
 
+	pi.on("session_info_changed", (_event, ctx) => {
+		if (!ticketContext || !ticketName || pi.getSessionName() === ticketName) return;
+		pi.setSessionName(ticketName);
+		ctx.ui.notify(`Session is linked to ${ticketContext.id} and keeps its ticket title. Unlink the ticket before renaming.`, "warning");
+	});
+
 	pi.on("session_start", async (event, ctx) => {
-		const compactForkStartup = forkCompactAttempt !== undefined && !forkCompactHandled;
+		const compactForkStartup = (rawForkCompactAttempt === "1" || forkCompactAttempt !== undefined) && !forkCompactHandled;
 		if (compactForkStartup) forkCompactHandled = true;
 		if (rawForkCompactAttempt !== undefined) delete process.env[FORK_COMPACT_ENV];
 		generation += 1;
@@ -1085,6 +1100,7 @@ export default function workflowRuntime(
 			automaticNamingStarted = false;
 			if (compactForkStartup) latestUserRequest = undefined;
 			ticketContext = undefined;
+			ticketName = undefined;
 			if (compactForkStartup || event.reason === "fork") publishContext();
 		}
 		if (compactForkStartup || event.reason === "fork" || result.effects.length || normalizeDefinition) {
@@ -1096,7 +1112,7 @@ export default function workflowRuntime(
 			applyPlanWidget(ctx, state.plan);
 		}
 		if (compactForkStartup) {
-			pi.appendEntry(RESET_ENTRY_TYPE, { version: 1, id: forkCompactAttempt, status: "ready" });
+			if (forkCompactAttempt) pi.appendEntry(RESET_ENTRY_TYPE, { version: 1, id: forkCompactAttempt, status: "ready" });
 			return;
 		}
 		if (event.reason !== "new" && event.reason !== "fork") {
