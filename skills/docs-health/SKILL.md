@@ -1,87 +1,41 @@
 ---
 name: docs-health
-description: Assess durable documentation health, propose focused fixes, implement on confirmation.
+description: Audit durable docs for cleanup and corrections. Apply approved changes.
 ---
 
-Assess durable documentation health and propose focused edits that would help future readers act correctly.
+Maintain durable docs without requiring a recent implementation session.
 
-### 1. Survey Documentation
+### 1. Survey docs
 
-Identify durable docs to audit:
+Audit `README.md`, root `CONTEXT.md`, project-local `AGENTS.md` or `CLAUDE.md`, `docs/**/*.md`, and other durable user, operator, or developer Markdown.
 
-- `README.md`
-- root `CONTEXT.md` when present
-- project-local `AGENTS.md` or `CLAUDE.md` when present
-- `docs/**/*.md`
-- other clearly durable user, operator, or developer Markdown files
+Exclude `agent-work/` artifacts, generated or vendored docs, dependencies, builds, temporary notes, and implementation summaries as primary docs.
 
-Exclude as primary docs:
+Flag missing docs only when they would help readers act correctly.
 
-- `agent-work/` plans, history, tickets, scratchpads, logs, and validation artifacts
-- generated output, vendored docs, dependency directories, and build artifacts
-- temporary notes or implementation summaries
+### 2. Assess
 
-If an expected durable doc is missing, note it only when future readers would act differently if it existed.
+Check claims against relevant code and commands. Find stale, misleading, duplicate, or unnecessary text.
 
-### 2. Evaluate Health
+- Propose deleting sections or files that no longer help readers.
+- Keep purpose, constraints, rationale, and useful user instructions. Cut text that merely repeats code.
+- Remove guidance that merely repeats code; do not move it elsewhere.
+- Ask about unclear intent or terminology; never invent answers to make docs agree.
+- Add only information that helps readers act correctly, not for completeness.
 
-Check for problems that affect future behavior:
+### 3. Propose edits
 
-- **Freshness**: stale paths, commands, architecture, feature descriptions, or workflow steps
-- **Clarity**: vague guidance, hidden assumptions, missing audience, or unactionable prose
-- **Organization**: important docs hard to find, misplaced content, or unclear ownership between files
-- **Duplicated truth**: repeated guidance that can drift or already conflicts
-- **Terminology drift**: terms that conflict with `CONTEXT.md` or surrounding docs
-- **Over-documentation**: low-signal sections, implementation history, exhaustive lists, or docs that restate obvious code
-- **Agent guidance bloat**: for project-local `AGENTS.md`, check whether the file can be shorter while preserving behavior-changing guardrails; prefer sectioning, merging, deletion, and moving durable architecture truth to `docs/STRUCTURE.md` over adding more guidance
-- **Links and paths**: broken or suspicious internal references when practical to verify
+Say what you inspected. For each worthwhile edit, name the file or section, change, and reason.
+Use the ask-user tool for approval before editing. If no changes are needed, say so without asking.
 
-Prefer deletion, tightening, or moving content before adding new documentation.
+### 4. Apply approved edits
 
-### 3. Report to User
-
-Present a concise assessment before editing:
-
-```md
-## Docs Health
-
-**Scope**: [files/areas audited]
-**Overall**: [healthy / needs focused cleanup / stale]
-
-### Suggested Fixes
-
-1. **[file/section]** — [problem and why it matters]
-   → Fix: [specific deletion, tightening, move, or addition]
-
-2. **[file/section]** — [problem and why it matters]
-   → Fix: [specific deletion, tightening, move, or addition]
-
-### Minimal Gap Analysis
-
-- [missing durable doc or section only if future readers would act differently]
-
-### Not Worth Documenting
-
-- [area]: [why documenting it would add noise or duplicate code]
-
-Ready to implement? Confirm and I'll apply the focused edits.
-```
-
-Keep suggested fixes focused: 3-7 high-value items, not exhaustive coverage. If documentation is healthy, say so and recommend no edits.
-
-### 4. Implement on Confirmation
-
-Once the user confirms:
-
-- Apply only the focused edits the user accepted.
-- Preserve current-state documentation; do not add change history unless it affects a public contract or operator action.
-- Prefer small replacements over appending new sections.
-- Keep examples realistic and remove stale duplicates instead of creating parallel explanations.
-- For non-trivial durable documentation edits, invoke the `docs-critic` subagent once after editing. Act on its feedback per the AGENTS.md critic rule; deleting an edit is acceptable when the critique shows it is not worth keeping.
-- Run relevant validation: path/link checks with `rg` or `find`, existing tests when docs affect tested inventories, and a final residue check for unfinished markers or prompt artifacts.
-
-Do not audit for completeness as an end in itself. The goal is healthier durable documentation with less noise.
+- Apply only accepted edits. Prefer small replacements over new sections.
+- Describe current state. Include history only when it affects public contracts or operator actions.
+- Keep examples realistic; remove stale duplicates instead of adding parallel explanations.
+- After substantive edits, invoke `docs-critic` once. Follow the `AGENTS.md` critic rule; you may discard edits the critique shows are not useful.
+- Check affected paths and links with `rg` or `find`. Run existing tests for affected inventories. Check for unfinished markers and prompt artifacts.
 
 ### Output
 
-Report the files changed and include a `Summary:` line with 1-2 sentences on what was fixed and what was deliberately left alone.
+List changed files. Include a 1-2 sentence `Summary:` line covering fixes and what you deliberately left alone.

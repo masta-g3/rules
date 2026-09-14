@@ -1,81 +1,54 @@
 ---
 name: context-md
-description: Create or refresh root CONTEXT.md for an existing project by investigating the repo, forming context hypotheses, and interviewing the user.
+description: Interview the user to establish project context. Write root CONTEXT.md for initial setup or a major rethink.
 argument-hint: "[optional focus]"
 ---
 
-Create or update only root `CONTEXT.md`. Do not scaffold the project, create tickets, or update unrelated docs.
+Create or update only root `CONTEXT.md`. Do not scaffold projects, create tickets, or edit other docs.
 
-### 1. Explore Existing Project
+### 1. Investigate
 
-Inspect the repo broadly before interviewing:
+Inspect relevant docs and code. Find facts yourself; ask about intent and decisions. Treat inferred purpose, audience, and stage as assumptions.
 
-- `README.md`
-- existing `CONTEXT.md` when present
-- `docs/STRUCTURE.md` and durable `docs/**/*.md`
-- package/config files
-- source directories and major modules
-- tests and examples
-- `agent-work/features.yaml` and recent plans/history when present
-- recent git history
+For new projects without code, use the user's description and session context instead of repo exploration.
 
-Build a concise understanding of what the repo appears to be, who it serves, its maturity, core domain concepts, constraints, and terminology.
+### 2. Summarize
 
-Do not treat code-inferred purpose, audience, or stage as final truth.
+Briefly state your understanding, uncertainties, and proposed changes to the existing framing. Label assumptions.
 
-For a brand-new project with no code to investigate (e.g. invoked from `project-init`), skip repo exploration and build the hypothesis from the user's project description and session context.
+### 3. Confirm understanding
 
-### 2. Present Context Hypothesis
+Use the ask-user tool to check your framing:
 
-Before interviewing, summarize:
+- **Mostly right**: clarify missing, uncertain, or high-impact details.
+- **Partly wrong**: resolve the core misunderstanding first.
+- **Mostly wrong**: restart from purpose, user, stage, success, and language.
 
-- **Likely purpose**
-- **Likely target user**
-- **Project type**: what kind of thing this is
-- **Project stage**: maturity and usage context
-- **Likely success criteria**
-- **Operating assumptions / constraints**
-- **Important domain terms**
-- **Unclear or conflicting signals**
-- **Suggested `CONTEXT.md` changes** when refreshing an existing file
+Do not write `CONTEXT.md` until the user confirms the framing.
 
-Label uncertain claims as assumptions.
+### 4. Interview
 
-### 3. Alignment Checkpoint
+Ask one decision question at a time, with a recommendation and brief rationale. Resolve dependent decisions in order; wait for each answer.
 
-Use the ask-user tool to ask whether the hypothesis is broadly right before continuing:
+Ask only unresolved questions. Skip confirmed topics. Stop when context is clear, not when every topic has been covered.
 
-- **Mostly right** → run a gap-filling interview focused on missing, uncertain, or high-impact details.
-- **Partly wrong** → ask the user to correct the core misunderstanding first, then continue with a targeted interview.
-- **Mostly wrong** → discard the repo-derived framing and restart from first principles: purpose, user, stage, success, and language.
+### 5. Write CONTEXT.md
 
-Do not proceed to write `CONTEXT.md` until the user confirms the working framing.
+Include only useful sections:
 
-### 4. Context Interview
+- Purpose
+- Target user
+- Project type
+- Project stage
+- Success criteria
+- Operating assumptions
+- Out of scope
+- Language: project-specific terms, definitions, and synonyms to avoid when useful
 
-Interview as in `plan-md`: one decision question at a time, each with your recommended answer based on repo evidence and a one-line rationale; wait for feedback before the next. Resolve dependent topics in order — purpose → target user → project type/stage → success criteria → out of scope → operating assumptions → terminology (including synonyms agents should avoid and what should not be documented even if visible in code).
+Prefer precise edits over rewrites. Keep good content; remove stale context, generic definitions, and text that merely repeats code. Do not duplicate `README.md` or `docs/STRUCTURE.md`.
 
-Ask only what the repo and the alignment checkpoint could not resolve; skip topics the user already confirmed. Stop when durable context is clear, not when the topic chain is exhausted.
-
-Do not write `CONTEXT.md` until project meaning, audience, type, stage, assumptions, and terminology are clear enough.
-
-### 5. Write or Refresh CONTEXT.md
-
-Create or update root `CONTEXT.md` with:
-
-- **Purpose**
-- **Target User**
-- **Project Type**
-- **Project Stage**
-- **Success Criteria**
-- **Operating Assumptions**
-- **Out of Scope**
-- **Language**: project-specific terms, definitions, and avoided synonyms when useful
-
-If updating an existing file, prefer precise edits over rewriting. Preserve good current content, remove stale context, and avoid duplicating `README.md` or `docs/STRUCTURE.md`.
-
-Keep it durable. Do not include implementation history, temporary workflow notes, file indexes, or architecture details better suited for `docs/STRUCTURE.md`.
+Exclude implementation history, temporary notes, file indexes, and architecture details.
 
 ### Output
 
-Report the `CONTEXT.md` path and include a `Summary:` line describing what was created or changed.
+Report the `CONTEXT.md` path and a `Summary:` line describing what you created or changed.

@@ -3,17 +3,16 @@
 - Write for an ADHD reader: answer first — or the action itself (command, path, snippet); context after, if at all.
 - Report in the spirit of ASD-STE100 Simplified Technical English: short declarative sentences, active voice, plain words.
 - Number multi-step work; restate position each turn ("step 3 of 5 done; next: backfill"). If anything is open, end with one concrete next action.
-- Ambiguous request: use the ask-user tool, don't guess.
+- Use the ask-user tool when ambiguity affects the outcome, scope, architecture, dependencies, or data safety. Investigate facts and make routine implementation choices yourself.
 - When asking the user a question, assume they have not read the code. Use product language, explain unavoidable technical terms, and show a small ASCII mockup or option preview when UI choices are easier to see than describe.
 - The user often dictates via speech-to-text: infer the intended words from garbled or misheard phrases; ask only when the intent is genuinely unclear.
 - When the user's prompt indicates a request for action, such as "can you...", "I want to...", "help me..." and similar expressions, treat these as instructions to do the work and take action. Do not stop at acknowledging capability (e.g. "Yes…"), proposing a plan, or offering to continue. Do not settle for a partial or "helpful enough" solution that does not fully satisfy the user's task to save time, effort or tokens. If a task requires sustained work, complete all the necessary work until the intended outcome is fulfilled.
 
 ## Project Orientation
 
-- Read root `CONTEXT.md` when present to understand the project's purpose, target user, stage, operating assumptions, and terminology.
-- Check `docs/STRUCTURE.md` to understand project organization; if missing, continue without it.
+- Read `CONTEXT.md` for project context and `docs/STRUCTURE.md` to locate code, when needed.
 - Before adding code, inspect the existing structure and similar solutions.
-- For unfamiliar or resumed work, also check recent git history and `agent-work/history` before planning; scout cross-cutting tasks with parallel read-only subagents.
+- Check git history and `agent-work/history` when prior decisions matter. Use parallel read-only scouts for independent investigations.
 - When working with Python, always use the `uv` tool for dependency management and virtual environments.
 
 ## Collaboration and Codebase Workflow
@@ -26,8 +25,8 @@
 
 - Prefer subtraction and the simplest solution that meets the requirement. Remove obsolete code instead of adding parallel abstractions.
 - Avoid unnecessary patterns, abstractions, dependencies, boilerplate, and enterprise-style structure. Use functional code when it fits the existing project style.
-- If the simple approach fails, stop and discuss the trade-offs instead of forcing a brittle solution.
-- Introduce new patterns only when necessary; discuss them first.
+- If an approach fails, try a simple alternative within scope. Ask before a workaround or scope change.
+- Reuse existing patterns. Ask before introducing a new shared pattern or changing architecture.
 - Use direct function names. Avoid names such as `enhanced` or `new`.
 - Comment only non-obvious logic. Do not add changelog-style comments.
 - Add validation only when failure has meaningful consequences. Let ordinary errors surface naturally; avoid blanket `try/except` blocks.

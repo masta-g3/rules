@@ -7,7 +7,7 @@ Work directly from the active plan or task we have been discussing.
 
 ### Baseline Verification
 
-If not done before, run a minimal smoke test before starting — run existing tests or start the app and confirm basic functionality. If broken, stop and report.
+Check the relevant baseline once before starting. Report existing failures; stop only if they block the task or its verification. Ask before fixing unrelated failures.
 
 ### Begin Implementation
 
@@ -42,7 +42,7 @@ Update docs during execution only when the approved plan lists them as explicit 
 
 ### Functional Testing (User-Facing Features Only)
 
-For user-facing features (UI flows, API endpoints, interactive elements), invoke a testing subagent and validate real behavior:
+For user-facing features (UI flows, API endpoints, interactive elements), test real behavior directly or through a testing subagent:
 - UI: Playwright or equivalent real-browser automation to walk through flows
 - API: call endpoints with realistic payloads
 - Data: query edge cases that could corrupt user data

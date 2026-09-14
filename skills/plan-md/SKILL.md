@@ -55,6 +55,8 @@ Include a context-files section:
 
 2. Inventory what already exists before designing: the code that owns this behavior, plus the architecture, libraries, utilities, and conventions the codebase already uses for this class of problem. Default to composing existing pieces, then brainstorm alternatives and pick the fundamental approach with the smallest surface area.
 
+   Identify code, checks, and references the change makes unnecessary. Plan their removal before additions where safe, and design only for demonstrated needs.
+
 3. Include a `## Reuse` section listing the existing components, patterns, and dependencies the plan builds on, with file paths. Any new abstraction, library, or pattern needs a one-line justification of why the existing option is inadequate.
 
 4. Write a detailed implementation plan (code snippets, file paths, architecture layout with components, data flows, and dependencies). Scale depth to complexity; use pseudocode, diagrams, and breakdowns as needed.
