@@ -7,7 +7,7 @@ export const MAX_TICKET_ID = 80;
 export const MAX_TITLE = 32;
 export const MAX_SUBTITLE = 64;
 export const MAX_DESCRIPTION = 240;
-export const MAX_ATTENTION = 96;
+export const MAX_ATTENTION = 150;
 export const MAX_REQUEST_ID = 64;
 const MAX_PROJECT_CWD = 4_096;
 

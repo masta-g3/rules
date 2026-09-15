@@ -122,13 +122,20 @@ test("session context bounds transcript, names, and attention", () => {
   assert.equal(sanitizeSessionName('"metadata redesign"'), "Metadata Redesign");
   assert.equal(sanitizeSessionName("four word session name"), undefined);
   assert.deepEqual(parseAttention('{"kind":"ready","text":"Review the patch","confidence":0.8}'), { kind: "ready", text: "Review the patch" });
+  for (const length of [97, 150]) {
+    const text = "x".repeat(length);
+    const attention = { kind: "ready", text };
+    assert.deepEqual(parseAttention(JSON.stringify({ ...attention, confidence: 0.99 })), attention);
+    assert.deepEqual(parseContextSnapshot({ version: 1, updatedAt: 1, attention })?.attention, attention);
+  }
+  assert.equal(parseAttention(JSON.stringify({ kind: "ready", text: "x".repeat(151), confidence: 0.99 })), undefined);
   assert.equal(parseAttention("null"), null);
   assert.equal(parseAttention('{"kind":"ready","text":"Maybe","confidence":0.4}'), undefined);
   assert.ok(attentionInput("request", "done", { id: "x-001", description: "Outcome" }, "Plan ready").includes("Current context"));
   const snapshot = { version: 1, updatedAt: 7, ticket: { id: "x-001", subtitle: "Scan context", future: true }, attention: { kind: "ready", text: "Review it" }, future: true };
   assert.deepEqual(parseContextSnapshot(snapshot), { version: 1, updatedAt: 7, ticket: { id: "x-001", subtitle: "Scan context" }, attention: { kind: "ready", text: "Review it" } });
   assert.equal(parseContextSnapshot({ ...snapshot, version: 2 }), undefined);
-  assert.equal(parseContextSnapshot({ ...snapshot, attention: { kind: "ready", text: "x".repeat(97) } }), undefined);
+  assert.equal(parseContextSnapshot({ ...snapshot, attention: { kind: "ready", text: "x".repeat(151) } }), undefined);
   assert.deepEqual(contextSnapshot({ id: "x-001", title: "Ignored", subtitle: "Scan context" }, undefined, 7), { version: 1, updatedAt: 7, ticket: { id: "x-001", subtitle: "Scan context" } });
 });
 
@@ -152,7 +159,7 @@ test("question attention has bounded deterministic request identity and summary"
   const bounded = questionAttention("long-call", {
     questions: [{ question: "x".repeat(200) }, { question: "another" }],
   });
-  assert.equal([...bounded.text].length, 96);
+  assert.equal([...bounded.text].length, 150);
   assert.ok(bounded.text.endsWith(" (+1 more)"));
   assert.equal(bounded.text.includes("another"), false);
 

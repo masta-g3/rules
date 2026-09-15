@@ -3,8 +3,8 @@ import { complete, type UserMessage } from "@earendil-works/pi-ai/compat";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const SESSION_MODELS = [
-	{ provider: "openai-codex", id: "gpt-5.3-codex-spark" },
 	{ provider: "openai-codex", id: "gpt-5.6-luna" },
+	{ provider: "openai-codex", id: "gpt-5.3-codex-spark" },
 ] as const;
 
 export type ModelAuth = { model: Model<Api>; apiKey: string; headers?: Record<string, string> };
@@ -130,7 +130,7 @@ export function createSessionModelCall(dependencies: SessionModelDependencies = 
 					maxTokens,
 					maxRetries: 0,
 					cacheRetention: "none",
-					reasoningEffort: "none",
+					reasoningEffort: "medium",
 					timeoutMs: 5_000,
 				});
 				const latencyMs = Math.max(0, now() - attemptStarted);

@@ -639,7 +639,7 @@ test("explicit session-name refresh awaits its model result and reports", async 
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
-test("session metadata models are fixed to Spark then Luna", async () => {
+test("session metadata models are fixed to Luna then Spark", async () => {
   const active = { provider: "openai-codex", id: "gpt-5.6-sol" };
   const candidates = new Map([
     ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
@@ -657,12 +657,12 @@ test("session metadata models are fixed to Spark then Luna", async () => {
     },
   });
 
-  assert.deepEqual(resolved.map(({ model }) => model.id), ["gpt-5.3-codex-spark", "gpt-5.6-luna"]);
-  assert.deepEqual(authenticated, ["gpt-5.3-codex-spark", "gpt-5.6-luna"]);
+  assert.deepEqual(resolved.map(({ model }) => model.id), ["gpt-5.6-luna", "gpt-5.3-codex-spark"]);
+  assert.deepEqual(authenticated, ["gpt-5.6-luna", "gpt-5.3-codex-spark"]);
   assert.equal(authenticated.includes(active.id), false);
 });
 
-test("metadata calls disable reasoning, use five seconds, and skip unsupported models", async () => {
+test("metadata calls use medium reasoning, five seconds, and skip unsupported models", async () => {
   const candidates = new Map([
     ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
     ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
@@ -674,7 +674,7 @@ test("metadata calls disable reasoning, use five seconds, and skip unsupported m
     async complete(model, _context, requestOptions) {
       options.push({ model: model.id, ...requestOptions });
       clock += 100;
-      if (model.id === "gpt-5.3-codex-spark") {
+      if (model.id === "gpt-5.6-luna") {
         return { stopReason: "error", errorMessage: "not supported with a ChatGPT account", content: [] };
       }
       return { stopReason: "stop", content: [{ type: "text", text: "Metadata Runtime" }] };
@@ -689,24 +689,24 @@ test("metadata calls disable reasoning, use five seconds, and skip unsupported m
 
   const first = await call(ctx, "prompt", "input", 64);
   assert.equal(first.outcome, "success");
-  assert.equal(first.model, "gpt-5.6-luna");
+  assert.equal(first.model, "gpt-5.3-codex-spark");
   assert.deepEqual(first.attempts.map((attempt) => [attempt.model, attempt.failure?.kind ?? attempt.outcome]), [
-    ["gpt-5.3-codex-spark", "unsupported"],
-    ["gpt-5.6-luna", "success"],
+    ["gpt-5.6-luna", "unsupported"],
+    ["gpt-5.3-codex-spark", "success"],
   ]);
-  assert.ok(options.every((item) => item.reasoningEffort === "none" && item.timeoutMs === 5_000));
+  assert.ok(options.every((item) => item.reasoningEffort === "medium" && item.timeoutMs === 5_000));
 
   options.length = 0;
   const second = await call(ctx, "prompt", "input", 64);
   assert.equal(second.outcome, "success");
-  assert.deepEqual(options.map((item) => item.model), ["gpt-5.6-luna"]);
-  assert.deepEqual(second.skippedModels, ["gpt-5.3-codex-spark"]);
+  assert.deepEqual(options.map((item) => item.model), ["gpt-5.3-codex-spark"]);
+  assert.deepEqual(second.skippedModels, ["gpt-5.6-luna"]);
 
   call.reset();
   options.length = 0;
   const afterReset = await call(ctx, "prompt", "input", 64);
   assert.equal(afterReset.outcome, "success");
-  assert.deepEqual(options.map((item) => item.model), ["gpt-5.3-codex-spark", "gpt-5.6-luna"]);
+  assert.deepEqual(options.map((item) => item.model), ["gpt-5.6-luna", "gpt-5.3-codex-spark"]);
 });
 
 test("a reset isolates unsupported-model state from an older in-flight call", async () => {
@@ -715,17 +715,17 @@ test("a reset isolates unsupported-model state from an older in-flight call", as
     ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
   ]);
   const attempted = [];
-  let finishOldSpark;
-  let holdSpark = true;
+  let finishOldLuna;
+  let holdLuna = true;
   const call = createSessionModelCall({
     async complete(model) {
       attempted.push(model.id);
-      if (model.id === "gpt-5.3-codex-spark" && holdSpark) {
-        holdSpark = false;
-        return new Promise((resolve) => { finishOldSpark = resolve; });
+      if (model.id === "gpt-5.6-luna" && holdLuna) {
+        holdLuna = false;
+        return new Promise((resolve) => { finishOldLuna = resolve; });
       }
-      if (model.id === "gpt-5.3-codex-spark") return { stopReason: "stop", content: [{ type: "text", text: "Fresh Spark" }] };
-      return { stopReason: "stop", content: [{ type: "text", text: "Luna Fallback" }] };
+      if (model.id === "gpt-5.6-luna") return { stopReason: "stop", content: [{ type: "text", text: "Fresh Luna" }] };
+      return { stopReason: "stop", content: [{ type: "text", text: "Spark Fallback" }] };
     },
   });
   const ctx = {
@@ -738,13 +738,13 @@ test("a reset isolates unsupported-model state from an older in-flight call", as
   const oldCall = call(ctx, "prompt", "input", 64);
   await settle();
   call.reset();
-  finishOldSpark({ stopReason: "error", errorMessage: "not supported with a ChatGPT account", content: [] });
+  finishOldLuna({ stopReason: "error", errorMessage: "not supported with a ChatGPT account", content: [] });
   await oldCall;
 
   attempted.length = 0;
   const nextCall = await call(ctx, "prompt", "input", 64);
-  assert.equal(nextCall.model, "gpt-5.3-codex-spark");
-  assert.deepEqual(attempted, ["gpt-5.3-codex-spark"]);
+  assert.equal(nextCall.model, "gpt-5.6-luna");
+  assert.deepEqual(attempted, ["gpt-5.6-luna"]);
 });
 
 test("metadata model resolution distinguishes missing authentication", async () => {
