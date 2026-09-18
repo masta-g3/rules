@@ -18,7 +18,7 @@ If a planning file exists, archive it:
 
 ### Update agent-work/features.yaml
 
-If tracked feature: `$SKILLS_ROOT/_lib/features_yaml.sh complete <feature-id> --plan-file <archive-path>` — sets status to `"done"`, `completed_at` to today, and `plan_file` to archive path. Verify discovered items are logged. Include `agent-work/features.yaml` in the commit.
+If tracked feature: `$SKILLS_ROOT/_lib/features_yaml.sh complete <feature-id> --plan-file <archive-path>` — sets status to `"done"`, `completed_at` to today, and `plan_file` to archive path. Verify discovered items are logged. Commit `agent-work/` updates only where the repo tracks them. Never force-add ignored or local-only files.
 
 ### Documentation
 
@@ -45,7 +45,7 @@ If this session touched multiple repositories, commit all session work independe
 
 If the plan names a worktree, the commit above went to its branch. Close it out per repo:
 
-1. Confirm the archived plan and the `agent-work/features.yaml` completion are part of that commit — the PR carries the ticket's full story, not just its code.
+1. Confirm tracked plan and ticket updates are in the commit.
 2. Before pushing, confirm the recorded PR target with the user; if absent, inspect and recommend the default branch. Push the branch and open the PR with `gh pr create --base <pr-target>`. Write the title and body per the `write-pr` skill, and link the archived plan path. Report the PR URL; do not merge it.
 3. Copy back anything worth keeping that the PR does not carry — `agent-work/tickets/<feature-id>/` evidence, decks, logs — into the top-level checkout, after the cleanup rules above have already pruned it.
 4. Announce the commit and PR are ready (hash, PR URL), then use the ask-user tool to wait: ask whether the PR is merged and the local worktree should be deleted.
