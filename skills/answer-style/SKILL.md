@@ -1,9 +1,7 @@
 ---
 name: answer-style
-description: Reshape the answer per the AGENTS.md Communication Style. Invoke to rewrite the previous response in that style, or to apply it deliberately to the next one.
+description: Rewrite the previous response or shape the next one in simple, concise language.
 disable-model-invocation: true
 ---
 
-Rewrite the pending or previous response to follow the Communication Style section of AGENTS.md exactly. If needed, re-read that section. Keep the response simple and concise, with examples if applicable.
-
-Before sending, verify: from the first and last lines alone, the reader knows what just happened and what to do next.
+Start with the answer. Use simple, concise terms. Avoid complex terminology. Include examples when helpful. Use a clear structure and explain step by step when it makes sense.

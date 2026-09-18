@@ -5,6 +5,8 @@ description: Reflect on reviewed work and update durable docs or agent guidance 
 
 After implementation passes review, identify session friction and propose guidance changes to prevent it from recurring.
 
+When available, call `set_workflow_step` with `stepId: "reflect"` before starting this authorized step. Reading this skill alone does not update the indicator. Changing steps does not authorize additional work.
+
 ### Process
 
 The step starts with `reviewing-guidance` as its default activity.

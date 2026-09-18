@@ -5,6 +5,8 @@ description: Execute on a plan.
 
 Work directly from the active plan or task we have been discussing.
 
+When available, call `set_workflow_step` with `stepId: "execute"` before starting this authorized step. Reading this skill alone does not update the indicator. Changing steps does not authorize additional work.
+
 ### Baseline Verification
 
 Check the relevant baseline once before starting. Report existing failures; stop only if they block the task or its verification. Ask before fixing unrelated failures.

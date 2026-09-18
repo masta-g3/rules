@@ -5,6 +5,8 @@ description: Commit files from session and archive/clean-up associated files.
 
 Assume the work has already been reviewed and reflected. Quick final scan for debug artifacts, prompt residue, temporary tests/scripts, generated outputs, and stale `agent-work/` scratch files before proceeding. Keep only `agent-work/` artifacts that remain useful after commit, per the AGENTS.md retention rules.
 
+When available, call `set_workflow_step` with `stepId: "commit"` before starting this authorized step. Reading this skill alone does not update the indicator. Changing steps does not authorize additional work.
+
 ### Archive Planning Document
 
 The step starts with `archiving-plan`. Rely on that default during archive work; do not make a redundant activity call.

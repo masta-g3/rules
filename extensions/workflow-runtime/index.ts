@@ -706,6 +706,31 @@ export default function workflowRuntime(
 	});
 
 	pi.registerTool({
+		name: "set_workflow_step",
+		label: "Set Workflow Step",
+		description: "Set the active workflow step and indicator without invoking its skill. Allows direct and backward changes; the current step is a no-op.",
+		promptSnippet: "Set the workflow indicator before starting an authorized step",
+		promptGuidelines: [
+			"Use set_workflow_step before starting a user-authorized workflow step, including explicitly requested chains. Read and follow that step's skill; reading it alone does not update the indicator.",
+			"set_workflow_step does not authorize additional work. Do not advance from handoff labels alone. Await the step change before publishing its activities.",
+		],
+		parameters: Type.Object({ stepId: StringEnum(WORKFLOW_DEFINITION.map((step) => step.id)) }),
+		async execute(_id, params, _signal, _update, ctx) {
+			if (state.activeStep !== params.stepId) {
+				generation += 1;
+				recoveryPending = false;
+				const interrupted = state.execution
+					? transition(state, { type: "end-focus" })
+					: { state, effects: [] as RuntimeEffect[] };
+				state = setState(pi, ctx, startWorkflowStep(interrupted.state, params.stepId, "tool"));
+				await refreshPlan(ctx);
+				applyEffects(pi, ctx, () => state, interrupted.effects, continuationQueue);
+			}
+			return { content: [{ type: "text", text: `Workflow step: ${params.stepId}.` }], details: { stepId: params.stepId } };
+		},
+	});
+
+	pi.registerTool({
 		name: "set_workflow_activity",
 		label: "Set Workflow Activity",
 		description: "Publish a fixed activity for the active workflow step.",

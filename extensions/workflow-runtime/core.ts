@@ -110,7 +110,10 @@ export function startWorkflowStep(state: WorkflowState, step: StepName, source?:
 export function setWorkflowActivity(state: WorkflowState, activityId: string): WorkflowState {
 	if (!state.activeStep) throw new Error("No active workflow step.");
 	const definition = (WORKFLOW_ACTIVITIES[state.activeStep] as readonly { id: string; label: string; review?: boolean; terminal?: boolean }[]).find((item) => item.id === activityId);
-	if (!definition) throw new Error(`Activity ${activityId} does not belong to ${state.activeStep}.`);
+	if (!definition) {
+		const owner = WORKFLOW_DEFINITION.find((step) => (WORKFLOW_ACTIVITIES[step.id] as readonly { id: string }[]).some((activity) => activity.id === activityId));
+		throw new Error(`Activity ${activityId} does not belong to ${state.activeStep}.${owner ? ` Call set_workflow_step with stepId "${owner.id}" first, only if the user authorized that step.` : ""}`);
+	}
 	const passes = { ...(state.activityPasses ?? {}) };
 	if (definition.review) passes[activityId] = (passes[activityId] ?? 0) + 1;
 	const pass = definition.review ? (passes[activityId] ?? 1) : undefined;

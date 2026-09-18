@@ -5,6 +5,8 @@ description: Review finished work before reflection and commit.
 
 Review the active task after implementation and before `/reflect`. If the plan names a worktree, run the review inside it — that is where the changed files and `agent-work` artifacts live.
 
+When available, call `set_workflow_step` with `stepId: "review"` before starting this authorized step. Reading this skill alone does not update the indicator. Changing steps does not authorize additional work.
+
 ### Review Process
 
 The step starts with `reviewing-implementation` as its default activity. Pi republishes it and increments its pass count when the exact `code-critic` tmux launch starts. For a non-tmux critic path only, call it manually as the fallback before each pass. Never use both paths for one pass.

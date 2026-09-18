@@ -6,6 +6,8 @@ argument-hint: "[request]"
 
 Create a detailed Markdown implementation plan for the provided request.
 
+When available, call `set_workflow_step` with `stepId: "plan-md"` before starting this authorized step. Reading this skill alone does not update the indicator. Changing steps does not authorize additional work.
+
 ### Pre-Work & User Interview
 
 The step starts with `inspecting-code`. Pi publishes `clarifying-requirements` automatically when `ask_user_question` starts. Do not make redundant activity calls for either boundary.
@@ -65,10 +67,9 @@ Include a context-files section:
 
 6. Under `## Implementation Phases`, divide work into incremental test-first phases (foundation → core → polish). Use `### Phase <number>: <short title>` headings, with actionable `[ ]` checkboxes directly under each phase, including its final verification. Write/update the failing test first, make the smallest passing change, then refactor. The `execute` skill marks completed actions with `[x]`. Move deferred work to `Discovered Work` or rewrite it as a plain note; do not leave it as an unchecked actionable item.
 
-7. Include a **verification strategy** for each phase:
-   - Focus on outcomes: "Does it achieve the goal?" not "Does it import?"
-   - Side effects: test workflows end-to-end, with the smallest necessary impact area
-   - Pure logic: test with realistic inputs and edge cases
+7. Include `## Acceptance Criteria`: a checklist of outcomes that must be true for the ticket to be complete. Derive criteria only from user-confirmed requirements and constraints. Clarify any ambiguity that affects completion during the interview; do not introduce assumptions or expand scope. Technical verification details may come from code inspection, but must not change the agreed outcome. Map each criterion to a test or executable check in the relevant implementation phase.
+   - Verify behavior with realistic inputs and edge cases. Check affected workflows end-to-end for side effects, with the smallest necessary impact area.
+   - For migrations, releases, or stateful workflows, define the complete expected final state: exact or derived counts, identity continuity, date coverage, exclusions, preserved state, and allowed exceptions. Include post-apply read-back checks.
 
 8. Note likely doc impacts as `Reflection Candidates` for `/reflect`.
 
@@ -78,4 +79,4 @@ For plans involving architectural decisions, multi-file changes, or complex logi
 
 ### Output
 
-For successful planning, call `set_workflow_activity` with `plan-ready` when available, report the plan path, include a `Summary:` line with a couple of lines summarizing the steps of the planned approach, then end with `READY FOR EXECUTE`. If planning is blocked, report `BLOCKED — <reason>`.
+For successful planning, call `set_workflow_activity` with `plan-ready` when available, report the plan path, include a `Summary:` line describing the approach, then a short **Complete when:** checklist summarizing all acceptance criteria in plain language. Preserve the agreed scope; introduce no new requirements. End with `READY FOR EXECUTE`. If planning is blocked, report `BLOCKED — <reason>`.

@@ -3,6 +3,7 @@
 - Write for an ADHD reader: answer first — or the action itself (command, path, snippet); context after, if at all.
 - Report in the spirit of ASD-STE100 Simplified Technical English: short declarative sentences, active voice, plain words.
 - Number multi-step work; restate position each turn ("step 3 of 5 done; next: backfill"). If anything is open, end with one concrete next action.
+- When the user asks for status or progress during ongoing work, answer at the earliest safe stopping point. Do not finish the task or start extra investigation before replying. Briefly state what is done, what is running or blocked, and what comes next; then resume the authorized work without waiting for confirmation unless the user asks to pause.
 - Use the ask-user tool when ambiguity affects the outcome, scope, architecture, dependencies, or data safety. Investigate facts and make routine implementation choices yourself.
 - When asking the user a question, assume they have not read the code. Use product language, explain unavoidable technical terms, and show a small ASCII mockup or option preview when UI choices are easier to see than describe.
 - The user often dictates via speech-to-text: infer the intended words from garbled or misheard phrases; ask only when the intent is genuinely unclear.
