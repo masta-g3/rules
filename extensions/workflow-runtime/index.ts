@@ -17,6 +17,7 @@ import {
 	shouldNormalizeWorkflowDefinition,
 	startWorkflowStep,
 	transition,
+	unlinkWorkflowTicketState,
 	withWorkflowDefinition,
 	WORKFLOW_ACTIVITIES,
 	WORKFLOW_DEFINITION,
@@ -445,7 +446,35 @@ export default function workflowRuntime(
 		return updated;
 	};
 
-	const clearState = (pi: ExtensionAPI, ctx: ExtensionContext): WorkflowState => setState(pi, ctx, {});
+	const clearWorkflowRail = (pi: ExtensionAPI, ctx: ExtensionContext): WorkflowState => setState(pi, ctx, {});
+
+	const clearTaskState = (
+		ctx: ExtensionContext,
+		mode: "ticket" | "full",
+		baseState: WorkflowState = state,
+	): WorkflowState => {
+		generation += 1;
+		metadataEpoch += 1;
+		metadataRequest += 1;
+		settledMetadataRequest = metadataRequest;
+		metadataStatus = metadataEnabled ? { state: "ready" } : { state: "disabled" };
+		settledMetadataStatus = metadataStatus;
+		lastMetadataWarning = undefined;
+		recoveryPending = false;
+		deferredWorkflowInputs = [];
+		latestUserRequest = undefined;
+		currentAttention = undefined;
+		attentionGenerationDone = -1;
+		automaticNamingStarted = false;
+		lastAdvanceShortcutAt = 0;
+		ticketContext = undefined;
+		ticketName = undefined;
+		const stopped = baseState.execution ? transition(baseState, { type: "end-focus" }).state : baseState;
+		const nextState = mode === "ticket" ? unlinkWorkflowTicketState(stopped, "command") : {};
+		publishContext();
+		state = setState(pi, ctx, nextState);
+		return state;
+	};
 
 	const rememberMetadataStatus = (requestId: number, status: MetadataStatus) => {
 		if (requestId <= settledMetadataRequest) return;
@@ -611,11 +640,17 @@ export default function workflowRuntime(
 	});
 
 	pi.registerCommand("wf-ticket", {
-		description: "Set or override the active workflow ticket",
+		description: "Set or clear the active workflow ticket",
 		handler: async (args, ctx) => {
-			const ticketId = parseTicketArg(args ?? "");
+			const rawArg = (args ?? "").trim();
+			if (rawArg === "clear") {
+				clearTaskState(ctx, "ticket");
+				ctx.ui.notify("Workflow ticket cleared. Workflow progress is retained.", "info");
+				return;
+			}
+			const ticketId = parseTicketArg(rawArg);
 			if (!ticketId) {
-				ctx.ui.notify("Usage: /wf-ticket <ticket-id>", "warning");
+				ctx.ui.notify("Usage: /wf-ticket <ticket-id> | clear", "warning");
 				return;
 			}
 			state = setState(pi, ctx, setWorkflowTicketState(state, ticketId, "command"));
@@ -625,11 +660,10 @@ export default function workflowRuntime(
 	});
 
 	pi.registerCommand("wf-clear", {
-		description: "Clear the workflow indicator",
+		description: "Clear the workflow and unlink its ticket",
 		handler: async (_args, ctx) => {
-			recoveryPending = false;
-			state = clearState(pi, ctx);
-			ctx.ui.notify("Workflow indicator cleared.", "info");
+			clearTaskState(ctx, "full");
+			ctx.ui.notify("Workflow and ticket cleared.", "info");
 		},
 	});
 
@@ -693,11 +727,11 @@ export default function workflowRuntime(
 	pi.registerTool({
 		name: "set_session_name",
 		label: "Set Session Name",
-		description: "Set the exact native Pi session name. Linked sessions keep their ticket title; unlink the ticket before renaming.",
+		description: "Set the exact native Pi session name. Linked sessions keep their ticket title; run /wf-ticket clear before renaming.",
 		parameters: Type.Object({ name: Type.String({ minLength: 1 }) }),
 		async execute(_id, params) {
 			if (ticketContext && params.name !== ticketName) {
-				throw new Error(`Session is linked to ${ticketContext.id} and keeps its ticket title. Unlink the ticket before renaming.`);
+				throw new Error(`Session is linked to ${ticketContext.id} and keeps its ticket title. Run /wf-ticket clear before renaming.`);
 			}
 			pi.setSessionName(params.name);
 			generation += 1;
@@ -885,7 +919,7 @@ export default function workflowRuntime(
 			lastAdvanceShortcutAt = 0;
 			recoveryPending = false;
 			if (!nextStep) {
-				state = clearState(pi, ctx);
+				state = clearWorkflowRail(pi, ctx);
 				ctx.ui.notify("Workflow indicator cleared.", "info");
 				return;
 			}
@@ -1088,7 +1122,7 @@ export default function workflowRuntime(
 	pi.on("session_info_changed", (_event, ctx) => {
 		if (!ticketContext || !ticketName || pi.getSessionName() === ticketName) return;
 		pi.setSessionName(ticketName);
-		ctx.ui.notify(`Session is linked to ${ticketContext.id} and keeps its ticket title. Unlink the ticket before renaming.`, "warning");
+		ctx.ui.notify(`Session is linked to ${ticketContext.id} and keeps its ticket title. Run /wf-ticket clear before renaming.`, "warning");
 	});
 
 	pi.on("session_start", async (event, ctx) => {
@@ -1121,24 +1155,26 @@ export default function workflowRuntime(
 			{ ...restored.state, steps: restored.steps },
 			boundaryReason,
 		);
+		if (compactForkStartup || event.reason === "fork") {
+			clearTaskState(ctx, "full", restored.state);
+			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
+			if (compactForkStartup && forkCompactAttempt) {
+				pi.appendEntry(RESET_ENTRY_TYPE, { version: 1, id: forkCompactAttempt, status: "ready" });
+			}
+			return;
+		}
 		if (startsEmpty) {
 			automaticNamingStarted = false;
-			if (compactForkStartup) latestUserRequest = undefined;
 			ticketContext = undefined;
 			ticketName = undefined;
-			if (compactForkStartup || event.reason === "fork") publishContext();
 		}
-		if (compactForkStartup || event.reason === "fork" || result.effects.length || normalizeDefinition) {
+		if (result.effects.length || normalizeDefinition) {
 			state = setState(pi, ctx, result.state);
 			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
 		} else {
 			state = result.state;
 			applyWidget(ctx, state, metadataStatus);
 			applyPlanWidget(ctx, state.plan);
-		}
-		if (compactForkStartup) {
-			if (forkCompactAttempt) pi.appendEntry(RESET_ENTRY_TYPE, { version: 1, id: forkCompactAttempt, status: "ready" });
-			return;
 		}
 		if (event.reason !== "new" && event.reason !== "fork") {
 			const ticketId = state.ticketId ?? restoredContext?.ticket?.id;

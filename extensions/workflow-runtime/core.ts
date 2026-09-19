@@ -94,6 +94,11 @@ export function setWorkflowTicketState(state: WorkflowState, ticketId: string | 
 	};
 }
 
+export function unlinkWorkflowTicketState(state: WorkflowState, source?: WorkflowSource): WorkflowState {
+	const { ticketId: _ticketId, plan: _plan, execution: _execution, ...unlinked } = state;
+	return { ...unlinked, ...(source ? { source } : {}) };
+}
+
 export function startWorkflowStep(state: WorkflowState, step: StepName, source?: WorkflowSource): WorkflowState {
 	const first = WORKFLOW_ACTIVITIES[step][0];
 	return {

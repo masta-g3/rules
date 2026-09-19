@@ -18,6 +18,7 @@ import {
   shouldNormalizeWorkflowDefinition,
   startWorkflowStep,
   transition,
+  unlinkWorkflowTicketState,
   withWorkflowDefinition,
   WORKFLOW_ACTIVITIES,
   WORKFLOW_DEFINITION,
@@ -49,6 +50,21 @@ test("ticket changes clear prior step-run and completion state", () => {
   const state = { activeStep: "commit", ticketId: "old-001", currentStepComplete: true, activity: { id: "commit-complete", label: "Commit complete" }, activityPasses: { review: 2 }, plan: { tasks: { completed: 2, total: 3 } } };
   assert.deepEqual(setWorkflowTicketState(state, "new-001", "command"), { activeStep: "commit", ticketId: "new-001", source: "command" });
   assert.deepEqual(setWorkflowTicketState(state, "old-001", "tool"), { ...state, source: "tool" });
+});
+
+test("ticket unlink preserves rail progress but removes ticket-derived state", () => {
+  const state = {
+    activeStep: "commit", ticketId: "old-001", currentStepComplete: true,
+    activity: { id: "commit-complete", label: "Commit complete" },
+    activityPasses: { "reviewing-plan": 2 }, plan: { tasks: { completed: 2, total: 3 } },
+    execution: { mode: "focus", scope: "execute", runId: "old-run", turnsCompleted: 2 },
+    source: "input", updatedAt: 10,
+  };
+  assert.deepEqual(unlinkWorkflowTicketState(state, "command"), {
+    activeStep: "commit", currentStepComplete: true,
+    activity: { id: "commit-complete", label: "Commit complete" },
+    activityPasses: { "reviewing-plan": 2 }, source: "command", updatedAt: 10,
+  });
 });
 
 test("positional markers support active, complete, and direct later steps", () => {
