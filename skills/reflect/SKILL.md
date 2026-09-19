@@ -20,7 +20,7 @@ Review only docs and sections related to the current work. If reading the releva
    - external constraints or decision rationale absent from code → the relevant domain doc
    - recurring agent mistakes, user corrections, review findings, or unexpected workflow pitfalls → the project-local `AGENTS.md`
    - repeatable project workflows already defined in local skills or agent configuration → the owning file. Do not create skills or change user-global configuration unless explicitly requested.
-3. Get approval as described below, then apply approved changes. For substantive edits, call `updating-guidance` when available before editing. Then invoke the `docs-critic` subagent. Skip both for no edits or minor fixes to typos, links, paths, or formatting. Follow the critic rule in `AGENTS.md`. Delete an update if the critique shows it is not worth keeping. Ask again if critic feedback requires changes beyond the approved scope.
+3. Apply changes under the approval rules below. For substantive edits, call `updating-guidance` when available before editing. Then invoke the `docs-critic` subagent. Skip both for no edits or minor fixes to typos, links, paths, or formatting. Follow the critic rule in `AGENTS.md`. Delete an update if the critique shows it is not worth keeping. Use the same approval rules for critic-driven changes.
 
 ### Editing rules
 
@@ -29,7 +29,8 @@ Review only docs and sections related to the current work. If reading the releva
 - If guidance fits both a domain doc and `AGENTS.md`, put the details in the domain doc. Add a short pointer in `AGENTS.md` only if agents are likely to miss it.
 - Keep project-local `AGENTS.md` focused on task execution, not session memory. Remove code-inferable guidance rather than moving it to another doc.
 - Update `CONTEXT.md` only when project meaning, audience, stage, assumptions, or terminology changes. Do not add implementation summaries, change history, or general programming terms.
-- Before editing durable docs or agent guidance, use the structured question tool to get approval. Summarize each proposed change in one short bullet: file, intended change, and why. Show exact wording only on request. Apply only approved changes. Invoking Reflect alone is not approval. Skip the question if no changes are needed.
+- Fix typos, links, paths, formatting, and factual errors in existing docs without asking. Verify facts against reviewed code.
+- Use the structured question tool before changing rules, workflows, project purpose, or promises to users—or when unsure. Show the file, why it needs changing, proposed text, and practical effect. Summarize long edits as before/after. Apply only approved changes.
 
 ### Boundaries
 

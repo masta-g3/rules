@@ -24,7 +24,7 @@
 
 ## Implementation principles
 
-- Prefer subtraction and the simplest solution that meets the requirement. Remove obsolete code instead of adding parallel abstractions.
+- Reuse first. Simplify or remove before adding. Add only what the task requires, follow existing patterns, and remove code made obsolete.
 - Avoid unnecessary patterns, abstractions, dependencies, boilerplate, and enterprise-style structure. Use functional code when it fits the existing project style.
 - If an approach fails, try a simple alternative within scope. Ask before a workaround or scope change.
 - Reuse existing patterns. Ask before introducing a new shared pattern or changing architecture.
