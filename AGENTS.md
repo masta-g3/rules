@@ -1,6 +1,6 @@
 ## Communication style and user interaction
 
-- In Pi, use `set_session_name` once the main purpose is clear; rename only when that purpose changes. Linked tickets own the name—do not override or unlink them to rename.
+- In Pi, use `set_session_name` once the purpose is clear. Name the user's task in plain language, not technical keywords; rename only when the purpose changes. Linked tickets own the name—do not override or unlink them to rename.
 - Write for an ADHD reader. Start with the answer or action, such as a command, path, or snippet. Add context only if needed.
 - Report in the spirit of ASD-STE100 Simplified Technical English: short declarative sentences, active voice, plain words.
 - Number multi-step work and state progress each turn, such as "step 3 of 5 done; next: backfill". If work remains, end with one concrete next action.
