@@ -42,10 +42,13 @@ Use when the user names a ticket or asks to try the automation on the next ticke
 3. Resolve the worktree decision before launching the child:
    - ask whether to use a worktree unless the user already decided;
    - if approved, confirm the start branch and PR target;
-   - create `agent-work/worktrees/<ticket-id>/<repo-name>/` on branch `<ticket-id>`;
-   - ensure `agent-work/worktrees/` is ignored and copy required untracked local configuration.
+   - reuse a Hub-supplied mapping as Hub-owned, without a Rules record;
+   - otherwise create an exact Rules-owned external record with `$SKILLS_ROOT/_lib/worktrees.sh create`; use `AGENT_WORKTREES_DIR` or its default `~/.local/share/agent-worktrees`;
+   - register an existing worktree only by explicit path and verified identity; never scan, migrate, or adopt by ticket name;
+   - copy only required inspected local configuration and keep its contents out of metadata.
 4. Launch one persistent child for the ticket with:
-   - `cwd` set to the approved worktree, or the current checkout when no worktree was approved;
+   - `cwd` set to the approved exact worktree, or the current checkout when no worktree was approved;
+   - the owner and absolute Rules record path when Rules owns it, with instructions to bind that path through `set_workflow_ticket` and never fall back to the source checkout;
    - `autoStopOnComplete: false`;
    - nested specialists enabled only when needed through a narrow allowlist.
 5. Send exactly one phase prompt at a time:
@@ -65,7 +68,7 @@ Use when the user names a ticket or asks to try the automation on the next ticke
 
 To process several tickets, repeat this mode per next actionable feature (new child per ticket) within the boundary the user set — epic prefix, ticket count, or stop-on-first-failure — then summarize completed, blocked, and remaining work.
 
-`WORKFLOW COMPLETE — PENDING PR MERGE` completes the commit turn. Report the open PR and retained worktree as pending cleanup; do not report the ticket as blocked.
+`WORKFLOW COMPLETE — PENDING PR MERGE` completes the commit turn. Report the open PR and retained worktree as pending cleanup; do not report the ticket as blocked. Workflow completion and worktree cleanup are independent. After approved integration and explicit artifact dispositions, use the owning closeout path and verify terminal cleanup rather than inferring it from Commit.
 
 ## Parallel tickets
 

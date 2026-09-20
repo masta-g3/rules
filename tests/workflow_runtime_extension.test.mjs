@@ -9,7 +9,7 @@ import { PlanWidget } from "../extensions/workflow-runtime/plan-widget.ts";
 import { createSessionModelCall, resolveSessionModels } from "../extensions/workflow-runtime/session-model.ts";
 import { TodoPanel } from "../extensions/workflow-runtime/todo-panel.ts";
 
-function harness(cwd, initialBranch = [], initialName, modelCall) {
+function harness(cwd, initialBranch = [], initialName, modelCall, readBinding) {
   const handlers = new Map();
   const commands = new Map();
   const shortcuts = new Map();
@@ -66,7 +66,7 @@ function harness(cwd, initialBranch = [], initialName, modelCall) {
     sendUserMessage(message) { operations.push({ kind: "send-user", message }); },
     events: { on() {}, emit() {} },
   };
-  workflowRuntime(pi, modelCall ? { modelCall } : undefined);
+  workflowRuntime(pi, modelCall || readBinding ? { ...(modelCall ? { modelCall } : {}), ...(readBinding ? { readBinding } : {}) } : undefined);
   return {
     branch,
     commands,
@@ -162,6 +162,9 @@ test("compact-fork startup clears inherited producer state before its exact rece
           version: 1, updatedAt: 10,
           ticket: { id: "meta-001", subtitle: "Old task", description: "Old description" },
           attention: { kind: "blocked", text: "Old blocker" },
+          worktree: { version: 1, recordId: "old-record", producer: "rules", revision: 4, updatedAt: 10, repositories: [
+            { sourcePath: cwd, worktreePath: join(cwd, "old-worktree"), branch: "old", role: "primary", state: "active" },
+          ] },
         } },
       ], "Metadata redesign");
 
@@ -178,6 +181,9 @@ test("compact-fork startup clears inherited producer state before its exact rece
       assert.equal(runtime.latest("workflow-runtime").plan, undefined);
       assert.equal(runtime.latest("pi-agent-hub-context").ticket, undefined);
       assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
+      assert.deepEqual(runtime.latest("pi-agent-hub-context").worktree, {
+        version: 1, recordId: "old-record", producer: "rules", revision: 5, updatedAt: runtime.latest("pi-agent-hub-context").worktree.updatedAt, cleared: true,
+      });
       assert.deepEqual(runtime.latest("workflow-runtime-reset"), { version: 1, id: attemptId, status: "ready" });
       const resetAppends = runtime.operations.filter((item) => item.kind === "append").slice(-3);
       assert.deepEqual(resetAppends.map((item) => item.customType), [
@@ -247,6 +253,25 @@ test("compact-fork reset rejects stale asynchronous metadata results", async () 
       assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
       assert.equal(runtime.latest("workflow-runtime").execution, undefined);
     });
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("native fork publishes a lifecycle tombstone", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [
+      { type: "custom", customType: "workflow-runtime", data: { activeStep: "execute", ticketId: "meta-001", worktreeRecord: join(cwd, "record.json") } },
+      { type: "custom", customType: "pi-agent-hub-context", data: { version: 1, updatedAt: 2, ticket: { id: "meta-001" }, worktree: {
+        version: 1, recordId: "fork-record", producer: "rules", revision: 3, updatedAt: 2,
+        repositories: [{ sourcePath: cwd, worktreePath: join(cwd, "task"), branch: "task", role: "primary", state: "active" }],
+      } } },
+    ]);
+    await runtime.emit("session_start", { reason: "fork" });
+    assert.deepEqual(runtime.latest("pi-agent-hub-context").worktree, {
+      version: 1, recordId: "fork-record", producer: "rules", revision: 4,
+      updatedAt: runtime.latest("pi-agent-hub-context").worktree.updatedAt, cleared: true,
+    });
+    assert.equal(runtime.latest("workflow-runtime").worktreeRecord, undefined);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -358,7 +383,7 @@ test("workflow clear commands durably unlink the right projection and release na
     const beforeMalformed = runtime.branch.length;
     await runtime.commands.get("wf-ticket").handler(" clear extra ", runtime.ctx);
     assert.equal(runtime.branch.length, beforeMalformed);
-    assert.match(runtime.operations.at(-1).message, /Usage: \/wf-ticket <ticket-id> \| clear/);
+    assert.match(runtime.operations.at(-1).message, /Usage: \/wf-ticket <ticket-id> \[absolute-worktree-record] \| clear/);
 
     await runtime.commands.get("wf-ticket").handler(" clear ", runtime.ctx);
     const unlinked = runtime.latest("workflow-runtime");
@@ -465,6 +490,140 @@ test("clearing during a final plan read cannot restore progress or continue Focu
       assert.equal(runtime.operations.filter((operation) => operation.kind === "send-message" || operation.kind === "send-user").length, 0);
     }
   } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("a delayed binding read cannot publish after workflow clear", async () => {
+  const cwd = await project();
+  let resolveBinding;
+  const readBinding = () => new Promise((resolve) => { resolveBinding = resolve; });
+  const recordPath = join(cwd, "record.json");
+  const snapshot = { version: 1, recordId: "stale-record", producer: "rules", revision: 2, updatedAt: 2, repositories: [
+    { sourcePath: cwd, worktreePath: cwd, branch: "task", role: "primary", state: "active" },
+  ] };
+  try {
+    const runtime = harness(cwd, [
+      { type: "custom", customType: "workflow-runtime", data: { activeStep: "execute", ticketId: "meta-001", worktreeRecord: recordPath } },
+      { type: "custom", customType: "pi-agent-hub-context", data: { version: 1, updatedAt: 2, ticket: { id: "meta-001" }, worktree: snapshot } },
+    ], "Metadata redesign", undefined, readBinding);
+    const starting = runtime.emit("session_start", { reason: "resume" });
+    await settle();
+    await runtime.commands.get("wf-clear").handler("", runtime.ctx);
+    resolveBinding({ recordPath, recordId: "stale-record", ticket: "meta-001", authoredRoot: cwd, snapshot });
+    await starting;
+    assert.equal(runtime.latest("workflow-runtime").worktreeRecord, undefined);
+    assert.equal(runtime.latest("pi-agent-hub-context").worktree.cleared, true);
+    assert.equal(runtime.latest("pi-agent-hub-context").worktree.repositories, undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("delayed command and tool binding validation cannot override a clear", async () => {
+  const cwd = await project();
+  const recordPath = join(cwd, "record.json");
+  const snapshot = { version: 1, recordId: "validated-record", producer: "rules", revision: 1, updatedAt: 1, repositories: [
+    { sourcePath: cwd, worktreePath: cwd, branch: "task", role: "primary", state: "active" },
+  ] };
+  try {
+    for (const entryPoint of ["command", "tool"]) {
+      let resolveBinding;
+      const readBinding = () => new Promise((resolve) => { resolveBinding = resolve; });
+      const runtime = harness(cwd, [], undefined, undefined, readBinding);
+      const pending = entryPoint === "command"
+        ? runtime.commands.get("wf-ticket").handler(`meta-001 ${recordPath}`, runtime.ctx)
+        : runtime.tools.get("set_workflow_ticket").execute("ticket", { ticketId: "meta-001", worktreeRecord: recordPath }, undefined, undefined, runtime.ctx);
+      await settle();
+      await runtime.commands.get("wf-clear").handler("", runtime.ctx);
+      resolveBinding({ recordPath, recordId: "validated-record", ticket: "meta-001", authoredRoot: cwd, snapshot });
+      if (entryPoint === "tool") await assert.rejects(pending, /changed while.*validat/i);
+      else await pending;
+      assert.equal(runtime.latest("workflow-runtime").worktreeRecord, undefined);
+      assert.equal(runtime.latest("workflow-runtime").ticketId, undefined);
+    }
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("explicit worktree binding owns ticket and plan refresh across resume", async () => {
+  const source = await project();
+  const bound = await project();
+  const records = await mkdtemp(join(tmpdir(), "rules-record-"));
+  const recordPath = join(records, "worktree.json");
+  try {
+    await writeFile(join(source, "agent-work/plans/meta-001.md"), "### Phase 1: Source\n- [ ] old\n");
+    await writeFile(join(bound, "agent-work/plans/meta-001.md"), "### Phase 1: Bound\n- [x] one\n- [x] two\n");
+    const record = {
+      version: 1, id: "task-record", revision: 1, owner: "rules", ticket: "meta-001", recordPath,
+      primaryRepository: "app", authoredRoot: bound, state: "active", updatedAt: new Date().toISOString(),
+      repositories: [{ label: "app", source, worktree: bound, branch: "task", role: "primary", state: "active" }],
+    };
+    await writeFile(recordPath, JSON.stringify(record));
+    const runtime = harness(source);
+    await runtime.tools.get("set_workflow_ticket").execute("ticket", { ticketId: "meta-001", worktreeRecord: recordPath }, undefined, undefined, runtime.ctx);
+    await runtime.emit("input", { source: "interactive", text: "/skill:execute meta-001" });
+    assert.deepEqual(runtime.latest("workflow-runtime").plan.tasks, { completed: 2, total: 2 });
+    assert.equal(runtime.latest("workflow-runtime").worktreeRecord, recordPath);
+    assert.equal(runtime.latest("pi-agent-hub-context").worktree.recordId, "task-record");
+
+    await mkdir(join(bound, "agent-work/history"), { recursive: true });
+    await writeFile(join(bound, "agent-work/history/meta-001.md"), "### Phase 1: Archived\n- [x] one\n- [x] two\n- [x] three\n");
+    const yaml = await readFile(join(bound, "agent-work/features.yaml"), "utf8");
+    await writeFile(join(bound, "agent-work/features.yaml"), yaml.replace("agent-work/plans/meta-001.md", "agent-work/history/meta-001.md"));
+    await rm(join(bound, "agent-work/plans/meta-001.md"));
+    await runtime.emit("tool_execution_end", { toolName: "edit" });
+    assert.deepEqual(runtime.latest("workflow-runtime").plan.tasks, { completed: 3, total: 3 });
+
+    const resumed = harness(source, runtime.branch, runtime.name);
+    await resumed.emit("session_start", { reason: "resume" });
+    assert.equal(resumed.latest("workflow-runtime").worktreeRecord, recordPath);
+    assert.deepEqual(resumed.latest("workflow-runtime").plan.tasks, { completed: 3, total: 3 });
+
+    const archivedPlan = join(bound, "agent-work/history/meta-001.md");
+    await rm(archivedPlan);
+    await resumed.emit("tool_execution_end", { toolName: "edit" });
+    assert.equal(resumed.latest("workflow-runtime").plan, undefined);
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.producer, "rules");
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.revision, 2);
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.repositories[0].state, "check-needed");
+
+    await writeFile(archivedPlan, "### Phase 1: Archived\n- [x] one\n- [x] two\n- [x] three\n");
+    await resumed.emit("tool_execution_end", { toolName: "edit" });
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.producer, "rules");
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.revision, 3);
+    assert.deepEqual(resumed.latest("workflow-runtime").plan.tasks, { completed: 3, total: 3 });
+
+    const featuresPath = join(bound, "agent-work/features.yaml");
+    const archivedYaml = await readFile(featuresPath, "utf8");
+    await rm(featuresPath);
+    await resumed.emit("tool_execution_end", { toolName: "edit" });
+    assert.equal(resumed.latest("workflow-runtime").plan, undefined);
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.producer, "rules");
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.revision, 4);
+    assert.match(resumed.latest("pi-agent-hub-context").worktree.repositories[0].issue, /ticket/);
+    await writeFile(featuresPath, archivedYaml);
+    await resumed.emit("tool_execution_end", { toolName: "edit" });
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.producer, "rules");
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.revision, 5);
+
+    await rm(recordPath);
+    await resumed.emit("tool_execution_end", { toolName: "edit" });
+    assert.equal(resumed.latest("workflow-runtime").plan, undefined);
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.producer, "rules");
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.revision, 6);
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.repositories[0].state, "check-needed");
+
+    await writeFile(recordPath, JSON.stringify(record));
+    await resumed.emit("tool_execution_end", { toolName: "edit" });
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.revision, 7);
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.repositories[0].state, "active");
+    await resumed.commands.get("wf-clear").handler("", resumed.ctx);
+    assert.equal(resumed.latest("workflow-runtime").worktreeRecord, undefined);
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.cleared, true);
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.producer, "rules");
+    assert.equal(resumed.latest("pi-agent-hub-context").worktree.revision, 8);
+    assert.ok(record.revision < resumed.latest("pi-agent-hub-context").worktree.revision);
+  } finally {
+    await rm(source, { recursive: true, force: true });
+    await rm(bound, { recursive: true, force: true });
+    await rm(records, { recursive: true, force: true });
+  }
 });
 
 test("ticket context precedes native name, ordinary turns stay stable, and plan refreshes", async () => {

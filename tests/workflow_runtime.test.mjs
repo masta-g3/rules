@@ -46,6 +46,23 @@ const expectedWorkflowDefinition = [
   { id: "commit", short: "CM", label: "Commit" },
 ];
 
+test("worktree wire parsing returns only normalized bounded fields", () => {
+  const parsed = parseContextSnapshot({
+    version: 1, updatedAt: 1, unknown: "drop",
+    worktree: {
+      version: 1, recordId: " record ", producer: " other ", revision: 2, updatedAt: 3, unknown: "drop",
+      repositories: [{
+        sourcePath: " /source ", worktreePath: " /worktree ", branch: " task ", role: "primary", state: "active",
+        issue: "bounded   issue", unknown: "drop",
+      }],
+    },
+  });
+  assert.deepEqual(parsed.worktree, {
+    version: 1, recordId: "record", producer: "other", revision: 2, updatedAt: 3,
+    repositories: [{ sourcePath: "/source", worktreePath: "/worktree", branch: "task", role: "primary", state: "active", issue: "bounded issue" }],
+  });
+});
+
 test("ticket changes clear prior step-run and completion state", () => {
   const state = { activeStep: "commit", ticketId: "old-001", currentStepComplete: true, activity: { id: "commit-complete", label: "Commit complete" }, activityPasses: { review: 2 }, plan: { tasks: { completed: 2, total: 3 } } };
   assert.deepEqual(setWorkflowTicketState(state, "new-001", "command"), { activeStep: "commit", ticketId: "new-001", source: "command" });

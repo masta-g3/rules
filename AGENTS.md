@@ -54,6 +54,8 @@ Tracked work persists across sessions under `agent-work/`:
 
 Keep workflow artifacts and scratch work in `agent-work/`. Keep durable architecture, onboarding, and reference docs in `docs/`. Before handoff or commit, delete temporary files from `agent-work/` unless still useful for active plans, review, reproduction, or evidence.
 
+Agent-owned worktrees use the exact external record created by `$SKILLS_ROOT/_lib/worktrees.sh`, under `AGENT_WORKTREES_DIR` by default. Bind workflow metadata to that record and read ticket/plan state from its authored root. Never infer, scan, migrate, force-remove, or duplicate a Hub-owned worktree. Workflow completion, merge outcome, and verified worktree cleanup are independent states.
+
 ## Papercuts
 
 During long-running tasks, record meaningful repo or harness problems likely to recur in `agent-work/tickets/<ticket>/papercuts.md` so they can be fixed later. Examples include failed commands, unclear interfaces, misleading paths, and missing docs. Create no record when work goes smoothly.

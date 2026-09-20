@@ -45,6 +45,7 @@ Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, a
 | `skills/commit` | Archive plan, finalize tracked work, commit |
 | `skills/write-pr` | Write a concise, visual pull request title and body |
 | `skills/workflow-orchestrator` | Parent-gated persistent-subagent automation, per ticket or in parallel worktrees |
+| `skills/_lib/worktrees.sh` | Exact external agent-worktree create/register/inspect/state/remove operations; uses `AGENT_WORKTREES_DIR` |
 | `skills/test-coverage` | Analyze test coverage |
 | `skills/docs-health` | Assess durable documentation health |
 

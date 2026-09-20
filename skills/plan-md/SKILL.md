@@ -18,15 +18,11 @@ Do not re-ask a worktree, start-branch, or PR-target decision that the user expl
 
 ### Worktree (Only If The User Approved One)
 
-Create one worktree per repository the plan will touch, under `agent-work/worktrees/<feature-id>/<repo-name>/`, branched as `<feature-id>` from the approved start branch. If a parent orchestrator supplied an existing approved worktree at that path, verify its branch and base, then reuse it instead of creating it again:
+Use one owner. If Hub supplied a worktree mapping, verify it and work there; do not create or register a second Rules-owned mapping. Otherwise use `$SKILLS_ROOT/_lib/worktrees.sh create` with one explicit JSON `--repo` argument per repository. The helper uses `AGENT_WORKTREES_DIR` (default `~/.local/share/agent-worktrees`) and creates a unique external task directory containing the durable `worktree.json` record and worktrees. Pass source, label, branch, base, integration target, and exactly one `primary` role. It never scans for or adopts existing worktrees.
 
-```bash
-git worktree add agent-work/worktrees/<feature-id>/<repo-name> -b <feature-id> <start-branch>
-```
+For an existing approved worktree, use `$SKILLS_ROOT/_lib/worktrees.sh register` with its exact source, worktree, branch, target, role, and an optional absolute `--root`. Registration validates and preserves its location, including an explicitly approved legacy nested location. Never register a Hub-owned mapping. If adopting a nested checkout, verify that Git cannot stage it; do not add a blanket ignore rule for external worktrees.
 
-- Ensure `agent-work/worktrees/` is gitignored in each affected repo before creating anything; a nested checkout must never be committed.
-- Copy untracked local config the build needs — `.env*` and equivalents — from the top-level checkout into the worktree.
-- Keep `agent-work/worktrees/` flat and predictable: nothing but these per-feature directories, and no leftovers from finished work.
+Bind Pi to the exact returned record by passing `worktreeRecord` to `set_workflow_ticket` (or `/wf-ticket <id> <absolute-record-path>`). Other harnesses read the record's `authoredRoot` and run there. Put the sole plan and ticket update in that authored root. Do not create a duplicate plan in the source checkout. Copy only required untracked local configuration after explicit inspection; never record its contents.
 
 ### Plan File Location & Naming
 
