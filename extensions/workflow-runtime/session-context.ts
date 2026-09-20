@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve, sep } from "node:path";
+import { parseWorktreeLifecycleSnapshot, type WorktreeLifecycleSnapshot } from "./worktree-context.ts";
 
 export const CONTEXT_ENTRY_TYPE = "pi-agent-hub-context";
 export const MAX_TICKET_ID = 80;
@@ -24,6 +25,7 @@ export type PiAgentHubContextV1 = {
 	updatedAt: number;
 	ticket?: { id: string; subtitle?: string; description?: string };
 	attention?: SessionAttention;
+	worktree?: WorktreeLifecycleSnapshot;
 };
 
 type MessageContent = string | Array<{ type?: string; text?: string }>;
@@ -156,15 +158,17 @@ export function parseContextSnapshot(value: unknown): PiAgentHubContextV1 | unde
 		if (!text || text !== raw.text) return undefined;
 		attention = { ...(requestId ? { requestId } : {}), kind: raw.kind as SessionAttention["kind"], text };
 	}
-	return { version: 1, updatedAt: item.updatedAt, ...(ticket ? { ticket } : {}), ...(attention ? { attention } : {}) };
+	const worktree = parseWorktreeLifecycleSnapshot(item.worktree);
+	return { version: 1, updatedAt: item.updatedAt, ...(ticket ? { ticket } : {}), ...(attention ? { attention } : {}), ...(worktree ? { worktree } : {}) };
 }
 
-export function contextSnapshot(ticket?: TicketContext, attention?: SessionAttention, updatedAt = Date.now()): PiAgentHubContextV1 {
+export function contextSnapshot(ticket?: TicketContext, attention?: SessionAttention, updatedAt = Date.now(), worktree?: WorktreeLifecycleSnapshot): PiAgentHubContextV1 {
 	return {
 		version: 1,
 		updatedAt,
 		...(ticket ? { ticket: { id: ticket.id, ...(ticket.subtitle ? { subtitle: ticket.subtitle } : {}), ...(ticket.description ? { description: ticket.description } : {}) } } : {}),
 		...(attention ? { attention } : {}),
+		...(worktree ? { worktree } : {}),
 	};
 }
 

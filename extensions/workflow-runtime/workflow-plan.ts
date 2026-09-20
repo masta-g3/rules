@@ -66,8 +66,8 @@ export function parseWorkflowPlan(text: string): { plan?: WorkflowPlan; projecti
 	return { plan, projection };
 }
 
-export async function readWorkflowPlan(cwd: string, planFile: string): Promise<{ plan?: WorkflowPlan; projection?: PlanProjection }> {
+export async function readWorkflowPlan(cwd: string, planFile: string): Promise<{ found?: true; plan?: WorkflowPlan; projection?: PlanProjection }> {
 	const path = projectPath(cwd, planFile);
 	if (!path) return {};
-	try { return parseWorkflowPlan(await readFile(path, "utf8")); } catch { return {}; }
+	try { return { found: true, ...parseWorkflowPlan(await readFile(path, "utf8")) }; } catch { return {}; }
 }

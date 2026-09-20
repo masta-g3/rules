@@ -10,17 +10,11 @@ Never run two writable ticket agents in the same checkout. Parallel execution re
 2. If fewer independent tickets are ready than the requested parallel count, either run the smaller ticket set or use the spare slot for a read-only advisory/design/research subagent whose output is fed into relevant ticket phases.
 3. Verify the main worktree is safe. Known ignored/untracked local artifacts are acceptable; unrelated tracked changes are a stop condition unless the user approves them.
 4. Confirm the shared start branch and PR target with the user. An explicit request for parallel execution approves worktree isolation but does not select these branches.
-5. Ensure `agent-work/worktrees/` is ignored, then create canonical isolated worktrees:
-   ```text
-   git worktree add \
-     agent-work/worktrees/<ticket-id>/<repo-name> \
-     -b <ticket-id> \
-     <start-branch>
-   ```
-6. Copy required untracked local configuration, such as `.env*`, into each worktree.
+5. For each ticket, reuse its Hub-owned mapping when supplied. Otherwise run `$SKILLS_ROOT/_lib/worktrees.sh create` with explicit repository JSON. It creates a unique external task path under `AGENT_WORKTREES_DIR` (default `~/.local/share/agent-worktrees`) and one durable `worktree.json`; ticket text alone never selects a path. Bind each Pi session to that exact record. Never scan, auto-register, migrate, or create a second owner.
+6. Copy only required inspected untracked local configuration into each worktree. Do not put secret contents in the record.
 7. Launch one persistent child per worktree with `cwd` set to that worktree and `autoStopOnComplete: false`. Enable nested specialists only with a narrow allowlist appropriate for the ticket/phase.
 8. Include a worktree boundary in every child prompt:
-   - work only in `agent-work/worktrees/<ticket-id>/<repo-name>` on branch `<ticket-id>`;
+   - work only in the exact recorded worktree on branch `<ticket-id>`;
    - do not touch the main checkout or sibling worktrees;
    - commit and push only the ticket branch;
    - do not merge or clean up worktrees.
@@ -30,9 +24,10 @@ Never run two writable ticket agents in the same checkout. Parallel execution re
 12. Let each ticket's `commit` phase push its branch and open its PR against the confirmed target.
 13. Accept `WORKFLOW COMPLETE — PENDING PR MERGE` while the PR remains open. Stop the child and retain its worktree.
 14. After the user confirms a PR was merged:
-    - remove that ticket's worktree;
-    - update the PR target branch in the top-level checkout;
-    - delete the local ticket branch with `git branch -d <ticket-id>`.
+    - update and verify the surviving source ticket/archive pointer;
+    - record explicit disposal or verified preservation for each useful local artifact;
+    - use Hub closeout for Hub ownership, or `$SKILLS_ROOT/_lib/worktrees.sh remove` for Rules ownership;
+    - verify the worktree is absent from Git and disk, then safely delete the local branch with `git branch -d <ticket-id>`; retain check-needed evidence on any refusal.
 15. Run full validation from the updated target branch after all selected PRs are merged.
 
 Expected PR conflicts are usually in `agent-work/features.yaml`, shared docs, tests, exports, and content indexes. Worktree isolation prevents runtime races, but the hosting service and user own merge order. Do not rebase, merge, or resolve cross-ticket conflicts without explicit user approval.

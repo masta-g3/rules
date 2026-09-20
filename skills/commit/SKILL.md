@@ -28,7 +28,7 @@ Assume `/reflect` handled durable documentation updates. Do not make broad docum
 
 When `set_workflow_activity` is available, call it with `committing-changes` before staging and committing.
 
-1. Inspect `git status --short`. If unrelated staged paths are present, ask the user whether to unstage them. If a worktree path appears as untracked, stop and add `agent-work/worktrees/` to `.gitignore` before staging — never commit a nested checkout. Then `git add` only session files.
+1. Inspect `git status --short`. If unrelated staged paths are present, ask the user whether to unstage them. If an explicitly adopted nested checkout appears as untracked, stop and ensure it cannot be staged; never commit a nested checkout. External Rules worktrees need no source-repository ignore rule. Then `git add` only session files.
 2. `git commit -m` format:
    - First line: sentence describing the high-level objective.
    - 2-5 bullets grouping changes by topic (omit if single cohesive change).
@@ -43,16 +43,14 @@ If this session touched multiple repositories, commit all session work independe
 
 ### Worktree Closeout
 
-If the plan names a worktree, the commit above went to its branch. Close it out per repo:
+If the plan names a worktree, the commit above went to its branch. Hub-owned worktrees stay under Hub closeout; do not register or remove them with Rules. For a Rules-owned record:
 
-1. Confirm tracked plan and ticket updates are in the commit.
-2. Before pushing, confirm the recorded PR target with the user; if absent, inspect and recommend the default branch. Push the branch and open the PR with `gh pr create --base <pr-target>`. Write the title and body per the `write-pr` skill, and link the archived plan path. Report the PR URL; do not merge it.
-3. Copy back anything worth keeping that the PR does not carry — `agent-work/tickets/<feature-id>/` evidence, decks, logs — into the top-level checkout, after the cleanup rules above have already pruned it.
-4. Announce the commit and PR are ready (hash, PR URL), then use the ask-user tool to wait: ask whether the PR is merged and the local worktree should be deleted.
-   - Confirmed: remove the worktree with `git worktree remove`, delete its now-empty parent under `agent-work/worktrees/`, update the PR target branch in the top-level checkout (`git pull` if it is checked out; otherwise `git fetch origin <pr-target>:<pr-target>`), then delete the local feature branch with `git branch -d <feature-id>` (never `-D` — if `-d` refuses, the branch has unmerged work; stop and report).
-   - Not yet: leave the worktree in place and end with the pending-merge output below.
-
-Removing the worktree does not touch the branch. If review asks for changes, `git worktree add agent-work/worktrees/<feature-id>/<repo-name> <feature-id>` restores it.
+1. Confirm tracked plan and ticket updates are committed. Run `$SKILLS_ROOT/_lib/worktrees.sh state --record <record> --state awaiting-merge --reason <bounded-reason>` before the merge handoff.
+2. Confirm the recorded PR target. Push and open the PR with `gh pr create --base <target>` and the `write-pr` skill. Do not infer or perform the merge.
+3. Inventory useful local untracked or ignored artifacts. Copy back only approved useful artifacts without overwriting unrelated files. Record a bounded disposition for every local artifact: `dispose`, or `preserve` with its verified absolute destination. Build outputs and dependencies are not automatically useful.
+4. Ask whether integration is complete and cleanup is approved. If not, retain the worktree and record `awaiting-merge` or `cleanup-pending` independently of workflow completion.
+5. After confirmed integration, first update the surviving source checkout's ticket `plan_file` and verify the canonical archived plan exists there. Then call `$SKILLS_ROOT/_lib/worktrees.sh remove --record <record> --outcome merged --artifact-dispositions '<json>' --authored-root <source> --plan-file <archive-relative-path>`. Use `discarded` only for an explicitly approved discard. The helper uses ordinary verified removal. It never forces removal, copies artifacts, scans for worktrees, or deletes a branch.
+6. If removal or safe `git branch -d` refuses, retain `cleanup-pending`/`check-needed` and report it. Never use `--force`, `rm -rf`, stash, or `branch -D`. The durable external record remains after cleanup and its authored root points to the surviving source.
 
 ### Complete Workflow Indicator
 

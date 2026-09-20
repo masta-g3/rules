@@ -17,6 +17,7 @@ import {
 	shouldNormalizeWorkflowDefinition,
 	startWorkflowStep,
 	transition,
+	unlinkWorkflowTicketState,
 	withWorkflowDefinition,
 	WORKFLOW_ACTIVITIES,
 	WORKFLOW_DEFINITION,
@@ -53,6 +54,7 @@ import {
 } from "./session-model.ts";
 import { applyPlanWidget } from "./plan-widget.ts";
 import { readWorkflowPlan } from "./workflow-plan.ts";
+import { brokenWorktreeSnapshot, clearedWorktreeSnapshot, projectWorktreeSnapshot, readWorktreeBinding, type WorktreeLifecycleSnapshot } from "./worktree-context.ts";
 import { TodoPanel, TODO_PANEL_OVERLAY_OPTIONS, TODO_PANEL_SHORTCUT } from "./todo-panel.ts";
 
 const ENTRY_TYPE = "workflow-runtime";
@@ -401,9 +403,10 @@ function metadataStatusReport(status: MetadataStatus): string {
 
 export default function workflowRuntime(
 	pi: ExtensionAPI,
-	dependencies: { modelCall?: SessionModelCall } = {},
+	dependencies: { modelCall?: SessionModelCall; readBinding?: typeof readWorktreeBinding } = {},
 ): void {
 	const modelCall = dependencies.modelCall ?? createSessionModelCall();
+	const readBinding = dependencies.readBinding ?? readWorktreeBinding;
 	const rawForkCompactAttempt = process.env[FORK_COMPACT_ENV];
 	const forkCompactAttempt = rawForkCompactAttempt && FORK_COMPACT_ATTEMPT.test(rawForkCompactAttempt)
 		? rawForkCompactAttempt
@@ -415,6 +418,8 @@ export default function workflowRuntime(
 	let state: WorkflowState = {};
 	let ticketContext: TicketContext | undefined;
 	let ticketName: string | undefined;
+	let worktreeLifecycle: WorktreeLifecycleSnapshot | undefined;
+	let lastPublishedContext = "";
 	let recoveryPending = false;
 	let lastAdvanceShortcutAt = 0;
 	let generation = 0;
@@ -445,7 +450,38 @@ export default function workflowRuntime(
 		return updated;
 	};
 
-	const clearState = (pi: ExtensionAPI, ctx: ExtensionContext): WorkflowState => setState(pi, ctx, {});
+	const clearWorkflowRail = (pi: ExtensionAPI, ctx: ExtensionContext): WorkflowState => setState(pi, ctx, {});
+
+	const clearTaskState = (
+		ctx: ExtensionContext,
+		mode: "ticket" | "full",
+		baseState: WorkflowState = state,
+	): WorkflowState => {
+		generation += 1;
+		metadataEpoch += 1;
+		metadataRequest += 1;
+		settledMetadataRequest = metadataRequest;
+		metadataStatus = metadataEnabled ? { state: "ready" } : { state: "disabled" };
+		settledMetadataStatus = metadataStatus;
+		lastMetadataWarning = undefined;
+		recoveryPending = false;
+		deferredWorkflowInputs = [];
+		latestUserRequest = undefined;
+		currentAttention = undefined;
+		attentionGenerationDone = -1;
+		automaticNamingStarted = false;
+		lastAdvanceShortcutAt = 0;
+		ticketContext = undefined;
+		ticketName = undefined;
+		const stopped = baseState.execution ? transition(baseState, { type: "end-focus" }).state : baseState;
+		const nextState = mode === "ticket" ? unlinkWorkflowTicketState(stopped, "command") : {};
+		if (mode === "full" && worktreeLifecycle && !worktreeLifecycle.cleared) {
+			worktreeLifecycle = clearedWorktreeSnapshot(worktreeLifecycle);
+			publishContext();
+		} else publishContext();
+		state = setState(pi, ctx, nextState);
+		return state;
+	};
 
 	const rememberMetadataStatus = (requestId: number, status: MetadataStatus) => {
 		if (requestId <= settledMetadataRequest) return;
@@ -524,15 +560,54 @@ export default function workflowRuntime(
 	};
 
 	const publishContext = (attention?: SessionAttention) => {
-		pi.appendEntry(CONTEXT_ENTRY_TYPE, contextSnapshot(ticketContext, attention));
+		const snapshot = contextSnapshot(ticketContext, attention, Date.now(), worktreeLifecycle);
+		const comparable = JSON.stringify({ ...snapshot, updatedAt: 0 });
+		if (comparable === lastPublishedContext) return;
+		lastPublishedContext = comparable;
+		pi.appendEntry(CONTEXT_ENTRY_TYPE, snapshot);
+	};
+
+	type BindingRead = { root?: string; snapshot?: WorktreeLifecycleSnapshot; clear?: true; broken?: true };
+	const readAuthoritativeBinding = async (ctx: ExtensionContext, ticketId: string): Promise<BindingRead> => {
+		if (!state.worktreeRecord) return { root: effectiveProjectCwd(ctx.cwd), clear: true };
+		const binding = await readBinding(state.worktreeRecord, ticketId);
+		return binding ? { root: binding.authoredRoot, snapshot: binding.snapshot } : { broken: true };
+	};
+
+	const applyBindingRead = (read: BindingRead, issue?: string) => {
+		let next = worktreeLifecycle;
+		if (read.clear && next && !next.cleared) next = clearedWorktreeSnapshot(next);
+		else if ((read.broken || issue) && (read.snapshot ?? next)) {
+			const base = read.snapshot && next?.recordId === read.snapshot.recordId && next.revision >= read.snapshot.revision ? next : (read.snapshot ?? next!);
+			next = brokenWorktreeSnapshot(base, issue);
+		}
+		else if (read.snapshot) next = projectWorktreeSnapshot(read.snapshot, next);
+		if (JSON.stringify(next) !== JSON.stringify(worktreeLifecycle)) {
+			worktreeLifecycle = next;
+			publishContext(currentAttention);
+		}
 	};
 
 	const refreshPlan = async (ctx: ExtensionContext) => {
 		const requestGeneration = generation;
-		const requestedTicket = ticketContext;
-		const root = effectiveProjectCwd(ctx.cwd);
-		const result = requestedTicket?.planFile ? await readWorkflowPlan(root, requestedTicket.planFile) : {};
-		if (requestGeneration !== generation || requestedTicket?.id !== ticketContext?.id) return undefined;
+		const requestedTicketId = state.ticketId;
+		const requestedBinding = state.worktreeRecord;
+		const bindingRead = requestedTicketId ? await readAuthoritativeBinding(ctx, requestedTicketId) : {};
+		if (requestGeneration !== generation || requestedTicketId !== state.ticketId || requestedBinding !== state.worktreeRecord) return undefined;
+		const root = bindingRead.root;
+		const requestedTicket = root && requestedTicketId ? await readTicketContext(root, requestedTicketId) : undefined;
+		const result = requestedTicket?.planFile && root ? await readWorkflowPlan(root, requestedTicket.planFile) : {};
+		if (requestGeneration !== generation || requestedTicketId !== state.ticketId || requestedBinding !== state.worktreeRecord) return undefined;
+		const bindingIssue = requestedBinding && !bindingRead.broken
+			? !requestedTicket ? "Bound authored root does not contain the workflow ticket"
+				: !requestedTicket.planFile || !result.found ? "Bound workflow ticket plan is missing or invalid" : undefined
+			: undefined;
+		applyBindingRead(bindingRead, bindingIssue);
+		const freshTicket = requestedTicket ?? (requestedTicketId ? { id: requestedTicketId } : undefined);
+		if (JSON.stringify(freshTicket) !== JSON.stringify(ticketContext)) {
+			ticketContext = freshTicket;
+			publishContext(currentAttention);
+		}
 		const projection = state.activeStep ? result.projection : undefined;
 		const current = JSON.stringify(state.plan);
 		if (JSON.stringify(projection) !== current) state = setState(pi, ctx, { ...state, plan: projection });
@@ -548,8 +623,12 @@ export default function workflowRuntime(
 		awaitGeneratedName = false,
 	) => {
 		const requestGeneration = ++generation;
-		const selected = await readTicketContext(effectiveProjectCwd(ctx.cwd), ticketId) ?? { id: ticketId };
-		if (requestGeneration !== generation) return false;
+		const requestedBinding = state.worktreeRecord;
+		const bindingRead = await readAuthoritativeBinding(ctx, ticketId);
+		const selectedTicket = bindingRead.root ? await readTicketContext(bindingRead.root, ticketId) : undefined;
+		if (requestGeneration !== generation || requestedBinding !== state.worktreeRecord) return false;
+		applyBindingRead(bindingRead, requestedBinding && !bindingRead.broken && !selectedTicket ? "Bound authored root does not contain the workflow ticket" : undefined);
+		const selected = selectedTicket ?? { id: ticketId };
 		const previousTicketName = ticketContext?.id === ticketId ? ticketName : undefined;
 		ticketContext = selected;
 		ticketName = selected.title ?? previousTicketName ?? (!rename ? pi.getSessionName() : undefined);
@@ -611,25 +690,45 @@ export default function workflowRuntime(
 	});
 
 	pi.registerCommand("wf-ticket", {
-		description: "Set or override the active workflow ticket",
+		description: "Set or clear the active workflow ticket",
 		handler: async (args, ctx) => {
-			const ticketId = parseTicketArg(args ?? "");
-			if (!ticketId) {
-				ctx.ui.notify("Usage: /wf-ticket <ticket-id>", "warning");
+			const rawArg = (args ?? "").trim();
+			if (rawArg === "clear") {
+				clearTaskState(ctx, "ticket");
+				ctx.ui.notify("Workflow ticket cleared. Workflow progress is retained.", "info");
 				return;
 			}
-			state = setState(pi, ctx, setWorkflowTicketState(state, ticketId, "command"));
-			if (ticketContext?.id !== ticketId) await selectTicket(ctx, ticketId);
+			const [ticketArg, recordPath, ...extra] = rawArg.split(/\s+/u);
+			const ticketId = parseTicketArg(ticketArg ?? "");
+			if (!ticketId || extra.length) {
+				ctx.ui.notify("Usage: /wf-ticket <ticket-id> [absolute-worktree-record] | clear", "warning");
+				return;
+			}
+			if (recordPath) {
+				const validationGeneration = generation;
+				const priorBinding = state.worktreeRecord;
+				const priorTicket = state.ticketId;
+				const binding = await readBinding(recordPath, ticketId);
+				if (validationGeneration !== generation || priorBinding !== state.worktreeRecord || priorTicket !== state.ticketId) {
+					ctx.ui.notify("Workflow changed while the worktree binding was being validated; the binding was not applied.", "warning");
+					return;
+				}
+				if (!binding) {
+					ctx.ui.notify("The worktree record is missing, invalid, or belongs to another ticket.", "warning");
+					return;
+				}
+			}
+			state = setState(pi, ctx, { ...setWorkflowTicketState(state, ticketId, "command"), ...(recordPath ? { worktreeRecord: recordPath } : {}) });
+			if (recordPath || ticketContext?.id !== ticketId) await selectTicket(ctx, ticketId);
 			ctx.ui.notify(`Workflow ticket set to ${ticketId}.`, "info");
 		},
 	});
 
 	pi.registerCommand("wf-clear", {
-		description: "Clear the workflow indicator",
+		description: "Clear the workflow and unlink its ticket",
 		handler: async (_args, ctx) => {
-			recoveryPending = false;
-			state = clearState(pi, ctx);
-			ctx.ui.notify("Workflow indicator cleared.", "info");
+			clearTaskState(ctx, "full");
+			ctx.ui.notify("Workflow and ticket cleared.", "info");
 		},
 	});
 
@@ -693,11 +792,11 @@ export default function workflowRuntime(
 	pi.registerTool({
 		name: "set_session_name",
 		label: "Set Session Name",
-		description: "Set the exact native Pi session name. Linked sessions keep their ticket title; unlink the ticket before renaming.",
+		description: "Set the exact native Pi session name. Linked sessions keep their ticket title; run /wf-ticket clear before renaming.",
 		parameters: Type.Object({ name: Type.String({ minLength: 1 }) }),
 		async execute(_id, params) {
 			if (ticketContext && params.name !== ticketName) {
-				throw new Error(`Session is linked to ${ticketContext.id} and keeps its ticket title. Unlink the ticket before renaming.`);
+				throw new Error(`Session is linked to ${ticketContext.id} and keeps its ticket title. Run /wf-ticket clear before renaming.`);
 			}
 			pi.setSessionName(params.name);
 			generation += 1;
@@ -751,12 +850,21 @@ export default function workflowRuntime(
 		],
 		parameters: Type.Object({
 			ticketId: Type.String({ description: "Ticket id like engine-003" }),
+			worktreeRecord: Type.Optional(Type.String({ description: "Exact absolute Rules worktree.json path" })),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			const ticketId = parseTicketArg(params.ticketId);
 			if (!ticketId) throw new Error("Invalid ticket id. Use format like engine-003.");
-			state = setState(pi, ctx, setWorkflowTicketState(state, ticketId, "tool"));
-			if (ticketContext?.id !== ticketId) await selectTicket(ctx, ticketId);
+			if (params.worktreeRecord) {
+				const validationGeneration = generation;
+				const priorBinding = state.worktreeRecord;
+				const priorTicket = state.ticketId;
+				const binding = await readBinding(params.worktreeRecord, ticketId);
+				if (validationGeneration !== generation || priorBinding !== state.worktreeRecord || priorTicket !== state.ticketId) throw new Error("Workflow changed while the worktree binding was being validated; the binding was not applied.");
+				if (!binding) throw new Error("The worktree record is missing, invalid, or belongs to another ticket.");
+			}
+			state = setState(pi, ctx, { ...setWorkflowTicketState(state, ticketId, "tool"), ...(params.worktreeRecord ? { worktreeRecord: params.worktreeRecord } : {}) });
+			if (params.worktreeRecord || ticketContext?.id !== ticketId) await selectTicket(ctx, ticketId);
 			return {
 				content: [{ type: "text", text: `Workflow ticket set to ${ticketId}.` }],
 				details: { ticketId },
@@ -885,7 +993,7 @@ export default function workflowRuntime(
 			lastAdvanceShortcutAt = 0;
 			recoveryPending = false;
 			if (!nextStep) {
-				state = clearState(pi, ctx);
+				state = clearWorkflowRail(pi, ctx);
 				ctx.ui.notify("Workflow indicator cleared.", "info");
 				return;
 			}
@@ -1023,7 +1131,7 @@ export default function workflowRuntime(
 				publishContext();
 			}
 		}
-		if (state.activeStep && ticketContext?.planFile) await refreshPlan(ctx);
+		if (state.activeStep && (state.worktreeRecord || ticketContext?.planFile)) await refreshPlan(ctx);
 	});
 
 	pi.on("agent_end", async (event, ctx) => {
@@ -1088,7 +1196,7 @@ export default function workflowRuntime(
 	pi.on("session_info_changed", (_event, ctx) => {
 		if (!ticketContext || !ticketName || pi.getSessionName() === ticketName) return;
 		pi.setSessionName(ticketName);
-		ctx.ui.notify(`Session is linked to ${ticketContext.id} and keeps its ticket title. Unlink the ticket before renaming.`, "warning");
+		ctx.ui.notify(`Session is linked to ${ticketContext.id} and keeps its ticket title. Run /wf-ticket clear before renaming.`, "warning");
 	});
 
 	pi.on("session_start", async (event, ctx) => {
@@ -1110,10 +1218,16 @@ export default function workflowRuntime(
 		deferredWorkflowInputs = [];
 		const branch = ctx.sessionManager.getBranch();
 		const startsEmpty = compactForkStartup || event.reason === "new" || event.reason === "fork";
-		const restoredContext = startsEmpty ? undefined : findLatestContext(branch);
+		const branchContext = findLatestContext(branch);
+		const restoredContext = startsEmpty ? undefined : branchContext;
+		worktreeLifecycle = compactForkStartup || event.reason === "fork" ? branchContext?.worktree : restoredContext?.worktree;
+		lastPublishedContext = branchContext ? JSON.stringify({ ...branchContext, updatedAt: 0 }) : "";
 		const restoredRequestQuestion = restoredContext?.attention?.kind === "question" && restoredContext.attention.requestId !== undefined;
 		currentAttention = restoredRequestQuestion ? undefined : restoredContext?.attention;
-		if (restoredRequestQuestion) pi.appendEntry(CONTEXT_ENTRY_TYPE, contextSnapshot(restoredContext?.ticket));
+		if (restoredRequestQuestion) {
+			ticketContext = restoredContext?.ticket;
+			publishContext();
+		}
 		const restored = event.reason === "new" ? { state: {} } : findLatestState(branch);
 		const boundaryReason = compactForkStartup ? "fork" : event.reason;
 		const result = transition(restored.state, { type: "session-boundary", reason: boundaryReason });
@@ -1121,24 +1235,26 @@ export default function workflowRuntime(
 			{ ...restored.state, steps: restored.steps },
 			boundaryReason,
 		);
+		if (compactForkStartup || event.reason === "fork") {
+			clearTaskState(ctx, "full", restored.state);
+			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
+			if (compactForkStartup && forkCompactAttempt) {
+				pi.appendEntry(RESET_ENTRY_TYPE, { version: 1, id: forkCompactAttempt, status: "ready" });
+			}
+			return;
+		}
 		if (startsEmpty) {
 			automaticNamingStarted = false;
-			if (compactForkStartup) latestUserRequest = undefined;
 			ticketContext = undefined;
 			ticketName = undefined;
-			if (compactForkStartup || event.reason === "fork") publishContext();
 		}
-		if (compactForkStartup || event.reason === "fork" || result.effects.length || normalizeDefinition) {
+		if (result.effects.length || normalizeDefinition) {
 			state = setState(pi, ctx, result.state);
 			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
 		} else {
 			state = result.state;
 			applyWidget(ctx, state, metadataStatus);
 			applyPlanWidget(ctx, state.plan);
-		}
-		if (compactForkStartup) {
-			if (forkCompactAttempt) pi.appendEntry(RESET_ENTRY_TYPE, { version: 1, id: forkCompactAttempt, status: "ready" });
-			return;
 		}
 		if (event.reason !== "new" && event.reason !== "fork") {
 			const ticketId = state.ticketId ?? restoredContext?.ticket?.id;

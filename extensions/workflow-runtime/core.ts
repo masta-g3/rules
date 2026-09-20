@@ -76,6 +76,7 @@ export const WORKFLOW_ACTIVITIES = {
 export type WorkflowState = {
 	activeStep?: StepName;
 	ticketId?: string;
+	worktreeRecord?: string;
 	execution?: FocusExecution;
 	activity?: WorkflowActivityDisplay;
 	activityPasses?: Record<string, number>;
@@ -86,12 +87,17 @@ export type WorkflowState = {
 };
 
 export function setWorkflowTicketState(state: WorkflowState, ticketId: string | undefined, source?: WorkflowSource): WorkflowState {
-	const { plan: _plan, activity: _activity, activityPasses: _passes, currentStepComplete: _complete, ...withoutStepRun } = state;
+	const { plan: _plan, activity: _activity, activityPasses: _passes, currentStepComplete: _complete, worktreeRecord: _binding, ...withoutStepRun } = state;
 	return {
 		...(state.ticketId === ticketId ? state : withoutStepRun),
 		ticketId,
 		...(source ? { source } : {}),
 	};
+}
+
+export function unlinkWorkflowTicketState(state: WorkflowState, source?: WorkflowSource): WorkflowState {
+	const { ticketId: _ticketId, plan: _plan, execution: _execution, ...unlinked } = state;
+	return { ...unlinked, ...(source ? { source } : {}) };
 }
 
 export function startWorkflowStep(state: WorkflowState, step: StepName, source?: WorkflowSource): WorkflowState {

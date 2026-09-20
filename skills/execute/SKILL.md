@@ -17,7 +17,7 @@ Iterate through each phase: implement, verify existing features still work, conf
 
 Execute the approved plan autonomously end-to-end unless the plan says otherwise. If it cannot be implemented as planned, try a clean minimal fix within the plan’s intent; stop and consult the user before hacks, ad-hoc patches, unreviewed rearchitecture, or significant deviations.
 
-If the plan names a worktree, do all implementation, test runs, and plan-checklist updates inside it. Re-create it with `git worktree add` if it is missing.
+If the plan names a worktree, do all implementation, test runs, ticket reads, and plan-checklist updates in its recorded authored root. Inspect the exact `worktree.json` with `$SKILLS_ROOT/_lib/worktrees.sh inspect --record <absolute-path>` before use. Do not recreate, discover, or fall back to a source checkout when a bound record or worktree is missing or mismatched; mark it `check-needed` and report the blocker. Reuse Hub-owned worktrees without creating a Rules record. Keep the explicit Pi binding current with `set_workflow_ticket(..., worktreeRecord)` when available.
 
 **Tracked features (`{epic}-{nnn}.md`):** set status to `in_progress` before starting: `$SKILLS_ROOT/_lib/features_yaml.sh update "{feature-id}" --json '{"status":"in_progress"}'`
 
