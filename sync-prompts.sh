@@ -155,8 +155,8 @@ sync_sanitized_subagents() {
     base=$(basename "$f")
     if [[ -f "$f" ]]; then
       awk '
-        /^model:[[:space:]]*openai-codex\// { next }
-        /^thinking:[[:space:]]*/ { next }
+        /^model:[[:space:]]*(openai-codex|claude-bridge)\// { next }
+        /^(thinking|systemPromptMode|inheritProjectContext|inheritSkills):[[:space:]]*/ { next }
         /^tools:[[:space:]]*/ {
           sub(/^tools:[[:space:]]*/, "")
           n = split($0, raw, ",")
@@ -167,6 +167,7 @@ sync_sanitized_subagents() {
             if (t == "read") t = "Read"
             else if (t == "grep") t = "Grep"
             else if (t == "find") t = "Glob"
+            else if (t == "ls") t = "LS"
             else if (t == "bash") t = "Bash"
             else if (t == "edit") t = "Edit"
             else if (t == "write") t = "Write"
@@ -233,7 +234,24 @@ ensure_pi_setting_array_value() {
 }
 
 ensure_pi_package() {
-  ensure_pi_setting_array_value "packages" "$1" "pi_packages"
+  local value="$1" source package_path
+  local settings="${pi_root}/settings.json"
+  if [[ "$value" == npm:* && -f "$settings" ]]; then
+    while IFS= read -r source; do
+      case "$source" in
+        npm:*|git:*|http:*|https:*|ssh:*) continue ;;
+        '~/'*) package_path="${HOME}/${source#\~/}" ;;
+        /*) package_path="$source" ;;
+        *) package_path="${pi_root}/${source}" ;;
+      esac
+      if [[ -f "${package_path}/package.json" ]] &&
+        jq -e --arg name "${value#npm:}" '.name == $name' "${package_path}/package.json" >/dev/null; then
+        add_unique all_files["pi_packages"] "$source"
+        return
+      fi
+    done < <(jq -r '.packages // [] | .[] | if type == "string" then . else .source end' "$settings")
+  fi
+  ensure_pi_setting_array_value "packages" "$value" "pi_packages"
 }
 
 ensure_pi_skill_path() {
@@ -278,8 +296,8 @@ sync_sanitized_subagents "${repo_root}/agents/" "${claude_root}/agents/"
 sync_sanitized_subagents "${repo_root}/agents/" "${cursor_root}/agents/"
 sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
 
-prune_and_record "${repo_root}/pi/agents/" "${pi_root}/agents/" "pi_subagents"
-sync_dir "${repo_root}/pi/agents/" "${pi_root}/agents/" "pi_subagents"
+# Shared subagents now own the former Pi-only definitions.
+rm -f "${pi_root}/agents/.rules-manifest-pi_subagents"
 prune_and_record "${repo_root}/pi/skills/" "${pi_root}/skills/" "pi_skills" long-execute
 sync_dir "${repo_root}/pi/skills/" "${pi_root}/skills/" "pi_skills"
 
@@ -358,7 +376,6 @@ if [[ "$SILENT" == false ]]; then
   print_row "AGENTS.md" "agents_md" "claude, cursor, pi"
   print_row "skills" "skills" "claude, cursor, pi"
   print_row "subagents" "subagents" "claude, cursor, pi"
-  print_row "pi-only subagents" "pi_subagents" "pi"
   print_row "pi-only skills" "pi_skills" "pi"
   print_row "extensions" "extensions" "pi"
   print_row "pi packages" "pi_packages" "pi"

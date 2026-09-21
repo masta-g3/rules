@@ -57,7 +57,7 @@ Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, a
 
 Project-local Pi extensions live in `extensions/` and sync into `~/.pi/agent/extensions/` via `./sync-prompts.sh`. Pi auto-loads synced extensions on startup; use `/reload` in an existing Pi session after syncing.
 
-Pi-only subagents live in `pi/agents/` and overlay into `~/.pi/agent/agents/` after the shared `agents/` sync. Use this for agents with Pi-specific providers, tools, or skills.
+All shared subagents live in `agents/` and sync to Claude, Cursor, and Pi. Pi keeps the configured provider/model and context settings. Claude and Cursor copies omit Pi-specific model, thinking, and context settings and use their default models; sync also translates tool names.
 
 Pi-only skills live in `pi/skills/` and overlay into `~/.pi/agent/skills/` after the shared `skills/` sync. Use this only for skills that depend on Pi runtime behavior and should not appear in Claude, Cursor, or Codex skill roots.
 
@@ -192,7 +192,7 @@ Sync records what it deploys in per-directory `.rules-manifest-*` files and prun
 
 Codex receives no `AGENTS.md`, skills, or subagents. Sync prunes repo-managed Codex prompt/workflow assets so Codex stays suitable for chat, browser-style research, and ad hoc tasks rather than tracked project workflow.
 
-Sync also ensures `npm:pi-tmux-subagents` and `~/.pi/agent/skills` are listed in `~/.pi/agent/settings.json`.
+Sync also ensures `npm:pi-tmux-subagents` and `~/.pi/agent/skills` are listed in `~/.pi/agent/settings.json`. If a configured local package has the name `pi-tmux-subagents` in its `package.json`, sync keeps that install instead of adding the npm entry.
 
 If `~/.claude/settings.json` exists, sync also refreshes the Claude statusline command.
 

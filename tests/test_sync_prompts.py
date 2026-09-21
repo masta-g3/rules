@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import os
 import shutil
 import subprocess
@@ -13,11 +14,37 @@ SYNC_PROMPTS = REPO_ROOT / "sync-prompts.sh"
 
 
 class SyncPromptsTest(unittest.TestCase):
+    def test_package_sync_respects_local_install(self) -> None:
+        if not shutil.which("jq"):
+            self.skipTest("jq is unavailable")
+        helpers = SYNC_PROMPTS.read_text().split('remove_path "${codex_root}/AGENTS.md"', 1)[0]
+        for source_kind in ("relative", "absolute", "object", "missing"):
+            with self.subTest(source=source_kind), tempfile.TemporaryDirectory() as home:
+                root = Path(home)
+                pi_root = root / ".pi" / "agent"
+                pi_root.mkdir(parents=True)
+                package = root / "dev" / "subagents"
+                package.mkdir(parents=True)
+                (package / "package.json").write_text(json.dumps({"name": "pi-tmux-subagents"}))
+                source = "../../dev/subagents" if source_kind == "relative" else str(package)
+                entry = {"source": source} if source_kind == "object" else source
+                packages = [] if source_kind == "missing" else [entry]
+                settings = pi_root / "settings.json"
+                settings.write_text(json.dumps({"packages": packages, "theme": "keep"}))
+                script = root / "check.sh"
+                script.write_text(helpers + '\nensure_pi_package "npm:pi-tmux-subagents"\n')
+                for _ in range(2):
+                    subprocess.run(["bash", str(script)], env={**os.environ, "HOME": home}, check=True, capture_output=True)
+                result = json.loads(settings.read_text())
+                expected = ["npm:pi-tmux-subagents"] if source_kind == "missing" else packages
+                self.assertEqual(result["packages"], expected)
+                self.assertEqual(result["theme"], "keep")
+
     def test_claude_and_cursor_subagents_do_not_receive_gpt_provider_config(self) -> None:
         source = SYNC_PROMPTS.read_text()
 
         self.assertIn("sync_sanitized_subagents()", source)
-        self.assertIn('model:[[:space:]]*openai-codex', source)
+        self.assertIn('model:[[:space:]]*(openai-codex|claude-bridge)', source)
         self.assertIn('sync_sanitized_subagents "${repo_root}/agents/" "${claude_root}/agents/"', source)
         self.assertIn('sync_sanitized_subagents "${repo_root}/agents/" "${cursor_root}/agents/"', source)
         self.assertNotIn('sync_dir "${repo_root}/agents/" "${claude_root}/agents/" "subagents"', source)
@@ -46,6 +73,34 @@ class SyncPromptsTest(unittest.TestCase):
             self.assertNotIn("openai-codex/gpt-5.5", pi_text)
             self.assertIn("thinking: high", pi_text)
             self.assertIn("tools: read, grep, find, bash", pi_text)
+
+    def test_shared_specialists_migrate_from_pi_only_manifest(self) -> None:
+        if not shutil.which("rsync") or not shutil.which("jq"):
+            self.skipTest("sync dependencies are unavailable")
+        with tempfile.TemporaryDirectory() as home:
+            root = Path(home)
+            pi_agents = root / ".pi" / "agent" / "agents"
+            pi_agents.mkdir(parents=True)
+            legacy = pi_agents / ".rules-manifest-pi_subagents"
+            legacy.write_text("frontend-designer.md\nsecond-opinion.md\n")
+            (pi_agents / "personal.md").write_text("keep")
+            for _ in range(2):
+                subprocess.run([str(SYNC_PROMPTS), "--silent"], cwd=REPO_ROOT,
+                               env={**os.environ, "HOME": home}, check=True)
+                self.assertFalse(legacy.exists())
+                self.assertEqual((pi_agents / "personal.md").read_text(), "keep")
+                for name in ("frontend-designer", "second-opinion"):
+                    original = (REPO_ROOT / "agents" / f"{name}.md").read_text()
+                    self.assertEqual((pi_agents / f"{name}.md").read_text(), original)
+                    self.assertIn("model: claude-bridge/claude-opus-5", original)
+                    self.assertIn(f"{name}.md", (pi_agents / ".rules-manifest-subagents").read_text())
+                    for harness in (".claude", ".cursor"):
+                        text = (root / harness / "agents" / f"{name}.md").read_text()
+                        for field in ("model:", "thinking:", "systemPromptMode:", "inheritProjectContext:", "inheritSkills:"):
+                            self.assertNotIn(field, text)
+                        self.assertNotIn("Opus 5 delegate", text)
+                        if name == "frontend-designer":
+                            self.assertIn("tools: Read, Grep, Glob, LS", text)
 
     def test_manifest_prunes_stale_repo_skills_but_keeps_user_skills(self) -> None:
         if not shutil.which("rsync") or not shutil.which("jq"):
