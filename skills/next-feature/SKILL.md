@@ -6,12 +6,14 @@ description: Select the next feature to implement from agent-work/features.yaml.
 ### 1. Review State
 
 - Run `git log --oneline -10` to understand recent work
-- Run `$SKILLS_ROOT/_lib/features_yaml.sh next` to find the next actionable feature
+- Run `$SKILLS_ROOT/_lib/features_yaml.sh next` to inspect active and ready work
 - Read `docs/STRUCTURE.md` only if feature context is unclear
 
 ### 2. Select Feature
 
-Priority order: `in_progress` first (resume active work), then `pending` features whose `depends_on` are all `done`, ranked by priority (1 > 2 > 3), then `created_at`, then ID.
+Recommend the most useful next ticket given the user's intent and recent work.
+Pending tickets are eligible only when their dependencies are all done.
+The helper's ranking is a default, not a binding choice.
 
 If nothing is ready, report blocked items and their unmet deps — do not guess or auto-resolve cycles.
 
@@ -34,9 +36,7 @@ Suggested plan file: agent-work/plans/[id].md
 
 Rules:
 
-- `IN PROGRESS` lists all active tracked features in the same order used for recommendation.
-- `READY OPTIONS` lists up to the top few ready `pending` features by the same priority and tie-break rules as selection.
-- `RECOMMENDED NEXT` remains the single canonical next item.
+- Show active work even when recommending a different ticket.
 - If nothing is actionable, report the no-ready situation and include the first few blocked items with unmet dependencies instead of inventing a recommendation.
 
 **Do not modify agent-work/features.yaml.** Status changes happen in execute/commit.

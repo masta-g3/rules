@@ -76,6 +76,7 @@ sync_dir() {
   local src="$1" dst="$2" category="$3"
   mkdir -p "$dst"
   collect_files "$src" "$category"
+  [[ -d "$src" ]] || return 0
 
   local rsync_out
   rsync_out=$(rsync -a --itemize-changes "$src" "$dst") || true
@@ -98,11 +99,9 @@ sync_dir() {
   done <<< "$rsync_out"
 }
 
-# Record what this repo deploys into a target directory and prune previously
-# deployed entries that no longer exist in the repo. User-installed files are
-# never in the manifest, so they are never touched. Manifests are per-category
-# so overlaid directories (e.g. shared + Pi-only skills) coexist. Extra seed
-# args cover repo assets removed before manifests existed.
+# Track individual files so nested removals preserve local additions.
+# Legacy directory entries are replaced with current source file paths, never
+# expanded from the destination. Explicit seeds retire known legacy assets.
 prune_and_record() {
   local src="$1" dst="$2" category="$3"
   shift 3
@@ -110,13 +109,22 @@ prune_and_record() {
   local manifest="${dst}.rules-manifest-${category}"
   mkdir -p "$dst"
 
-  local current=() f base
-  for f in "$src"*; do
-    [[ -e "$f" ]] || continue
-    current+=("$(basename "$f")")
+  local current=() f base parent
+  if [[ -d "$src" ]]; then
+    while IFS= read -r f; do
+      current+=("${f#./}")
+    done < <(cd "$src" && find . \( -type f -o -type l \) | LC_ALL=C sort)
+  fi
+
+  for base in "${seed[@]}"; do
+    if [[ ! -e "${src}${base}" && -e "${dst}${base}" ]]; then
+      rm -rf "${dst:?}${base}"
+      add_unique all_files[$category] "$(strip_ext "$base")"
+      add_unique removed_files[$category] "$(strip_ext "$base")"
+    fi
   done
 
-  local known=("${seed[@]}")
+  local known=()
   if [[ -f "$manifest" ]]; then
     while IFS= read -r base; do
       [[ -n "$base" ]] && known+=("$base")
@@ -131,10 +139,15 @@ prune_and_record() {
         break
       fi
     done
-    if [[ "$stale" == true && -e "${dst}${base}" ]]; then
-      rm -rf "${dst:?}${base}"
-      add_unique all_files[$category] "$(strip_ext "$base")"
-      add_unique removed_files[$category] "$(strip_ext "$base")"
+    if [[ "$stale" == true && ( -f "${dst}${base}" || -L "${dst}${base}" ) ]]; then
+      rm -f "${dst}${base}"
+      add_unique all_files[$category] "$(strip_ext "${base%%/*}")"
+      add_unique removed_files[$category] "$(strip_ext "${base%%/*}")"
+      parent=$(dirname "$base")
+      while [[ "$parent" != "." ]]; do
+        rmdir "${dst}${parent}" 2>/dev/null || break
+        parent=$(dirname "$parent")
+      done
     fi
   done
 
@@ -298,7 +311,7 @@ sync_dir "${repo_root}/agents/" "${pi_root}/agents/" "subagents"
 
 # Shared subagents now own the former Pi-only definitions.
 rm -f "${pi_root}/agents/.rules-manifest-pi_subagents"
-prune_and_record "${repo_root}/pi/skills/" "${pi_root}/skills/" "pi_skills" long-execute
+prune_and_record "${repo_root}/pi/skills/" "${pi_root}/skills/" "pi_skills" long-execute focus
 sync_dir "${repo_root}/pi/skills/" "${pi_root}/skills/" "pi_skills"
 
 prune_and_record "${repo_root}/extensions/" "${pi_root}/extensions/" "extensions" long-execute.ts workflow-indicator.ts

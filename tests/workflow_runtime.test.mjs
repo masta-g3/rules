@@ -390,26 +390,23 @@ test("activates focus without selecting a workflow step", () => {
 test("focus reminders follow the active scope and require explicit exit", () => {
   const execute = continuationContent(activeState({ turnsCompleted: 4 }));
 
-  assert.match(execute, /active focus run for ticket focus-001/);
-  assert.match(execute, /Follow Execute and the active plan/);
-  assert.match(execute, /Verify progress against the actual result/);
-  assert.match(execute, /call `end_focus`/);
-  assert.match(execute, /outcome `completed`/);
-  assert.match(execute, /`blocked`/);
-  assert.match(execute, /concise summary/);
-  assert.match(execute, /Do not stop at a progress report or leave focus active/);
+  assert.match(execute, /^Continue Execute within the active plan/);
+  assert.match(execute, /Re-read it after compaction or whenever details are unclear; follow its verification gates/);
+  assert.match(execute, /Prefer removal and simplification; reuse before adding/);
+  assert.match(execute, /Verify actual results/);
+  assert.match(execute, /Keep working while safe, in-scope work remains/);
+  assert.match(execute, /Call end_focus when complete and verified, or blocked; include a brief summary/);
   assert.doesNotMatch(execute, /Turns completed|turnsCompleted|next turn/);
 
   const unticketed = continuationContent({ ...activeState(), ticketId: undefined });
-  assert.match(unticketed, /^Continue the active Execute focus run/);
+  assert.equal(unticketed, execute);
 
   const standalone = continuationContent({
     execution: { mode: "focus", scope: "standalone", runId: "run-2", turnsCompleted: 2 },
   });
-  assert.match(standalone, /^Continue the active standalone focus run/);
-  assert.match(standalone, /Follow the user's task and project instructions/);
-  assert.match(standalone, /only when the user explicitly requests it/);
-  assert.doesNotMatch(standalone, /Follow Execute/);
+  assert.match(standalone, /^Continue the approved task\. Prefer removal and simplification; reuse before adding/);
+  assert.match(standalone, /Call end_focus when complete and verified, or blocked; include a brief summary/);
+  assert.doesNotMatch(standalone, /Execute|active plan|verification gates/);
 });
 
 test("focus recovery chooses one delivery for each Pi lifecycle path", () => {

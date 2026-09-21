@@ -260,14 +260,11 @@ export function focusScope(state: WorkflowState): FocusScope | undefined {
 export function continuationContent(state: WorkflowState): string {
 	if (!state.execution) return "";
 	const start = state.execution.scope === "execute"
-		? state.ticketId
-			? `Continue the active focus run for ticket ${state.ticketId}.\nFollow Execute and the active plan.`
-			: "Continue the active Execute focus run.\nFollow Execute and the active plan."
-		: "Continue the active standalone focus run.\nFollow the user's task and project instructions.";
-	return `${start}
-Focus itself does not start or advance workflow steps. Start or advance one only when the user explicitly requests it.
-Verify progress against the actual result, then take the next concrete work or verification step.
-Exit focus explicitly: call \`end_focus\` with outcome \`completed\` when the requested outcome is complete and verified, or \`blocked\` when further progress requires user input or an external dependency; include a concise summary in either case. Do not stop at a progress report or leave focus active after either condition.`;
+		? "Continue Execute within the active plan. Re-read it after compaction or whenever details are unclear; follow its verification gates.\n"
+		: "Continue the approved task. ";
+	return `${start}Prefer removal and simplification; reuse before adding.
+Verify actual results. Keep working while safe, in-scope work remains.
+Call end_focus when complete and verified, or blocked; include a brief summary.`;
 }
 
 export function transition(state: WorkflowState, event: RuntimeEvent): TransitionResult {

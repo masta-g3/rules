@@ -125,12 +125,50 @@ class SyncPromptsTest(unittest.TestCase):
             # A manifest entry whose source disappears from the repo is pruned on the next run.
             (claude_skills / "old-thing").mkdir()
             (claude_skills / "old-thing" / "SKILL.md").write_text("previously synced")
-            manifest.write_text(manifest.read_text() + "old-thing\n")
+            manifest.write_text(manifest.read_text() + "old-thing/SKILL.md\n")
             subprocess.run([str(SYNC_PROMPTS), "--silent"], cwd=REPO_ROOT, env=env, check=True)
 
             self.assertFalse((claude_skills / "old-thing").exists())
             self.assertEqual((claude_skills / "user-skill" / "SKILL.md").read_text(), "mine")
             self.assertNotIn("old-thing", manifest.read_text())
+
+    def test_recursive_manifest_cleanup_and_migration(self) -> None:
+        if not shutil.which("rsync"):
+            self.skipTest("rsync is unavailable")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            src, dst = root / "source", root / "target"
+            (src / "skill" / "assets").mkdir(parents=True)
+            (src / "skill" / "SKILL.md").write_text("current")
+            (src / "skill" / "assets" / "old.html").write_text("asset")
+            (dst / "skill").mkdir(parents=True)
+            (dst / "skill" / "local.md").write_text("mine")
+            manifest = dst / ".rules-manifest-test"
+            manifest.write_text("skill\n")
+            helpers = SYNC_PROMPTS.read_text().split("sync_sanitized_subagents()", 1)[0]
+            script = root / "sync.sh"
+            script.write_text(helpers + '\nprune_and_record "$SRC/" "$DST/" test\nsync_dir "$SRC/" "$DST/" test\n')
+            env = {**os.environ, "HOME": tmp, "SRC": str(src), "DST": str(dst)}
+
+            def sync():
+                result = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, check=True)
+                self.assertEqual(result.stderr, "")
+
+            sync()
+            self.assertIn("skill/assets/old.html", manifest.read_text())
+            self.assertNotIn("local.md", manifest.read_text())
+            (src / "skill" / "assets" / "old.html").unlink()
+            (src / "skill" / "assets").rmdir()
+            sync()
+            self.assertFalse((dst / "skill" / "assets").exists())
+            self.assertEqual((dst / "skill" / "local.md").read_text(), "mine")
+            shutil.rmtree(src)
+            sync()
+            self.assertFalse((dst / "skill" / "SKILL.md").exists())
+            self.assertEqual((dst / "skill" / "local.md").read_text(), "mine")
+            self.assertEqual(manifest.read_text(), "")
+            sync()
 
     def test_extension_sync_migrates_legacy_runtime_without_deleting_user_extensions(self) -> None:
         if not shutil.which("rsync") or not shutil.which("jq"):
@@ -161,7 +199,7 @@ class SyncPromptsTest(unittest.TestCase):
                 self.assertFalse((extensions / "workflow-indicator.ts").exists())
                 self.assertFalse((extensions / "long-execute.ts").exists())
                 self.assertEqual((extensions / "user-extension.ts").read_text(), "keep me")
-                self.assertTrue((pi_root / "skills" / "focus" / "SKILL.md").is_file())
+                self.assertFalse((pi_root / "skills" / "focus").exists())
                 self.assertFalse(old_skill.exists())
 
 

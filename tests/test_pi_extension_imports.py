@@ -107,7 +107,7 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertIn('customType: EVENT_TYPE', source)
         self.assertIn('triggerTurn: true', source)
         self.assertIn('deliverAs: "followUp"', source)
-        self.assertIn("Exit focus explicitly: call", core)
+        self.assertIn("Call end_focus when complete and verified, or blocked", core)
         self.assertIn("end_focus", core)
 
     def test_legacy_workflow_extensions_are_removed(self) -> None:
@@ -147,14 +147,8 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertNotIn('${cursor_root}/skills/" "pi_skills"', source)
         self.assertNotIn('${codex_root}/skills/" "pi_skills"', source)
 
-    def test_focus_skill_supports_execute_and_standalone_scopes(self) -> None:
-        source = (REPO_ROOT / "pi" / "skills" / "focus" / "SKILL.md").read_text()
-
-        self.assertIn("$SKILLS_ROOT/execute/SKILL.md", source)
-        self.assertIn("With no active workflow step", source)
-        self.assertIn("only when the user explicitly requests it", source)
-        self.assertIn("`end_focus`", source)
-        self.assertNotIn("LONG EXECUTE CONTINUE", source)
+    def test_focus_skill_is_removed(self) -> None:
+        self.assertFalse((REPO_ROOT / "pi" / "skills" / "focus").exists())
         self.assertFalse((REPO_ROOT / "pi" / "skills" / "long-execute").exists())
 
 
