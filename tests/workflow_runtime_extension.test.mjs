@@ -666,7 +666,7 @@ test("ticket names reject exact-name overrides and survive stage changes and ref
     await runtime.commands.get("session-metadata-disable").handler("", runtime.ctx);
     await runtime.commands.get("session-name").handler("refresh", runtime.ctx);
     assert.equal(runtime.name, "Metadata redesign");
-    assert.match(runtime.operations.at(-1).message, /refreshed from meta-001/);
+    assert.equal(runtime.operations.at(-1).message, 'Session renamed to “Metadata redesign” from meta-001.');
     assert.equal(delayed.calls.length, 0);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
@@ -887,10 +887,54 @@ test("title-less explicit tickets name from ticket and conversation context", as
     delayed.calls[0].resolve("Legacy Metadata");
     await settle();
     assert.equal(runtime.name, "Legacy Metadata");
-    await runtime.commands.get("session-name").handler("refresh", runtime.ctx);
-    assert.equal(delayed.calls.length, 1);
+    const refresh = runtime.commands.get("session-name").handler("refresh", runtime.ctx);
+    for (let attempt = 0; attempt < 100 && delayed.calls.length < 2; attempt++) await settle();
+    assert.equal(delayed.calls.length, 2);
     assert.equal(runtime.name, "Legacy Metadata");
+    delayed.calls[1].resolve("Updated Legacy Work");
+    await refresh;
+    assert.equal(runtime.name, "Updated Legacy Work");
+    assert.equal(runtime.operations.at(-1).message, 'Session renamed to “Updated Legacy Work” using legacy-001 context.');
     await assert.rejects(runtime.tools.get("set_session_name").execute("name", { name: "Stage update" }), /ticket title/i);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("failed title-less refresh keeps the linked name and reports failure", async () => {
+  const cwd = await project();
+  const delayed = delayedModel();
+  try {
+    await writeFile(join(cwd, "agent-work/features.yaml"), "- id: legacy-001\n  subtitle: Keep the task name stable\n");
+    const runtime = harness(cwd, [], undefined, delayed.call);
+    await runtime.commands.get("wf-ticket").handler("legacy-001", runtime.ctx);
+    delayed.calls[0].resolve("Existing Legacy Work");
+    await settle();
+    const refresh = runtime.commands.get("session-name").handler("refresh", runtime.ctx);
+    for (let attempt = 0; attempt < 100 && delayed.calls.length < 2; attempt++) await settle();
+    assert.equal(delayed.calls.length, 2);
+    delayed.calls[1].resolve(metadataSuccess(""));
+    await refresh;
+    assert.equal(runtime.name, "Existing Legacy Work");
+    assert.equal(runtime.operations.at(-1).message, "Could not refresh the session name.");
+    runtime.externalName("Unrelated name");
+    await runtime.emit("session_info_changed", { name: "Unrelated name" });
+    assert.equal(runtime.name, "Existing Legacy Work");
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("ticket title edits replace generated names on refresh", async () => {
+  const cwd = await project();
+  const delayed = delayedModel();
+  try {
+    await writeFile(join(cwd, "agent-work/features.yaml"), "- id: legacy-001\n  subtitle: Keep the task name stable\n");
+    const runtime = harness(cwd, [], undefined, delayed.call);
+    await runtime.commands.get("wf-ticket").handler("legacy-001", runtime.ctx);
+    delayed.calls[0].resolve("Generated Legacy Work");
+    await settle();
+    await writeFile(join(cwd, "agent-work/features.yaml"), "- id: legacy-001\n  title: Authored Legacy Work\n");
+    await runtime.commands.get("session-name").handler("refresh", runtime.ctx);
+    assert.equal(runtime.name, "Authored Legacy Work");
+    assert.equal(delayed.calls.length, 1);
+    assert.equal(runtime.operations.at(-1).message, 'Session renamed to “Authored Legacy Work” from legacy-001.');
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -928,7 +972,7 @@ test("explicit session-name refresh awaits its model result and reports", async 
     delayed.calls[0].resolve("Fresh Metadata");
     await refresh;
     assert.equal(runtime.name, "Fresh Metadata");
-    assert.equal(runtime.operations.at(-1).message, "Session name refreshed.");
+    assert.equal(runtime.operations.at(-1).message, 'Session renamed to “Fresh Metadata”.');
 
     const stale = delayedModel();
     const changed = harness(cwd, branch, "Old Name", stale.call);

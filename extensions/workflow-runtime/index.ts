@@ -635,6 +635,20 @@ export default function workflowRuntime(
 		currentAttention = attention;
 		publishContext(attention);
 		let nameApplied = false;
+		if (awaitGeneratedName && !selected.title) {
+			if (metadataEnabled) {
+				const source = ticketNamingInput(ticketContext, recentTranscript(ctx.sessionManager.getBranch() as TranscriptEntry[]));
+				const initialName = pi.getSessionName();
+				const title = await callMetadata(ctx, "session name", NAMING_PROMPT, source, 64, sanitizeSessionName);
+				if (title && requestGeneration === generation && pi.getSessionName() === initialName) {
+					ticketName = title;
+					pi.setSessionName(title);
+					nameApplied = true;
+				}
+			}
+			await refreshPlan(ctx);
+			return nameApplied;
+		}
 		if (ticketName) {
 			if (pi.getSessionName() !== ticketName) pi.setSessionName(ticketName);
 			nameApplied = true;
@@ -650,8 +664,7 @@ export default function workflowRuntime(
 				pi.setSessionName(ticketName);
 				return true;
 			};
-			if (awaitGeneratedName) nameApplied = await applyGeneratedName();
-			else void applyGeneratedName();
+			void applyGeneratedName();
 		}
 		await refreshPlan(ctx);
 		return nameApplied;
@@ -771,11 +784,12 @@ export default function workflowRuntime(
 			if (ticketContext) {
 				const ticketId = ticketContext.id;
 				const ok = await selectTicket(ctx, ticketId, true, currentAttention, true);
-				return ctx.ui.notify(ok ? `Session name refreshed from ${ticketId}.` : "Could not refresh the session name.", ok ? "info" : "warning");
+				const source = ticketContext?.title ? `from ${ticketId}` : `using ${ticketId} context`;
+				return ctx.ui.notify(ok ? `Session renamed to “${pi.getSessionName()}” ${source}.` : "Could not refresh the session name.", ok ? "info" : "warning");
 			}
 			if (!metadataEnabled) return ctx.ui.notify("Session metadata is disabled. Run /session-metadata-enable first.", "warning");
 			const ok = await generateName(ctx, recentTranscript(ctx.sessionManager.getBranch() as TranscriptEntry[]), true);
-			ctx.ui.notify(ok ? "Session name refreshed." : "Could not refresh the session name.", ok ? "info" : "warning");
+			ctx.ui.notify(ok ? `Session renamed to “${pi.getSessionName()}”.` : "Could not refresh the session name.", ok ? "info" : "warning");
 		},
 	});
 
