@@ -8,11 +8,15 @@ Create a detailed Markdown implementation plan for the provided request.
 
 When available, call `set_workflow_step` with `stepId: "plan-md"` before starting this authorized step. Reading this skill alone does not update the indicator. Changing steps does not authorize additional work.
 
-### Pre-Work & User Interview
+### Planning
 
 The step starts with `inspecting-code`. Pi publishes `clarifying-requirements` automatically when `ask_user_question` starts. Do not make redundant activity calls for either boundary.
 
-Open the interview by asking whether to isolate this work in a git worktree; the answer shapes where every later step runs. If approved, inspect the current and default branches. Ask which branch should seed the worktree, then which should receive the PR; recommend the default branch for both. Then investigate the codebase to resolve discoverable facts, and interview the user about the decisions that remain. Ask one decision question at a time, include your recommended answer and rationale, and wait for feedback before continuing. Use very simple and straightforward language. Be thorough about decisions that materially affect the plan. Resolve them in dependency order, one question at a time. Do not re-ask settled questions or ask about facts you can verify in the codebase. Ask what must be true for the work to count as complete. Suggest specific results the user can check, using plain, simple language. Write the plan only after the user confirms these acceptance criteria and shared understanding; never implement it during this skill.
+Open the interview by asking whether to isolate this work in a git worktree; the answer shapes where every later step runs. If approved, inspect the current and default branches. Ask which branch should seed the worktree, then which should receive the PR; recommend the default branch for both.
+
+Read code to answer factual questions. Ask the user about choices that affect scope, behavior, architecture, dependencies, or data safety. Ask one question at a time in plain language, recommend an answer with a reason, and wait. Resolve dependent decisions in order without re-asking settled questions. Continue this conversation throughout research, drafting, and review.
+
+Start the plan file once the initial scope is clear. Keep confirmed decisions and open questions there so the user can inspect the draft. Revise it in place as decisions settle, preserving exact limits, exclusions, and guarantees. Show the proposed behavior or approach with a short example, flow, or mockup before detailing implementation. Before marking the plan ready, resolve open questions and confirm the approach and acceptance criteria with the user. Keep the decisions, not obsolete draft notes or the interview transcript. Never silently change confirmed decisions or implement during this skill.
 
 Do not re-ask a worktree, start-branch, or PR-target decision that the user explicitly confirmed in the current request or that a parent orchestrator supplies as confirmed user input.
 
@@ -63,7 +67,7 @@ Include a context-files section:
 
 6. Under `## Implementation Phases`, divide work into incremental test-first phases (foundation → core → polish). Use `### Phase <number>: <short title>` headings, with actionable `[ ]` checkboxes directly under each phase, including its final verification. Write/update the failing test first, make the smallest passing change, then refactor. The `execute` skill marks completed actions with `[x]`. Move deferred work to `Discovered Work` or rewrite it as a plain note; do not leave it as an unchecked actionable item.
 
-7. Include `## Acceptance Criteria`: a checklist of outcomes that must be true for the ticket to be complete. Derive criteria only from user-confirmed requirements and constraints. Clarify any ambiguity that affects completion during the interview; do not introduce assumptions or expand scope. Technical verification details may come from code inspection, but must not change the agreed outcome. Map each criterion to a test or executable check in the relevant implementation phase.
+7. Include `## Acceptance Criteria`: a checklist derived only from user-confirmed requirements and constraints. Map each criterion to a test or executable check in the relevant implementation phase. Code inspection may inform verification, but must not change the agreed outcome.
    - Verify behavior with realistic inputs and edge cases. Check affected workflows end-to-end for side effects, with the smallest necessary impact area.
    - For migrations, releases, or stateful workflows, define the complete expected final state: exact or derived counts, identity continuity, date coverage, exclusions, preserved state, and allowed exceptions. Include post-apply read-back checks.
 
