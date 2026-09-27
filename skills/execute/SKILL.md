@@ -15,7 +15,7 @@ Check the relevant baseline once before starting. Report existing failures; stop
 
 Iterate through each phase: implement, verify existing features still work, confirm tests pass, then move on. Mark completed steps with `[x]` as you go.
 
-Execute the approved plan autonomously end-to-end unless the plan says otherwise. If it cannot be implemented as planned, try a clean minimal fix within the plan’s intent; stop and consult the user before hacks, ad-hoc patches, unreviewed rearchitecture, or significant deviations.
+Execute the approved plan autonomously end-to-end unless the plan says otherwise. Resolve routine implementation issues within the approved scope. If a fix would change agreed behavior, acceptance criteria, architecture, dependencies, or data safety, stop and ask the user before proceeding. Record approved changes in the plan before continuing.
 
 If the plan names a worktree, do all implementation, test runs, ticket reads, and plan-checklist updates in its recorded authored root. Inspect the exact `worktree.json` with `$SKILLS_ROOT/_lib/worktrees.sh inspect --record <absolute-path>` before use. Do not recreate, discover, or fall back to a source checkout when a bound record or worktree is missing or mismatched; mark it `check-needed` and report the blocker. Reuse Hub-owned worktrees without creating a Rules record. Keep the explicit Pi binding current with `set_workflow_ticket(..., worktreeRecord)` when available.
 
@@ -24,7 +24,7 @@ If the plan names a worktree, do all implementation, test runs, ticket reads, an
 ### Discovered Work
 
 **Tracked features:** check if the work exists in `agent-work/features.yaml` first — if not, register it via `ticket-init` skill with `discovered_from` set to the parent feature ID.
-- Blocks current work → handle it first if small and low-risk; otherwise pause and report to the user
+- Blocks current work → resolve within approved scope if small and low-risk; otherwise stop and ask the user
 - Parallelizable → add to backlog, continue
 
 Update the plan document with a "Discovered Work" section. Never silently absorb new scope into the current task.
