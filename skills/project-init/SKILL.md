@@ -24,18 +24,7 @@ Initialize the project with appropriate tooling:
 
 Create root `CONTEXT.md` with the `context-md` skill: it owns the interview and document structure, and for a new project it builds its hypothesis from the user's description and this session's clarifications.
 
-Create `docs/STRUCTURE.md` as the architecture and onboarding guide. Include:
-
-- **Tech stack**: technologies chosen and why
-- **Architecture**: component diagram, file structure, data flow
-- **Data models**: key schemas/entities (can be skeletal initially)
-- **Key patterns**: code conventions, error handling, state management
-
-For UI projects, also include:
-- **Navigation/flows**: user journeys, state diagrams
-- **Design direction**: color palette, typography, visual patterns
-
-`docs/STRUCTURE.md` captures the implementation *how*—detailed enough that any engineer can navigate and extend the project correctly. It evolves as the project grows, but should not contain implementation history or temporary workflow notes.
+Create `docs/STRUCTURE.md` only when navigation or code placement is non-obvious. Explain where readers could reasonably look or edit in the wrong place: misleading paths, generated files, ownership boundaries, or indirect component connections. Use a short table or prose; no fixed sections. Omit obvious folder descriptions. Link to detailed docs rather than embedding them.
 
 ### 3. Initial Commit
 

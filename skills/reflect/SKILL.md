@@ -25,6 +25,7 @@ Review only docs and sections related to the current work. If reading the releva
 2. Review the findings for friction, mistakes, and wrong assumptions. Distinguish guidance problems from code or interface problems. Propose the smallest correction at the source. If no useful correction is warranted, take no action. Route guidance proposals to the owning file:
    - project purpose, target user, project type, project stage, operating assumptions, or shared terminology → `CONTEXT.md`
    - user or operator instructions → `README.md`
+   - non-obvious code locations, relationships, or placement boundaries → `docs/STRUCTURE.md`
    - external constraints or decision rationale absent from code → the relevant domain doc
    - durable project-wide execution rules with no better home → the project-local `AGENTS.md`. Normally leave it unchanged; recurrence alone does not justify a rule.
    - repeatable project workflows already defined in local skills or agent configuration → the owning file. Do not create skills or change user-global configuration unless explicitly requested.

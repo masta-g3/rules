@@ -12,7 +12,7 @@
 
 ## Project orientation
 
-- Read `CONTEXT.md` for project context and `docs/STRUCTURE.md` to locate code, when needed.
+- Read `CONTEXT.md` for project context and, if present, `docs/STRUCTURE.md` to locate code when needed.
 - Before adding code, inspect the existing structure and similar solutions.
 - Check git history and `agent-work/history` when prior decisions matter. Use parallel read-only scouts for independent investigations.
 - Always use `uv` for Python dependencies and virtual environments.
