@@ -15,8 +15,6 @@ Recommend the most useful next ticket given the user's intent and recent work.
 Pending tickets are eligible only when their dependencies are all done.
 The helper's ranking is a default, not a binding choice.
 
-If nothing is ready, report blocked items and their unmet deps — do not guess or auto-resolve cycles.
-
 Report active work and a few next-ready options. For multi-repo sessions, report per repo.
 
 Default helper output has three sections:
@@ -37,7 +35,7 @@ Suggested plan file: agent-work/plans/[id].md
 Rules:
 
 - Show active work even when recommending a different ticket.
-- If nothing is actionable, report the no-ready situation and include the first few blocked items with unmet dependencies instead of inventing a recommendation.
+- If nothing is actionable, report that and the first few blocked items with unmet dependencies. Do not invent a recommendation or auto-resolve cycles.
 
 **Do not modify agent-work/features.yaml.** Status changes happen in execute/commit.
 
