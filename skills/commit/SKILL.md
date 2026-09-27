@@ -38,14 +38,10 @@ Assume `/reflect` handled durable documentation updates. Do not make broad docum
 
 ### Commit
 
-1. Inspect `git status --short`. If unrelated staged paths are present, ask the user whether to unstage them. If an explicitly adopted nested checkout appears as untracked, stop and ensure it cannot be staged; never commit a nested checkout. External Rules worktrees need no source-repository ignore rule. Then `git add` only session files.
-2. `git commit -m` format:
-   - First line: sentence describing the high-level objective.
-   - 2-5 bullets grouping changes by topic (omit if single cohesive change).
-   - No signatures (by Claude Code, coauthored with..., etc.).
-3. Do not push unless specifically instructed.
-
-Example: `Refactor API endpoints for better error handling.` with bullets like `- Standardize error response format.` / `- Add request validation middleware.`
+Commit only session work. Ask before unstaging unrelated changes.
+Never stage a nested checkout.
+Use an objective-focused subject; add 2–5 topic bullets only when useful.
+No attribution signatures. Do not push unless specifically instructed.
 
 ### Multi-Repo Sessions
 
@@ -53,11 +49,7 @@ If this session touched multiple repositories, commit all session work independe
 
 ### Worktree Closeout
 
-If the plan names a worktree, commit there and confirm all required plan and ticket updates are committed. Respect external ownership; do not take over cleanup.
-
-Confirm the PR target before an authorized push or PR. Do not infer or perform the merge. Remove a worktree only after the user confirms integration and approves cleanup, or explicitly approves discarding the work. Preserve approved local artifacts without overwriting unrelated files, and verify that the canonical ticket and archived plan survive cleanup.
-
-If approval is pending or cleanup fails, retain the worktree and report the blocker. Never force removal or hide changes to bypass safety checks. Workflow completion, merge outcome, and verified cleanup are separate states.
+If the plan names a worktree, read and follow [Worktree Closeout](references/worktree-closeout.md).
 
 ### Completion requirements
 
