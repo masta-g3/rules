@@ -7,7 +7,7 @@ Maintain durable docs without requiring a recent implementation session.
 
 ### 1. Survey docs
 
-Audit `README.md`, root `CONTEXT.md`, project-local `AGENTS.md` or `CLAUDE.md`, `docs/**/*.md`, and other durable user, operator, or developer Markdown.
+Audit the requested files or area. For a repo-wide audit, inspect `README.md`, root `CONTEXT.md`, project-local agent guidance, and durable docs under `docs/` or elsewhere.
 
 Exclude `agent-work/` artifacts, generated or vendored docs, dependencies, builds, temporary notes, and implementation summaries as primary docs.
 
@@ -18,7 +18,7 @@ Flag missing docs only when they would help readers act correctly.
 Check claims against relevant code and commands. Find stale, misleading, duplicate, or unnecessary text.
 
 - Propose deleting sections or files that no longer help readers.
-- Keep purpose, constraints, rationale, and useful user instructions. Cut text that merely repeats code.
+- Keep purpose, constraints, rationale, and useful user instructions.
 - Remove guidance that merely repeats code; do not move it elsewhere.
 - Ask about unclear intent or terminology; never invent answers to make docs agree.
 - Add only information that helps readers act correctly, not for completeness.
