@@ -5,11 +5,18 @@ description: Review finished work before reflection and commit.
 
 Review the active task after implementation and before `/reflect`. If the plan names a worktree, run the review inside it — that is where the changed files and `agent-work` artifacts live.
 
-When available, call `set_workflow_step` with `stepId: "review"` before starting this authorized step. Reading this skill alone does not update the indicator. Changing steps does not authorize additional work.
+Only start review when authorized by the user. Reading this skill does not authorize work.
+
+### Runtime integration
+
+#### Pi
+
+When the tools are available:
+- Before starting, call `set_workflow_step` with `stepId: "review"`. Changing the indicator does not authorize additional work.
+- The initial activity is `reviewing-implementation`. Launch `code-critic` through `tmux_subagent`; Pi republishes that activity and increments the pass count. Only for a non-tmux launch, publish `reviewing-implementation` manually before each pass. Never do both.
+- Call `set_workflow_activity` with `fixing-review-findings` before fixes and `review-complete` before the successful report.
 
 ### Review Process
-
-The step starts with `reviewing-implementation` as its default activity. Pi republishes it and increments its pass count when the exact `code-critic` tmux launch starts. For a non-tmux critic path only, call it manually as the fallback before each pass. Never use both paths for one pass.
 
 Own correctness, plan fidelity, and scope. `code-critic` owns the implementation-craft and simplification pass; give it the changed files and plan rather than repeating its checks.
 
@@ -18,7 +25,7 @@ Own correctness, plan fidelity, and scope. `code-critic` owns the implementation
    If the implementation adds useful but unplanned behavior, infrastructure, policy, state, dependency, or user-facing behavior, remove it from the current change. Report what was removed. Ask the user only if removal would break the requested outcome, an existing contract, data safety, or the commit boundary.
 3. Check session and `agent-work` hygiene per the AGENTS.md artifact retention rules.
 4. Invoke the `code-critic` reviewer subagent with the assembled file list and the plan path. Craft review is its lane — do a light pass yourself rather than duplicating it.
-5. Evaluate the findings and fix all clear, high-impact, in-scope issues before reporting. When available, call `set_workflow_activity` with `fixing-review-findings` before fixes; the later tmux critic launch restores `reviewing-implementation` automatically. Ignore nits, low-confidence findings, and suggestions that widen scope. After material fixes, rerun relevant verification and invoke `code-critic` again on the updated files. Continue until no actionable issues remain or progress requires user input. Do not stop merely to relay feedback that can be fixed within the current review step.
+5. Evaluate the findings and fix all clear, high-impact, in-scope issues before reporting. Ignore nits and low-confidence findings. Do not implement suggestions that widen scope. After material fixes, rerun relevant verification and invoke `code-critic` again on the updated files. Continue until no actionable issues remain or progress requires user input. Do not stop merely to relay feedback that can be fixed within the current review step.
 
 ### Boundaries
 
@@ -28,9 +35,11 @@ Do not:
 - create a commit
 - perform broad documentation updates; note reflection candidates instead
 
+Do not act on out-of-scope suggestions. If a finding identifies a clear, high-impact problem, record it under `Reflection Candidates` in the active plan for later triage. Ignore nits and speculative improvements.
+
 ### Output
 
-For successful review, call `set_workflow_activity` with `review-complete` when available, then include a `Summary:` list with 2–5 bullets grouping the material corrections and simplifications. Note code, tests, fallbacks, or duplicate paths removed and LOC reduced when meaningful. End with the verification rerun and result. Omit change details when no changes were needed. Include any documentation or reflection candidates before the handoff label.
+For successful review, include a `Summary:` list with 2–5 bullets grouping the material corrections and simplifications. Note code, tests, fallbacks, or duplicate paths removed and LOC reduced when meaningful. End with the verification rerun and result. Omit change details when no changes were needed. Include any documentation or reflection candidates before the handoff label.
 - **READY FOR REFLECT** — no actionable review issues remain
 
 Otherwise:

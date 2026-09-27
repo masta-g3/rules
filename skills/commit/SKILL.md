@@ -5,11 +5,23 @@ description: Commit files from session and archive/clean-up associated files.
 
 Assume the work has already been reviewed and reflected. Quick final scan for debug artifacts, prompt residue, temporary tests/scripts, generated outputs, and stale `agent-work/` scratch files before proceeding. Keep only `agent-work/` artifacts that remain useful after commit, per the AGENTS.md retention rules.
 
-When available, call `set_workflow_step` with `stepId: "commit"` before starting this authorized step. Reading this skill alone does not update the indicator. Changing steps does not authorize additional work.
+Only start commit when authorized by the user. Reading this skill does not authorize work.
+
+### Runtime integration
+
+#### Pi
+
+When the tools are available:
+- Before starting, call `set_workflow_step` with `stepId: "commit"`. Changing the indicator does not authorize additional work.
+- The initial activity is `archiving-plan`; do not duplicate that signal.
+- Call `set_workflow_activity` with `committing-changes` before staging and committing.
+- After meeting the completion requirements below, call `complete_workflow` once as the final action before the output. If a commit fails or closeout is blocked, leave Commit active.
+
+#### Worktree tooling
+
+For agent-managed worktree closeout, follow [the worktree helper reference](../_lib/worktrees.md). Worktrees supplied by a host such as Hub stay under that host's closeout; do not register or remove them with Rules.
 
 ### Archive Planning Document
-
-The step starts with `archiving-plan`. Rely on that default during archive work; do not make a redundant activity call.
 
 If a planning file exists, archive it:
 
@@ -26,8 +38,6 @@ Assume `/reflect` handled durable documentation updates. Do not make broad docum
 
 ### Commit
 
-When `set_workflow_activity` is available, call it with `committing-changes` before staging and committing.
-
 1. Inspect `git status --short`. If unrelated staged paths are present, ask the user whether to unstage them. If an explicitly adopted nested checkout appears as untracked, stop and ensure it cannot be staged; never commit a nested checkout. External Rules worktrees need no source-repository ignore rule. Then `git add` only session files.
 2. `git commit -m` format:
    - First line: sentence describing the high-level objective.
@@ -43,20 +53,17 @@ If this session touched multiple repositories, commit all session work independe
 
 ### Worktree Closeout
 
-If the plan names a worktree, the commit above went to its branch. Hub-owned worktrees stay under Hub closeout; do not register or remove them with Rules. For a Rules-owned record:
+If the plan names a worktree, commit there and confirm all required plan and ticket updates are committed. Respect external ownership; do not take over cleanup.
 
-1. Confirm tracked plan and ticket updates are committed. Run `$SKILLS_ROOT/_lib/worktrees.sh state --record <record> --state awaiting-merge --reason <bounded-reason>` before the merge handoff.
-2. Confirm the recorded PR target. Push and open the PR with `gh pr create --base <target>` and the `write-pr` skill. Do not infer or perform the merge.
-3. Inventory useful local untracked or ignored artifacts. Copy back only approved useful artifacts without overwriting unrelated files. Record a bounded disposition for every local artifact: `dispose`, or `preserve` with its verified absolute destination. Build outputs and dependencies are not automatically useful.
-4. Ask whether integration is complete and cleanup is approved. If not, retain the worktree and record `awaiting-merge` or `cleanup-pending` independently of workflow completion.
-5. After confirmed integration, first update the surviving source checkout's ticket `plan_file` and verify the canonical archived plan exists there. Then call `$SKILLS_ROOT/_lib/worktrees.sh remove --record <record> --outcome merged --artifact-dispositions '<json>' --authored-root <source> --plan-file <archive-relative-path>`. Use `discarded` only for an explicitly approved discard. The helper uses ordinary verified removal. It never forces removal, copies artifacts, scans for worktrees, or deletes a branch.
-6. If removal or safe `git branch -d` refuses, retain `cleanup-pending`/`check-needed` and report it. Never use `--force`, `rm -rf`, stash, or `branch -D`. The durable external record remains after cleanup and its authored root points to the surviving source.
+Confirm the PR target before an authorized push or PR. Do not infer or perform the merge. Remove a worktree only after the user confirms integration and approves cleanup, or explicitly approves discarding the work. Preserve approved local artifacts without overwriting unrelated files, and verify that the canonical ticket and archived plan survive cleanup.
 
-### Complete Workflow Indicator
+If approval is pending or cleanup fails, retain the worktree and report the blocker. Never force removal or hide changes to bypass safety checks. Workflow completion, merge outcome, and verified cleanup are separate states.
 
-When the current harness provides the Pi-only `complete_workflow` tool, call it once as the final action before the output, but only after every required repository commit succeeds and tracked feature and plan closeout is complete. For untracked work, first confirm that no feature or plan closeout is required. A worktree with an explicit pending-PR-merge handoff has completed repository closeout for this commit turn; later merge cleanup is a separate user-invoked task. In other harnesses, skip only this indicator step.
+### Completion requirements
 
-Do not call `complete_workflow` if a commit failed, required feature or plan changes are not committed, or the turn is blocked before closeout. Failed or blocked commit turns must keep Commit active.
+Report completion only after every required repository commit succeeds and tracked feature and plan closeout is complete. For untracked work, confirm that no feature or plan closeout is required. An explicit pending-PR-merge handoff completes repository closeout for this turn; later merge cleanup is a separate user-invoked task.
+
+If a commit fails, required changes remain uncommitted, or closeout is blocked, report the blocker instead of completion.
 
 ### Output
 
