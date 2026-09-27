@@ -3,7 +3,7 @@ import { complete, type UserMessage } from "@earendil-works/pi-ai/compat";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const SESSION_MODELS = [
-	{ provider: "openai-codex", id: "gpt-5.6-luna" },
+	{ provider: "openai-codex", id: "gpt-6-luna" },
 	{ provider: "openai-codex", id: "gpt-5.3-codex-spark" },
 ] as const;
 

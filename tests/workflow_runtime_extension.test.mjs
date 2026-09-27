@@ -991,7 +991,7 @@ test("session metadata models are fixed to Luna then Spark", async () => {
   const active = { provider: "openai-codex", id: "gpt-5.6-sol" };
   const candidates = new Map([
     ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
-    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
   ]);
   const authenticated = [];
   const resolved = await resolveSessionModels({
@@ -1005,15 +1005,15 @@ test("session metadata models are fixed to Luna then Spark", async () => {
     },
   });
 
-  assert.deepEqual(resolved.map(({ model }) => model.id), ["gpt-5.6-luna", "gpt-5.3-codex-spark"]);
-  assert.deepEqual(authenticated, ["gpt-5.6-luna", "gpt-5.3-codex-spark"]);
+  assert.deepEqual(resolved.map(({ model }) => model.id), ["gpt-6-luna", "gpt-5.3-codex-spark"]);
+  assert.deepEqual(authenticated, ["gpt-6-luna", "gpt-5.3-codex-spark"]);
   assert.equal(authenticated.includes(active.id), false);
 });
 
 test("metadata calls use medium reasoning, five seconds, and skip unsupported models", async () => {
   const candidates = new Map([
     ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
-    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
   ]);
   const options = [];
   let clock = 0;
@@ -1022,7 +1022,7 @@ test("metadata calls use medium reasoning, five seconds, and skip unsupported mo
     async complete(model, _context, requestOptions) {
       options.push({ model: model.id, ...requestOptions });
       clock += 100;
-      if (model.id === "gpt-5.6-luna") {
+      if (model.id === "gpt-6-luna") {
         return { stopReason: "error", errorMessage: "not supported with a ChatGPT account", content: [] };
       }
       return { stopReason: "stop", content: [{ type: "text", text: "Metadata Runtime" }] };
@@ -1039,7 +1039,7 @@ test("metadata calls use medium reasoning, five seconds, and skip unsupported mo
   assert.equal(first.outcome, "success");
   assert.equal(first.model, "gpt-5.3-codex-spark");
   assert.deepEqual(first.attempts.map((attempt) => [attempt.model, attempt.failure?.kind ?? attempt.outcome]), [
-    ["gpt-5.6-luna", "unsupported"],
+    ["gpt-6-luna", "unsupported"],
     ["gpt-5.3-codex-spark", "success"],
   ]);
   assert.ok(options.every((item) => item.reasoningEffort === "medium" && item.timeoutMs === 5_000));
@@ -1048,19 +1048,19 @@ test("metadata calls use medium reasoning, five seconds, and skip unsupported mo
   const second = await call(ctx, "prompt", "input", 64);
   assert.equal(second.outcome, "success");
   assert.deepEqual(options.map((item) => item.model), ["gpt-5.3-codex-spark"]);
-  assert.deepEqual(second.skippedModels, ["gpt-5.6-luna"]);
+  assert.deepEqual(second.skippedModels, ["gpt-6-luna"]);
 
   call.reset();
   options.length = 0;
   const afterReset = await call(ctx, "prompt", "input", 64);
   assert.equal(afterReset.outcome, "success");
-  assert.deepEqual(options.map((item) => item.model), ["gpt-5.6-luna", "gpt-5.3-codex-spark"]);
+  assert.deepEqual(options.map((item) => item.model), ["gpt-6-luna", "gpt-5.3-codex-spark"]);
 });
 
 test("a reset isolates unsupported-model state from an older in-flight call", async () => {
   const candidates = new Map([
     ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
-    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
   ]);
   const attempted = [];
   let finishOldLuna;
@@ -1068,11 +1068,11 @@ test("a reset isolates unsupported-model state from an older in-flight call", as
   const call = createSessionModelCall({
     async complete(model) {
       attempted.push(model.id);
-      if (model.id === "gpt-5.6-luna" && holdLuna) {
+      if (model.id === "gpt-6-luna" && holdLuna) {
         holdLuna = false;
         return new Promise((resolve) => { finishOldLuna = resolve; });
       }
-      if (model.id === "gpt-5.6-luna") return { stopReason: "stop", content: [{ type: "text", text: "Fresh Luna" }] };
+      if (model.id === "gpt-6-luna") return { stopReason: "stop", content: [{ type: "text", text: "Fresh Luna" }] };
       return { stopReason: "stop", content: [{ type: "text", text: "Spark Fallback" }] };
     },
   });
@@ -1091,14 +1091,14 @@ test("a reset isolates unsupported-model state from an older in-flight call", as
 
   attempted.length = 0;
   const nextCall = await call(ctx, "prompt", "input", 64);
-  assert.equal(nextCall.model, "gpt-5.6-luna");
-  assert.deepEqual(attempted, ["gpt-5.6-luna"]);
+  assert.equal(nextCall.model, "gpt-6-luna");
+  assert.deepEqual(attempted, ["gpt-6-luna"]);
 });
 
 test("metadata model resolution distinguishes missing authentication", async () => {
   const candidates = new Map([
     ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
-    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
   ]);
   const call = createSessionModelCall({ complete: async () => assert.fail("completion must not run") });
   const result = await call({
@@ -1161,9 +1161,9 @@ test("metadata status badge and command report timeout without login advice", as
     const runtime = harness(cwd, [], undefined, async () => ({
       outcome: "failure",
       failure: { kind: "timeout", message: "Request timed out after 5000ms" },
-      model: "gpt-5.6-luna",
+      model: "gpt-6-luna",
       latencyMs: 5_000,
-      attempts: [{ model: "gpt-5.6-luna", latencyMs: 5_000, outcome: "failure", failure: { kind: "timeout", message: "Request timed out after 5000ms" } }],
+      attempts: [{ model: "gpt-6-luna", latencyMs: 5_000, outcome: "failure", failure: { kind: "timeout", message: "Request timed out after 5000ms" } }],
       skippedModels: ["gpt-5.3-codex-spark"],
     }));
     await runtime.emit("session_start", { reason: "new" });
@@ -1180,7 +1180,7 @@ test("metadata status badge and command report timeout without login advice", as
 
     await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
     const report = runtime.operations.at(-1).message;
-    assert.match(report, /gpt-5\.6-luna/);
+    assert.match(report, /gpt-6-luna/);
     assert.match(report, /5000 ms/);
     assert.match(report, /timeout/i);
     assert.match(report, /gpt-5\.3-codex-spark/);
@@ -1286,7 +1286,7 @@ test("an older metadata request cannot overwrite the latest badge state", async 
     delayed.calls[0].resolve({
       outcome: "failure",
       failure: { kind: "timeout", message: "Late timeout" },
-      model: "gpt-5.6-luna",
+      model: "gpt-6-luna",
       latencyMs: 5_000,
       attempts: [],
       skippedModels: [],
