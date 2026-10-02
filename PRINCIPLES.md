@@ -1,6 +1,5 @@
 > *Controlling complexity is the essence of computer programming.*
 
-- **Stay under ~70% context.** Compact at a sensible cut-off when approaching the 50% mark.
 - **One task per session.** Single problem, single ticket. Peripheral work surfaced along the way gets logged as a new ticket, never pursued inline.
 - **Don't delegate design.** Agents are good for execution and brainstorming, but not for architecture or system design — that's a weak spot.
 - **Agents drift local.** They produce semi-duplicate code, reinvent utilities, and ignore global patterns and conventions. Counter with explicit guidelines and review agents.
