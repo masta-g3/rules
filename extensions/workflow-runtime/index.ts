@@ -777,10 +777,9 @@ export default function workflowRuntime(
 		handler: async (_args, ctx) => ctx.ui.notify(metadataStatusReport(metadataStatus), "info"),
 	});
 
-	pi.registerCommand("session-name", {
-		description: "Regenerate the native Pi session name (usage: /session-name refresh)",
-		handler: async (args, ctx) => {
-			if (args.trim() !== "refresh") return ctx.ui.notify("Usage: /session-name refresh", "warning");
+	pi.registerCommand("session-name-refresh", {
+		description: "Refresh the native Pi session name",
+		handler: async (_args, ctx) => {
 			if (ticketContext) {
 				const ticketId = ticketContext.id;
 				const ok = await selectTicket(ctx, ticketId, true, currentAttention, true);

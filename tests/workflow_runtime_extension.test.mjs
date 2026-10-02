@@ -427,7 +427,7 @@ test("runtime registers commands, shortcuts, and guarded producer tools", async 
   const cwd = await project();
   try {
     const runtime = harness(cwd, [], "Existing");
-    assert.deepEqual([...runtime.commands.keys()].sort(), ["session-metadata-disable", "session-metadata-enable", "session-metadata-status", "session-name", "wf-clear", "wf-ticket", "wf-todos"]);
+    assert.deepEqual([...runtime.commands.keys()].sort(), ["session-metadata-disable", "session-metadata-enable", "session-metadata-status", "session-name-refresh", "wf-clear", "wf-ticket", "wf-todos"]);
     assert.ok(runtime.shortcuts.has("ctrl+shift+right"));
     assert.equal(runtime.shortcuts.size, 2);
     for (const tool of ["set_session_name", "set_workflow_activity", "set_workflow_ticket", "complete_workflow"]) assert.ok(runtime.tools.has(tool));
@@ -729,7 +729,7 @@ test("ticket names reject exact-name overrides and survive stage changes and ref
     assert.equal(runtime.latest("workflow-runtime").activeStep, "review");
     assert.equal(runtime.name, "Metadata redesign");
     await runtime.commands.get("session-metadata-disable").handler("", runtime.ctx);
-    await runtime.commands.get("session-name").handler("refresh", runtime.ctx);
+    await runtime.commands.get("session-name-refresh").handler("", runtime.ctx);
     assert.equal(runtime.name, "Metadata redesign");
     assert.equal(runtime.operations.at(-1).message, 'Session renamed to “Metadata redesign” from meta-001.');
     assert.equal(delayed.calls.length, 0);
@@ -776,7 +776,7 @@ test("fork releases the child name and keeps the original ticket name protected"
     await fork.emit("session_info_changed", { name: "Manual discussion name" });
     assert.equal(fork.name, "Manual discussion name");
     fork.branch.push({ type: "message", message: { role: "user", content: "Discuss another approach" } });
-    await fork.commands.get("session-name").handler("refresh", fork.ctx);
+    await fork.commands.get("session-name-refresh").handler("", fork.ctx);
     assert.equal(fork.name, "Different Discussion");
     assert.equal(original.name, "Metadata redesign");
     await assert.rejects(original.tools.get("set_session_name").execute("name", { name: "Child name" }), /ticket title/i);
@@ -869,7 +869,7 @@ test("ticket replacement and refresh cannot revive prior attention", async () =>
     await runtime.emit("session_start", { reason: "resume" });
     await runtime.commands.get("wf-ticket").handler("other-001", runtime.ctx);
     assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
-    await runtime.commands.get("session-name").handler("refresh", runtime.ctx);
+    await runtime.commands.get("session-name-refresh").handler("", runtime.ctx);
     assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
@@ -952,7 +952,7 @@ test("title-less explicit tickets name from ticket and conversation context", as
     delayed.calls[0].resolve("Legacy Metadata");
     await settle();
     assert.equal(runtime.name, "Legacy Metadata");
-    const refresh = runtime.commands.get("session-name").handler("refresh", runtime.ctx);
+    const refresh = runtime.commands.get("session-name-refresh").handler("", runtime.ctx);
     for (let attempt = 0; attempt < 100 && delayed.calls.length < 2; attempt++) await settle();
     assert.equal(delayed.calls.length, 2);
     assert.equal(runtime.name, "Legacy Metadata");
@@ -973,7 +973,7 @@ test("failed title-less refresh keeps the linked name and reports failure", asyn
     await runtime.commands.get("wf-ticket").handler("legacy-001", runtime.ctx);
     delayed.calls[0].resolve("Existing Legacy Work");
     await settle();
-    const refresh = runtime.commands.get("session-name").handler("refresh", runtime.ctx);
+    const refresh = runtime.commands.get("session-name-refresh").handler("", runtime.ctx);
     for (let attempt = 0; attempt < 100 && delayed.calls.length < 2; attempt++) await settle();
     assert.equal(delayed.calls.length, 2);
     delayed.calls[1].resolve(metadataSuccess(""));
@@ -996,7 +996,7 @@ test("ticket title edits replace generated names on refresh", async () => {
     delayed.calls[0].resolve("Generated Legacy Work");
     await settle();
     await writeFile(join(cwd, "agent-work/features.yaml"), "- id: legacy-001\n  title: Authored Legacy Work\n");
-    await runtime.commands.get("session-name").handler("refresh", runtime.ctx);
+    await runtime.commands.get("session-name-refresh").handler("", runtime.ctx);
     assert.equal(runtime.name, "Authored Legacy Work");
     assert.equal(delayed.calls.length, 1);
     assert.equal(runtime.operations.at(-1).message, 'Session renamed to “Authored Legacy Work” from legacy-001.');
@@ -1024,13 +1024,26 @@ test("title-less tickets protect their name while generation is pending", async 
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
-test("explicit session-name refresh awaits its model result and reports", async () => {
+test("session-name-refresh works without arguments", async () => {
+  const cwd = await project();
+  try {
+    await writeFile(join(cwd, "agent-work/features.yaml"), "- id: named-001\n  title: Authored Name\n");
+    const runtime = harness(cwd);
+    await runtime.commands.get("wf-ticket").handler("named-001", runtime.ctx);
+    assert.equal(runtime.commands.has("session-name"), false);
+    await runtime.commands.get("session-name-refresh").handler("", runtime.ctx);
+    assert.equal(runtime.name, "Authored Name");
+    assert.equal(runtime.operations.at(-1).message, 'Session renamed to “Authored Name” from named-001.');
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("explicit session-name-refresh awaits its model result and reports", async () => {
   const cwd = await project();
   try {
     const delayed = delayedModel();
     const branch = [{ type: "message", message: { role: "user", content: "Refresh this metadata session" } }];
     const runtime = harness(cwd, branch, "Old Name", delayed.call);
-    const refresh = runtime.commands.get("session-name").handler("refresh", runtime.ctx);
+    const refresh = runtime.commands.get("session-name-refresh").handler("", runtime.ctx);
     await settle();
     assert.equal(delayed.calls.length, 1);
     assert.equal(runtime.operations.some((item) => item.kind === "notify"), false);
@@ -1041,7 +1054,7 @@ test("explicit session-name refresh awaits its model result and reports", async 
 
     const stale = delayedModel();
     const changed = harness(cwd, branch, "Old Name", stale.call);
-    const rejected = changed.commands.get("session-name").handler("refresh", changed.ctx);
+    const rejected = changed.commands.get("session-name-refresh").handler("", changed.ctx);
     await settle();
     assert.equal(stale.calls.length, 1);
     changed.externalName("External Name");
@@ -1443,7 +1456,7 @@ test("optional model operations quietly absorb resolver and injected call failur
 
     const refresh = delayedModel();
     const explicit = harness(cwd, [{ type: "message", message: { role: "user", content: "Refresh this name" } }], "Old Name", refresh.call);
-    const request = explicit.commands.get("session-name").handler("refresh", explicit.ctx);
+    const request = explicit.commands.get("session-name-refresh").handler("", explicit.ctx);
     await settle();
     refresh.calls[0].resolve(Promise.reject(new Error("refresh failed")));
     await request;
