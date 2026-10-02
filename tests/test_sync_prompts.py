@@ -92,7 +92,7 @@ class SyncPromptsTest(unittest.TestCase):
                 for name in ("frontend-designer", "second-opinion"):
                     original = (REPO_ROOT / "agents" / f"{name}.md").read_text()
                     self.assertEqual((pi_agents / f"{name}.md").read_text(), original)
-                    self.assertIn("model: claude-bridge/claude-opus-5", original)
+                    self.assertIn("model: claude-bridge/claude-opus-5-5", original)
                     self.assertIn(f"{name}.md", (pi_agents / ".rules-manifest-subagents").read_text())
                     for harness in (".claude", ".cursor"):
                         text = (root / harness / "agents" / f"{name}.md").read_text()

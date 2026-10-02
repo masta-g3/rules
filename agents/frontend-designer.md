@@ -2,7 +2,7 @@
 name: frontend-designer
 description: Visual design direction and critique for interfaces, explainers, diagrams, decks, and documents.
 tools: read, grep, find, ls
-model: claude-bridge/claude-opus-5
+model: claude-bridge/claude-opus-5-5
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false
