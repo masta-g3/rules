@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Agent rules · Repository overview</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --paper:#edeff1; --surface:#f7f8f9; --ink:#14181c; --muted:#59636b; --rule:#c9d0d6;
+  --gate:#2a3bc8; --gate-bg:#e1e5fb; --warn:#8a4b00; --warn-bg:#fbefdc; --ok:#1d6b3a; --ok-bg:#dff1e5;
+  --body:system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  --s1:4px; --s2:8px; --s3:12px; --s4:20px; --s5:32px; --s6:56px;
+  --small:.8rem; --text:clamp(1rem,.9rem + .3vw,1.15rem); --sub:clamp(1.2rem,1rem + .6vw,1.6rem);
+  --title:clamp(2rem,1.1rem + 2.8vw,4rem); --line:1px; --focus:3px;
+  --width:1240px; --pad:clamp(20px,5vw,88px); --nav-height:64px;
+}
+@media(prefers-color-scheme:dark){:root{--paper:#10151a;--surface:#171d23;--ink:#e8edf2;--muted:#98a5af;--rule:#2a333b;--gate:#93a4ff;--gate-bg:#1b2340;--warn:#f0b46a;--warn-bg:#2e2214;--ok:#7fd29c;--ok-bg:#13281b}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:var(--nav-height)}
+body{margin:0;background:var(--paper);color:var(--ink);font:var(--text)/1.5 var(--body)}
+h1,h2,h3,p,ol,ul,pre{margin:0}
+h1,h2{font:500 var(--title)/1.1 var(--mono);letter-spacing:-.04em;max-width:24ch;text-wrap:balance}
+h3{font-size:var(--sub);font-weight:600}
+code,pre,.eyebrow,.index,.step-name,.mono{font-family:var(--mono)}
+code{overflow-wrap:anywhere;font-size:.92em}
+a{color:inherit;text-underline-offset:var(--s1)}a:focus-visible{outline:var(--focus) solid var(--gate);outline-offset:var(--s1)}
+.topbar{position:sticky;top:0;z-index:2;min-height:var(--nav-height);display:flex;justify-content:space-between;align-items:center;gap:var(--s4);padding:var(--s3) var(--pad);background:var(--paper);border-bottom:var(--line) solid var(--rule);font:var(--small)/1.4 var(--mono)}
+.brand{text-decoration:none}.nav{display:flex;gap:var(--s1);flex-wrap:wrap}.nav a{padding:var(--s2) var(--s3);text-decoration:none;border-bottom:var(--line) solid transparent}.nav a[aria-current="location"]{border-color:var(--ink);font-weight:700}
+.skip{position:fixed;top:var(--s2);left:var(--s2);z-index:5;padding:var(--s3);background:var(--surface);transform:translateY(-200%)}.skip:focus{transform:none}
+.slide{min-height:calc(100svh - var(--nav-height));padding:var(--s6) var(--pad);display:flex;align-items:center;border-bottom:var(--line) solid var(--rule);scroll-margin-top:var(--nav-height)}
+.inner{width:100%;max-width:var(--width);margin:auto;display:grid;gap:var(--s5)}
+.eyebrow{font-size:var(--small);color:var(--muted);display:flex;gap:var(--s4);flex-wrap:wrap}
+.lead{max-width:66ch;color:var(--muted)}.caption{color:var(--muted);font-size:var(--small)}
+.footer{display:flex;justify-content:space-between;gap:var(--s4);color:var(--muted);font-size:var(--small)}
+.takeaway{font-size:var(--sub);max-width:52ch}
+.index{color:var(--muted)}
+
+/* 01 purpose */
+.example{display:grid;grid-template-columns:1fr 1.5fr;gap:var(--s6);border-top:var(--line) solid var(--rule);padding-top:var(--s5)}
+.request{display:grid;align-content:start;gap:var(--s4)}.request blockquote{margin:0;font-size:var(--sub);max-width:24ch}
+.outcomes{list-style:none;padding:0;display:grid;gap:var(--s4)}.outcomes li{display:grid;grid-template-columns:var(--s5) 1fr;gap:var(--s4);padding-bottom:var(--s4);border-bottom:var(--line) solid var(--rule)}.outcomes strong{font-weight:600}.outcomes p{color:var(--muted)}
+.counter{list-style:none;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2) var(--s5)}
+.counter li{display:grid;grid-template-columns:1fr auto 1.2fr;gap:var(--s3);align-items:baseline;padding:var(--s3) 0;border-bottom:var(--line) solid var(--rule);font-size:var(--small)}
+.counter .problem{color:var(--warn)}.counter .arrow{color:var(--muted);font-family:var(--mono)}
+
+/* 02 workflow matrix */
+.entries{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s4);font-size:var(--small)}
+.entries div{background:var(--surface);padding:var(--s3) var(--s4);border-left:var(--s1) solid var(--rule)}
+.entries strong{display:block;font-family:var(--mono)}
+.matrix{display:grid;grid-template-columns:9.5rem repeat(6,minmax(0,1fr));font-size:var(--small);border-top:var(--line) solid var(--rule)}
+.matrix>*{padding:var(--s3) var(--s2);border-bottom:var(--line) solid var(--rule)}
+.matrix .rowhead{color:var(--muted);font-family:var(--mono)}
+.matrix .colhead{font:600 .95rem/1.3 var(--mono);display:flex;flex-direction:column;gap:var(--s1);border-bottom:2px solid var(--ink)}
+.matrix .colhead .index{font-weight:400;font-size:var(--small)}
+.matrix .col-tracked{background:var(--surface)}
+.status{display:inline-block;padding:0 var(--s2);font-family:var(--mono);border:var(--line) solid currentColor}
+.status.pending{color:var(--muted)}.status.progress{color:var(--warn);background:var(--warn-bg)}.status.done{color:var(--ok);background:var(--ok-bg)}
+.critic{font-family:var(--mono)}
+.gate{color:var(--gate);background:var(--gate-bg);padding:var(--s1) var(--s2);border-left:var(--s1) solid var(--gate);font:var(--small)/1.4 var(--mono)}
+.dash{color:var(--muted)}
+
+/* 03 records */
+.timeline{list-style:none;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s4);counter-reset:t}
+.timeline li{display:grid;gap:var(--s3);align-content:start}
+.timeline .when{font:600 var(--small)/1.4 var(--mono);display:flex;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:var(--s2)}
+pre{background:var(--surface);padding:var(--s3) var(--s4);font-size:.78rem;line-height:1.55;overflow:auto;white-space:pre}
+pre .hl{background:var(--gate-bg);color:var(--gate);font-weight:700}
+pre .dim{color:var(--muted)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:var(--s5)}
+.split article{display:grid;gap:var(--s3);align-content:start}
+.split ul{padding-left:1.1em;color:var(--muted);font-size:var(--small);display:grid;gap:var(--s2)}
+
+/* 04 catalog */
+.catalog{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:var(--line) solid var(--rule)}
+.catalog section{padding:var(--s4) var(--s4) var(--s4) 0;display:grid;align-content:start;gap:var(--s3)}
+.catalog section+section{padding-left:var(--s4);border-left:var(--line) solid var(--rule)}
+.catalog h3{font-size:1rem}.catalog .when-use{color:var(--muted);font-size:var(--small)}
+.skill-list{list-style:none;padding:0;display:grid;gap:var(--s3);font-size:var(--small)}
+.skill-list small{display:block;color:var(--muted);font:var(--small)/1.45 var(--body)}
+.agents{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--s3);font-size:var(--small)}
+.agents div{background:var(--surface);padding:var(--s3);display:grid;gap:var(--s1);align-content:start}
+.agents .used{color:var(--gate);font-family:var(--mono);font-size:.72rem}
+
+/* 05 deploy */
+.deploy{width:100%;border-collapse:collapse;font-size:var(--small)}
+.deploy th,.deploy td{padding:var(--s3) var(--s3);border-bottom:var(--line) solid var(--rule);text-align:left;vertical-align:top}
+.deploy thead th{font-family:var(--mono);border-bottom:2px solid var(--ink)}
+.deploy tbody th{font-weight:400}
+.deploy td.yes{font-family:var(--mono)}.deploy td.no{color:var(--muted);font-family:var(--mono)}
+.deploy .codex{color:var(--muted)}
+.flowline{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;font:var(--small)/1.4 var(--mono)}
+.flowline span{background:var(--surface);padding:var(--s2) var(--s3)}
+.flowline .arrow{background:none;color:var(--muted);padding:0}
+
+/* 06 pi runtime */
+.term{background:#0f1418;color:#dfe6ec;font:.85rem/1.6 var(--mono);padding:var(--s4);display:grid;gap:var(--s2);border:var(--line) solid var(--rule)}
+.term .t-dim{color:#8795a1}.term .t-on{color:#b8c4ff;font-weight:700}.term .t-ok{color:#8fdcaa}.term .t-focus{color:#f4c06a;font-weight:700}
+.legend{list-style:none;padding:0;display:flex;gap:var(--s4);flex-wrap:wrap;font-size:var(--small);color:var(--muted)}
+.legend code{color:var(--ink)}
+.features{list-style:none;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s4) var(--s5)}
+.features li{display:grid;gap:var(--s1);padding-top:var(--s3);border-top:var(--line) solid var(--rule)}
+.features strong{font-weight:600}.features p{color:var(--muted);font-size:var(--small)}
+
+/* 07 map + start */
+.where{width:100%;border-collapse:collapse;font-size:var(--small)}
+.where th,.where td{padding:var(--s3);border-bottom:var(--line) solid var(--rule);text-align:left;vertical-align:top}
+.where thead th{font-family:var(--mono);border-bottom:2px solid var(--ink)}
+.where td:last-child{color:var(--muted)}
+.start{list-style:none;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s4)}
+.start li{display:grid;gap:var(--s2);align-content:start;padding-top:var(--s3);border-top:2px solid var(--ink)}
+.start p{color:var(--muted);font-size:var(--small)}
+
+@media(max-width:900px){
+  .brand span{display:none}.slide{padding:var(--s5) var(--pad)}
+  .example,.split,.entries,.counter,.timeline,.features,.start{grid-template-columns:1fr;gap:var(--s4)}
+  .catalog{grid-template-columns:1fr 1fr}.catalog section+section{border-left:0;padding-left:0}.catalog section:nth-child(even){padding-left:var(--s4);border-left:var(--line) solid var(--rule)}
+  .agents{grid-template-columns:1fr 1fr}
+  .matrix{grid-template-columns:7rem repeat(6,minmax(8rem,1fr));overflow-x:auto}
+  .matrix-wrap{overflow-x:auto}
+  .footer{flex-direction:column}.nav a{padding:var(--s2)}h1,h2{letter-spacing:-.03em}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{:root{color-scheme:light;--paper:white;--surface:#f4f5f6;--ink:#14181c;--muted:#59636b;--rule:#c9d0d6;--gate:#2a3bc8;--gate-bg:#e1e5fb;--title:28pt;--text:10.5pt;--sub:14pt;--small:8.5pt;--s6:28px;--pad:20px}.topbar,.skip,.footer a{display:none}.slide{min-height:0;break-after:page;border:0;display:block;padding:var(--pad)}.slide:last-child{break-after:auto}}
+</style>
+</head>
+<body>
+<a class="skip" href="#overview">Skip to overview</a>
+<header class="topbar"><a class="brand" href="#overview">Agent rules <span>/ repo overview</span></a>
+<nav class="nav" aria-label="Slides">
+<a href="#overview" aria-label="Slide 1: Purpose" aria-current="location">01</a>
+<a href="#workflow" aria-label="Slide 2: Workflow">02</a>
+<a href="#records" aria-label="Slide 3: Records">03</a>
+<a href="#skills" aria-label="Slide 4: Skills and agents">04</a>
+<a href="#deploy" aria-label="Slide 5: Deployment">05</a>
+<a href="#pi" aria-label="Slide 6: Pi runtime">06</a>
+<a href="#start" aria-label="Slide 7: Repo map and start">07</a>
+</nav></header>
+<main>
+
+<section class="slide" id="overview" aria-labelledby="title"><div class="inner">
+<p class="eyebrow"><span>01 / Purpose</span><span>For maintainers and contributors</span></p>
+<h1 id="title">Shared instructions for AI coding work.</h1>
+<p class="lead">This repo is not an app. It holds the rules, skills, reviewer agents, and Pi extensions that tell coding agents how to plan, build, review, and record changes in your other projects.</p>
+<div class="example"><div class="request"><p class="caption">Example request in your project</p><blockquote>"Add dark mode. Plan it before changing code."</blockquote><p class="caption">The app code lives in your project. This repo shapes how the agent works on it.</p></div>
+<ol class="outcomes">
+<li><span class="index">01</span><div><strong>A plan you can inspect</strong><p>Scope, decisions, and acceptance checks before any code changes.</p></div></li>
+<li><span class="index">02</span><div><strong>A change you can review</strong><p>Code plus verification, checked against the plan by the agent and a critic.</p></div></li>
+<li><span class="index">03</span><div><strong>A record you can resume</strong><p>Ticket status and plans in <code>agent-work/</code>, so a new session can continue.</p></div></li>
+</ol></div>
+<div class="inner" style="gap:var(--s3)">
+<h3>Why the rules exist</h3>
+<p class="caption">Each rule answers a known agent failure, from <code>PRINCIPLES.md</code> and <code>AGENTS.md</code>.</p>
+<ul class="counter">
+<li><span class="problem">Agents drift local and duplicate code</span><span class="arrow">→</span><span>Reuse first; plan and code critics check fit</span></li>
+<li><span class="problem">Agents over-build and over-abstract</span><span class="arrow">→</span><span>Smallest viable change; functional style where it fits</span></li>
+<li><span class="problem">Agents code defensively</span><span class="arrow">→</span><span>No silent fallbacks or compat shims; let errors surface</span></li>
+<li><span class="problem">Sessions lose context</span><span class="arrow">→</span><span>One task per session; state lives in <code>agent-work/</code></span></li>
+<li><span class="problem">Agents decide design alone</span><span class="arrow">→</span><span>Each step stops for the user; questions on material choices</span></li>
+<li><span class="problem">Docs fill up with history</span><span class="arrow">→</span><span><code>reflect</code> keeps only current truth in <code>docs/</code></span></li>
+</ul>
+</div>
+<div class="footer"><span>Skills give instructions. Helpers, agents, and extensions support them.</span><a href="#workflow">Next: workflow →</a></div>
+</div></section>
+
+<section class="slide" id="workflow" aria-labelledby="workflow-title"><div class="inner">
+<p class="eyebrow">02 / Workflow</p>
+<h2 id="workflow-title">Six steps. Each one stops for you.</h2>
+<p class="lead">A step ends with a handoff label such as <code>READY FOR REVIEW</code>. The label names the next step. It does not run it. You invoke each step.</p>
+<div class="entries">
+<div><strong>Tracked work</strong>Starts at <code>next-feature</code>. Uses a ticket in <code>features.yaml</code>. Plan file: <code>auth-001.md</code>.</div>
+<div><strong>Standalone work</strong>Starts at <code>plan-md</code>. No ticket or status changes. Plan file: <code>DARK_MODE.md</code>.</div>
+</div>
+<div class="matrix-wrap"><div class="matrix" role="table" aria-label="Workflow steps compared">
+<div class="rowhead" role="columnheader">step</div>
+<div class="colhead col-tracked" role="columnheader"><span class="index">1 · tracked only</span>next-feature</div>
+<div class="colhead" role="columnheader"><span class="index">2</span>plan-md</div>
+<div class="colhead" role="columnheader"><span class="index">3</span>execute</div>
+<div class="colhead" role="columnheader"><span class="index">4</span>review</div>
+<div class="colhead" role="columnheader"><span class="index">5</span>reflect</div>
+<div class="colhead" role="columnheader"><span class="index">6</span>commit</div>
+
+<div class="rowhead" role="rowheader">does</div>
+<div class="col-tracked">Recommends a ready ticket. Dependencies must be done.</div>
+<div>Asks about material choices. Writes scope, approach, and checks.</div>
+<div>Implements the plan. Runs verification. Ticks the checklist.</div>
+<div>Checks correctness, plan fit, and scope. Fixes clear issues.</div>
+<div>Updates lasting docs and guidance only if needed.</div>
+<div>Commits. Archives the plan. Closes the ticket.</div>
+
+<div class="rowhead" role="rowheader">writes</div>
+<div class="col-tracked dash">nothing</div>
+<div><code>plans/&lt;id&gt;.md</code></div>
+<div>code, tests, plan checklist</div>
+<div>fixes</div>
+<div><code>docs/</code>, <code>CONTEXT.md</code>, <code>AGENTS.md</code></div>
+<div>git commit, <code>history/</code></div>
+
+<div class="rowhead" role="rowheader">ticket status</div>
+<div class="col-tracked"><span class="status pending">pending</span></div>
+<div><span class="status pending">pending</span></div>
+<div><span class="status progress">in_progress</span></div>
+<div><span class="status progress">in_progress</span></div>
+<div><span class="status progress">in_progress</span></div>
+<div><span class="status done">done</span></div>
+
+<div class="rowhead" role="rowheader">second check</div>
+<div class="col-tracked dash">—</div>
+<div class="critic">plan-critic<br><span class="caption">complex plans</span></div>
+<div class="dash">—</div>
+<div class="critic">code-critic</div>
+<div class="critic">docs-critic<br><span class="caption">substantive edits</span></div>
+<div class="dash">—</div>
+
+<div class="rowhead" role="rowheader">ends with</div>
+<div class="col-tracked"><span class="gate">READY FOR PLAN</span></div>
+<div><span class="gate">READY FOR EXECUTE</span></div>
+<div><span class="gate">READY FOR REVIEW</span></div>
+<div><span class="gate">READY FOR REFLECT</span></div>
+<div><span class="gate">READY FOR COMMIT</span></div>
+<div class="caption mono">WORKFLOW COMPLETE</div>
+</div></div>
+<p class="caption">Critic rule: fix only clear, high-impact findings. Ignore nits and out-of-scope ideas. Re-run a critic only after material changes.</p>
+<div class="footer"><span>To chain steps, ask explicitly ("plan and execute this"), or use <code>workflow-orchestrator</code>.</span><a href="#records">Next: records →</a></div>
+</div></section>
+
+<section class="slide" id="records" aria-labelledby="records-title"><div class="inner">
+<p class="eyebrow">03 / Records</p>
+<h2 id="records-title">One ticket, three moments on disk.</h2>
+<p class="lead">Agents never edit <code>features.yaml</code> by hand. They call <code>skills/_lib/features_yaml.sh</code>, which validates fields and returns JSON. Highlighted lines change.</p>
+<ol class="timeline">
+<li><p class="when"><span>After plan-md</span><span class="index">pending</span></p>
+<pre><span class="dim"># agent-work/features.yaml</span>
+- id: auth-001
+  <span class="hl">status: pending</span>
+  title: Email signup
+  subtitle: Validate email before account creation
+  priority: 1
+  <span class="hl">plan_file: agent-work/plans/auth-001.md</span>
+
+<span class="dim"># agent-work/</span>
+plans/<span class="hl">auth-001.md</span></pre></li>
+<li><p class="when"><span>During execute</span><span class="index">in_progress</span></p>
+<pre><span class="dim"># agent-work/features.yaml</span>
+- id: auth-001
+  <span class="hl">status: in_progress</span>
+  ...
+  plan_file: agent-work/plans/auth-001.md
+
+<span class="dim"># agent-work/plans/auth-001.md</span>
+- [x] Add email validator
+- [x] Wire signup form
+- [ ] Add rejection test</pre></li>
+<li><p class="when"><span>After commit</span><span class="index">done</span></p>
+<pre><span class="dim"># agent-work/features.yaml</span>
+- id: auth-001
+  <span class="hl">status: done</span>
+  ...
+  <span class="hl">plan_file: agent-work/history/auth-001.md</span>
+
+<span class="dim"># agent-work/</span>
+plans/      <span class="dim">(empty)</span>
+history/<span class="hl">auth-001.md</span></pre></li>
+</ol>
+<div class="split">
+<article><h3>Inside <code>agent-work/</code></h3><ul>
+<li><code>features.yaml</code>: backlog. Statuses: pending, in_progress, done, abandoned, superseded.</li>
+<li><code>plans/</code> and <code>history/</code>: active and finished plans.</li>
+<li><code>tickets/&lt;id&gt;/</code>: evidence or repro files, only when needed.</li>
+<li><code>decks/</code>: HTML explainers like this one.</li>
+</ul></article>
+<article><h3>Outside <code>agent-work/</code></h3><ul>
+<li><code>CONTEXT.md</code>: what the project is and who it serves.</li>
+<li><code>docs/</code>: durable architecture and reference. Current truth only.</li>
+<li>Tickets hold short facts. Plans hold scope and checklists. YAML never holds <code>steps</code>.</li>
+</ul></article>
+</div>
+<div class="footer"><span>Ticket fields: title 1–3 words, subtitle 4–6 words, description one outcome sentence.</span><a href="#skills">Next: skills →</a></div>
+</div></section>
+
+<section class="slide" id="skills" aria-labelledby="skills-title"><div class="inner">
+<p class="eyebrow">04 / Skills and agents</p>
+<h2 id="skills-title">More than the six-step loop.</h2>
+<p class="lead">Each skill is a <code>SKILL.md</code> file with steps for one task. Ask for it by name. The six workflow skills are on slide 02; these are the rest.</p>
+<div class="catalog">
+<section><h3>Set up</h3><p class="when-use">New repo or new body of work</p><ul class="skill-list">
+<li><code>project-init</code><small>Create <code>agent-work/</code> scaffolding</small></li>
+<li><code>context-md</code><small>Interview you, write <code>CONTEXT.md</code></small></li>
+<li><code>epic-init</code><small>Split a big feature into tickets</small></li>
+<li><code>ticket-init</code><small>Add one or more tickets</small></li>
+</ul></section>
+<section><h3>Write</h3><p class="when-use">Prose for people</p><ul class="skill-list">
+<li><code>explain-html</code><small>Visual HTML explainers</small></li>
+<li><code>write-pr</code><small>Pull request title and body</small></li>
+<li><code>unslop</code><small>Remove AI writing patterns</small></li>
+<li><code>answer-style</code><small>Reshape an answer to plain style</small></li>
+</ul></section>
+<section><h3>Maintain</h3><p class="when-use">Periodic health checks</p><ul class="skill-list">
+<li><code>docs-health</code><small>Audit durable docs, apply approved fixes</small></li>
+<li><code>test-coverage</code><small>Find gaps, propose critical tests</small></li>
+</ul></section>
+<section><h3>Automate</h3><p class="when-use">Only when you ask</p><ul class="skill-list">
+<li><code>workflow-orchestrator</code><small>A parent agent runs each ticket step through a persistent subagent, one phase at a time. Works one ticket at a time or in parallel worktrees.</small></li>
+</ul></section>
+</div>
+<div class="inner" style="gap:var(--s3)">
+<h3>Specialist agents in <code>agents/</code></h3>
+<div class="agents">
+<div><code>plan-critic</code><span class="caption">Approach, reuse, scope</span><span class="used">used by plan-md</span></div>
+<div><code>code-critic</code><span class="caption">Slop, bloat, plan drift</span><span class="used">used by review</span></div>
+<div><code>docs-critic</code><span class="caption">Doc clarity and fit</span><span class="used">used by reflect</span></div>
+<div><code>second-opinion</code><span class="caption">Plans, assessments, decisions</span><span class="used">on request</span></div>
+<div><code>frontend-designer</code><span class="caption">Visual direction and critique</span><span class="used">on request</span></div>
+</div>
+</div>
+<div class="footer"><span>Critics run as separate sessions, so they see the files fresh.</span><a href="#deploy">Next: deployment →</a></div>
+</div></section>
+
+<section class="slide" id="deploy" aria-labelledby="deploy-title"><div class="inner">
+<p class="eyebrow">05 / Deployment</p>
+<h2 id="deploy-title">Edit here. Sync copies it out.</h2>
+<div class="flowline" aria-label="Deployment flow"><span>edit source in this repo</span><span class="arrow">→</span><span>./sync-prompts.sh</span><span class="arrow">→</span><span>~/.claude · ~/.cursor · ~/.pi/agent</span><span class="arrow">→</span><span>Pi: /reload</span></div>
+<table class="deploy">
+<caption class="caption" style="text-align:left;padding-bottom:var(--s2)">What each harness receives</caption>
+<thead><tr><th scope="col">Source</th><th scope="col">Claude</th><th scope="col">Cursor</th><th scope="col">Pi</th><th scope="col" class="codex">Codex</th></tr></thead>
+<tbody>
+<tr><th scope="row"><code>AGENTS.md</code></th><td class="yes">✓ as CLAUDE.md</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">— removed</td></tr>
+<tr><th scope="row"><code>skills/</code></th><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">— removed</td></tr>
+<tr><th scope="row"><code>agents/</code></th><td class="yes">✓ default model</td><td class="yes">✓ default model</td><td class="yes">✓ keeps model + thinking</td><td class="no">— removed</td></tr>
+<tr><th scope="row"><code>extensions/</code>, <code>pi/skills/</code></th><td class="no">—</td><td class="no">—</td><td class="yes">✓ Pi only</td><td class="no">—</td></tr>
+<tr><th scope="row"><code>statusline/</code></th><td class="yes">✓ if settings exist</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+</tbody></table>
+<div class="split">
+<article><h3>Safe pruning</h3><p class="caption">Sync writes a <code>.rules-manifest-*</code> file per target. When you delete an asset here, the next sync removes its copy. Skills, agents, and extensions you installed yourself stay untouched.</p></article>
+<article><h3>Why Codex gets nothing</h3><p class="caption">Codex stays a plain tool for chat, research, and quick tasks. Tracked project workflow runs in Claude, Cursor, or Pi.</p></article>
+</div>
+<div class="footer"><span>Sync also registers <code>pi-tmux-subagents</code> and the skills path in Pi settings.</span><a href="#pi">Next: Pi runtime →</a></div>
+</div></section>
+
+<section class="slide" id="pi" aria-labelledby="pi-title"><div class="inner">
+<p class="eyebrow">06 / Pi runtime</p>
+<h2 id="pi-title">In Pi, the workflow is visible.</h2>
+<p class="lead"><code>extensions/workflow-runtime/</code> shows where a session is in the loop, links it to a ticket, and publishes that state for dashboards such as pi-agent-hub.</p>
+<div class="term" role="img" aria-label="Pi workflow rail examples">
+<div><span class="t-dim">auth-001 ·</span> <span class="t-ok">✓ Plan</span> <span class="t-dim">─</span> <span class="t-on">◉ Execute</span> <span class="t-dim">─ · Review ─ · Reflect ─ · Commit</span>  <span class="t-dim">◇ meta</span></div>
+<div><span class="t-dim">auth-001 ·</span> <span class="t-ok">✓ Plan</span> <span class="t-dim">─</span> <span class="t-focus">◆ Focus</span> <span class="t-dim">turn 4 ─ · Review ─ · Reflect ─ · Commit</span></div>
+<div><span class="t-dim">auth-001 ·</span> <span class="t-ok">✓✓✓✓✓ Commit complete</span></div>
+</div>
+<ul class="legend"><li>Simplified rail examples.</li><li><code>✓</code> done position</li><li><code>◉</code> current step</li><li><code>·</code> later step</li><li><code>◆/◇ Focus</code> autonomous loop running</li><li><code>◇ meta</code> naming/attention model status</li></ul>
+<ul class="features">
+<li><strong>Ticket link</strong><p><code>/skill:plan-md auth-001</code> or <code>/wf-ticket auth-001</code> links the ticket. The session takes the ticket title as its name.</p></li>
+<li><strong>Focus mode</strong><p>During execute, the agent can call <code>start_focus</code> to keep working across turns. It stops with <code>end_focus</code> (completed or blocked). Esc pauses it.</p></li>
+<li><strong>Next step shortcut</strong><p>Double-press <code>Ctrl+Shift+→</code> to run the next skill with the linked ticket. <code>/wf-todos</code> shows the plan checklist.</p></li>
+<li><strong>Attention signals</strong><p>Questions and ready/blocked states are published so a dashboard can show which session needs you.</p></li>
+</ul>
+<p class="caption">The rail shows position, not an audit. Rules works without Hub; publishing context does not give Hub ownership of Git or worktrees.</p>
+<div class="footer"><span><code>extensions/notify.ts</code> also sends a macOS notification when Pi waits for input.</span><a href="#start">Next: start here →</a></div>
+</div></section>
+
+<section class="slide" id="start" aria-labelledby="start-title"><div class="inner">
+<p class="eyebrow">07 / Repo map and first use</p>
+<h2 id="start-title">Know where a change belongs.</h2>
+<table class="where">
+<thead><tr><th scope="col">To change…</th><th scope="col">Edit</th><th scope="col">Keep in mind</th></tr></thead>
+<tbody>
+<tr><td>Agent behavior everywhere</td><td><code>AGENTS.md</code></td><td>Short, durable rules. Deployed to every harness.</td></tr>
+<tr><td>How one task is done</td><td><code>skills/&lt;name&gt;/SKILL.md</code></td><td>Keep portable. Pi-only skills go in <code>pi/skills/</code>.</td></tr>
+<tr><td>Ticket or worktree operations</td><td><code>skills/_lib/</code></td><td>Use the helpers; do not copy their logic into prompts.</td></tr>
+<tr><td>Reviewer behavior</td><td><code>agents/*.md</code></td><td>Sync adapts models and tool names per harness.</td></tr>
+<tr><td>Pi rail, focus, naming</td><td><code>extensions/workflow-runtime/</code></td><td>Runtime code, not Pi core.</td></tr>
+<tr><td>Backlog viewer</td><td><code>bin/pv</code></td><td>Human TUI across projects. <code>fv</code> is an alias.</td></tr>
+</tbody></table>
+<ol class="start">
+<li><span class="index">01 · deploy</span><code>./sync-prompts.sh</code><p>Run from this repo. In an open Pi session, run <code>/reload</code>.</p></li>
+<li><span class="index">02 · ask</span><span>In your project: <q>Use plan-md to plan dark mode.</q></span><p>Use <code>next-feature</code> instead to pick from a backlog.</p></li>
+<li><span class="index">03 · advance</span><span>Read the result. Ask for the next step.</span><p>Example: approve the plan, then ask for <code>execute</code>.</p></li>
+</ol>
+<p class="caption">Tests: <code>env -u PI_AGENT_HUB_PRIMARY_CWD -u PI_AGENT_HUB_FORK_COMPACT uv run pytest -q</code></p>
+<p class="takeaway">Edit the source here, sync, then let each step stop for your decision.</p>
+<div class="footer"><span>Details: <code>README.md</code>, <code>docs/STRUCTURE.md</code>, <code>PRINCIPLES.md</code>.</span><a href="#overview">Back to purpose ↑</a></div>
+</div></section>
+</main>
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const links = [...document.querySelectorAll('.nav a')];
+function currentIndex() {
+  const offset = document.querySelector('.topbar').getBoundingClientRect().height;
+  return slides.reduce((best, slide, index) => Math.abs(slide.getBoundingClientRect().top - offset) < Math.abs(slides[best].getBoundingClientRect().top - offset) ? index : best, 0);
+}
+function updateNav() { const active = currentIndex(); links.forEach((link, index) => { if(index === active) link.setAttribute('aria-current','location'); else link.removeAttribute('aria-current'); }); }
+window.addEventListener('scroll', updateNav, { passive:true });
+window.addEventListener('resize', updateNav);
+document.addEventListener('keydown', event => {
+  if(event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.target.closest('input,textarea,select,button,a,[contenteditable]')) return;
+  const moves = {ArrowRight:1, ArrowLeft:-1};
+  if(!(event.key in moves)) return;
+  event.preventDefault();
+  const index = Math.max(0, Math.min(slides.length - 1, currentIndex() + moves[event.key]));
+  slides[index].scrollIntoView({block:'start'});
+});
+updateNav();
+</script>
+</body>
+</html>
