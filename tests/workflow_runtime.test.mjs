@@ -245,6 +245,24 @@ test("deterministic plan projection handles phases, fences, and flat lists", () 
   assert.equal(bounded.phases.length, 100);
 });
 
+test("plan phases end at sibling headings but retain nested checklists", () => {
+  const parsed = parseWorkflowPlan("### Phase 1: Build\n- [x] Build\n#### Verification\n- [x] Test\n### Deferred work\n- [ ] Later\n### Phase 2: Ship\n- [ ] Release\n## Notes\n- [ ] Outside");
+  assert.deepEqual(parsed.plan.sections.map((section) => section.tasks.map((task) => task.text)), [["Build", "Test"], ["Release"]]);
+  assert.deepEqual(parsed.projection.tasks, { completed: 2, total: 3 });
+  assert.equal(parsed.projection.nextStep, "Release");
+  assert.equal(parsed.projection.phase.index, 2);
+});
+
+test("drawer retains full Unicode plan text while progress metadata stays bounded", () => {
+  const title = "界".repeat(85) + " title end";
+  const task = "🚀".repeat(125) + " preserve all data";
+  const parsed = parseWorkflowPlan(`### Phase 1: ${title}\n- [ ] ${task}`);
+  assert.equal(parsed.plan.sections[0].heading, `Phase 1 · ${title}`);
+  assert.equal(parsed.plan.sections[0].tasks[0].text, task);
+  assert.equal(parsed.projection.phase.title, "界".repeat(80));
+  assert.equal(parsed.projection.nextStep, "🚀".repeat(120));
+});
+
 test("the producer owns the ordered workflow definition", () => {
   assert.deepEqual(WORKFLOW_DEFINITION, expectedWorkflowDefinition);
 });

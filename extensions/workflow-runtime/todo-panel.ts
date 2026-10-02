@@ -7,6 +7,7 @@ export const TODO_PANEL_OVERLAY_OPTIONS = { anchor: "right-center", width: 54, m
 
 export class TodoPanel implements Component {
 	private offset = 0;
+	private positioned = false;
 	private rows = 1;
 	private readonly tui: TUI;
 	private readonly theme: Theme;
@@ -24,19 +25,33 @@ export class TodoPanel implements Component {
 	render(width: number): string[] {
 		if (width < 4) return width ? [truncateToWidth("Plan", width)] : [];
 		const contentWidth = width - 4;
-		const body = this.plan.sections.flatMap((section, sectionIndex) => [
-			...wrapTextWithAnsi(section.heading ?? "Tasks", contentWidth).map((line) => this.theme.fg(sectionIndex === this.plan.currentSectionIndex ? "accent" : "muted", this.theme.bold(line))),
-			...section.tasks.flatMap((task) => this.taskRows(task, contentWidth)),
-		]);
-		this.rows = Math.max(1, Math.floor(this.tui.terminal.rows * .8) - 3);
+		const body: string[] = [];
+		let sectionStart = 0;
+		let nextTaskStart: number | undefined;
+		for (const [sectionIndex, section] of this.plan.sections.entries()) {
+			const current = sectionIndex === this.plan.currentSectionIndex;
+			if (current) sectionStart = body.length;
+			body.push(...wrapTextWithAnsi(section.heading ?? "Tasks", contentWidth).map((line) => this.theme.fg(current ? "accent" : "muted", this.theme.bold(line))));
+			for (const task of section.tasks) {
+				if (current && !task.done && nextTaskStart === undefined) nextTaskStart = body.length;
+				body.push(...this.taskRows(task, contentWidth));
+			}
+		}
+		this.rows = Math.max(1, Math.floor(this.tui.terminal.rows * .8) - 4);
+		if (!this.positioned) {
+			this.offset = nextTaskStart !== undefined && nextTaskStart >= sectionStart + this.rows ? nextTaskStart : sectionStart;
+			this.positioned = true;
+		}
 		this.offset = Math.max(0, Math.min(this.offset, Math.max(0, body.length - this.rows)));
 		const visible = body.slice(this.offset, this.offset + this.rows);
 		const line = (text: string) => { const value = truncateToWidth(text, contentWidth); return `${this.theme.fg("borderMuted", "│ ")}${value}${" ".repeat(Math.max(0, contentWidth - visibleWidth(value)))}${this.theme.fg("borderMuted", " │")}`; };
 		const title = truncateToWidth(` Plan · ${this.ticket} `, width - 2);
+		const position = body.length > this.rows ? ` · Rows ${this.offset + 1}–${this.offset + visible.length}/${body.length}` : "";
 		return [
 			`${this.theme.fg("borderMuted", "╭")}${this.theme.fg("accent", this.theme.bold(title))}${this.theme.fg("borderMuted", `${"─".repeat(Math.max(0, width - visibleWidth(title) - 2))}╮`)}`,
 			...visible.map(line),
-			line(this.theme.fg("dim", `${this.plan.completed}/${this.plan.total} done · ↑↓ PgUp/PgDn · Esc`)),
+			line(this.theme.fg("dim", `${this.plan.completed}/${this.plan.total} done${position}`)),
+			line(this.theme.fg("dim", "↑↓ PgUp/PgDn · Esc close")),
 			this.theme.fg("borderMuted", `╰${"─".repeat(width - 2)}╯`),
 		];
 	}

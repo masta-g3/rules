@@ -1,6 +1,6 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
-import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { PlanProjection } from "./workflow-plan.ts";
 
 export const PLAN_WIDGET_KEY = "workflow-plan";
@@ -16,9 +16,9 @@ export class PlanWidget implements Component {
 	render(width: number): string[] {
 		const phase = this.plan.phase ? `Phase ${this.plan.phase.index}/${this.plan.phase.count} · ${this.plan.phase.title}` : "Plan";
 		const progress = `✓ ${this.plan.tasks.completed}/${this.plan.tasks.total} tasks${this.plan.nextStep ? ` · Next: ${this.plan.nextStep}` : ""}`;
-		if (width < 16) return [truncateToWidth(`${phase} · ${progress}`, width)];
-		const contentWidth = Math.max(1, width - 4);
-		const rows = [phase, progress].flatMap((line) => wrapTextWithAnsi(line, contentWidth));
+		if (width < 36) return [truncateToWidth(`${progress} · ${phase}`, width)];
+		const contentWidth = width - 4;
+		const rows = [phase, progress].map((line) => truncateToWidth(line, contentWidth));
 		const title = " plan ";
 		return [
 			this.theme.fg("borderMuted", `╭${title}${"─".repeat(Math.max(1, width - visibleWidth(title) - 2))}╮`),

@@ -11,7 +11,8 @@ export type PlanProjection = {
 	nextStep?: string;
 };
 
-const clean = (value: string, max = 120) => [...value.replace(/\s+/g, " ").trim()].slice(0, max).join("");
+const clean = (value: string) => value.replace(/\s+/g, " ").trim();
+const bounded = (value: string, max: number) => [...value].slice(0, max).join("");
 
 function projectPath(cwd: string, relative: string): string | undefined {
 	const root = resolve(cwd);
@@ -36,10 +37,10 @@ export function parseWorkflowPlan(text: string): { plan?: WorkflowPlan; projecti
 			const headingLevel = heading[1]!.length;
 			const match = /^(phase|stage)\s+(\d+)\s*(?::|[-–—])\s*(.+)$/i.exec(heading[2] ?? "");
 			if (match) {
-				const title = clean(match[3] ?? "", 80);
+				const title = clean(match[3] ?? "");
 				active = { heading: `${match[1]!.toLowerCase() === "stage" ? "Stage" : "Phase"} ${match[2]} · ${title}`, headingLevel, title, tasks: [] };
 				sections.push(active);
-			} else if (active && headingLevel < active.headingLevel) {
+			} else if (active && headingLevel <= active.headingLevel) {
 				active = undefined;
 			}
 			continue;
@@ -58,10 +59,10 @@ export function parseWorkflowPlan(text: string): { plan?: WorkflowPlan; projecti
 	const plan: WorkflowPlan = { sections: planSections, completed: tasks.filter((task) => task.done).length, total: tasks.length, currentSectionIndex: selected };
 	const section = populated[selected];
 	const projection: PlanProjection = {
-		...(section ? { phase: { index: selected + 1, count: populated.length, title: section.title! } } : {}),
+		...(section ? { phase: { index: selected + 1, count: populated.length, title: bounded(section.title!, 80) } } : {}),
 		tasks: { completed: plan.completed, total: plan.total },
 		...(populated.length ? { phases: populated.slice(0, 100).map((item) => ({ completed: item.tasks.filter((task) => task.done).length, total: item.tasks.length })) } : {}),
-		...(tasks.find((task) => !task.done) ? { nextStep: tasks.find((task) => !task.done)!.text } : {}),
+		...(tasks.find((task) => !task.done) ? { nextStep: bounded(tasks.find((task) => !task.done)!.text, 120) } : {}),
 	};
 	return { plan, projection };
 }

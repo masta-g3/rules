@@ -8,6 +8,8 @@ import workflowRuntime from "../extensions/workflow-runtime/index.ts";
 import { PlanWidget } from "../extensions/workflow-runtime/plan-widget.ts";
 import { createSessionModelCall, resolveSessionModels } from "../extensions/workflow-runtime/session-model.ts";
 import { TodoPanel } from "../extensions/workflow-runtime/todo-panel.ts";
+import { parseWorkflowPlan } from "../extensions/workflow-runtime/workflow-plan.ts";
+import { visibleWidth } from "@earendil-works/pi-tui";
 
 function harness(cwd, initialBranch = [], initialName, modelCall, readBinding) {
   const handlers = new Map();
@@ -356,6 +358,69 @@ test("plan widget and todo drawer remain bounded and read only", () => {
   panel.handleInput("\u001b");
   assert.equal(closed, 1);
   assert.equal(renders, 0);
+});
+
+test("todo drawer opens on current work and keeps manual paging through resize", () => {
+  const theme = { fg: (_token, text) => text, bold: (text) => text };
+  const completed = Array.from({ length: 25 }, (_, index) => `- [x] Done ${index}`).join("\n");
+  const pending = Array.from({ length: 25 }, (_, index) => `- [ ] Pending ${index}`).join("\n");
+  const { plan } = parseWorkflowPlan(`### Phase 1: Completed\n${completed}\n### Phase 2: Current\n${pending}`);
+  const original = structuredClone(plan);
+  const terminal = { rows: 20 };
+  let renders = 0;
+  let closed = 0;
+  const panel = new TodoPanel({ terminal, requestRender() { renders++; } }, theme, "todo-001", plan, () => { closed++; });
+  const opening = panel.render(54);
+  assert.ok(opening.some((line) => line.includes("Phase 2 · Current")));
+  assert.ok(opening.some((line) => line.includes("Pending 0")));
+  assert.ok(opening.some((line) => /Rows \d+–\d+\/52/.test(line)));
+
+  for (let index = 0; index < 5; index++) { panel.handleInput("\u001b[5~"); panel.render(54); }
+  assert.ok(panel.render(54).some((line) => line.includes("Phase 1 · Completed")));
+  terminal.rows = 12;
+  const resized = panel.render(36);
+  assert.ok(resized.some((line) => line.includes("Phase 1 · Completed")));
+  assert.ok(resized.some((line) => line.includes("Esc")));
+  assert.ok(resized.every((line) => visibleWidth(line) <= 36));
+  assert.ok(resized.length <= Math.floor(terminal.rows * .8));
+  for (let index = 0; index < 20; index++) { panel.handleInput("\u001b[6~"); panel.render(36); }
+  assert.ok(panel.render(36).some((line) => line.includes("Pending 24")));
+  assert.ok(panel.render(36).some((line) => /–52\/52/.test(line)));
+  panel.handleInput("\u001b");
+  assert.equal(closed, 1);
+  assert.ok(renders > 0);
+  assert.deepEqual(plan, original);
+});
+
+test("todo drawer reveals the first incomplete task within a long phase", () => {
+  const theme = { fg: (_token, text) => text, bold: (text) => text };
+  const { plan } = parseWorkflowPlan(`### Phase 1: Build\n${"- [x] Done\n".repeat(30)}- [ ] Actual next task\n${"- [ ] Later\n".repeat(30)}`);
+  const panel = new TodoPanel({ terminal: { rows: 20 }, requestRender() {} }, theme, "todo-001", plan, () => {});
+  assert.ok(panel.render(54).some((line) => line.includes("Actual next task")));
+});
+
+test("todo drawer allows paging to the end of long Unicode task text", () => {
+  const theme = { fg: (_token, text) => `\u001b[32m${text}\u001b[39m`, bold: (text) => text };
+  const { plan } = parseWorkflowPlan(`- [ ] ${"界🚀 ".repeat(100)}Important final requirement`);
+  const panel = new TodoPanel({ terminal: { rows: 15 }, requestRender() {} }, theme, "todo-001", plan, () => {});
+  for (let index = 0; index < 30; index++) {
+    const output = panel.render(36);
+    assert.ok(output.every((line) => visibleWidth(line) <= 36));
+    assert.ok(output.length <= 12);
+    panel.handleInput("\u001b[6~");
+  }
+  assert.ok(panel.render(36).some((line) => line.includes("final requirement")));
+});
+
+test("plan widget stays compact across narrow and wide Unicode layouts", () => {
+  const theme = { fg: (_token, text) => `\u001b[32m${text}\u001b[39m`, bold: (text) => text };
+  const widget = new PlanWidget(theme, { phase: { index: 1, count: 2, title: "界".repeat(80) }, tasks: { completed: 1, total: 3 }, nextStep: "🚀".repeat(120) });
+  for (const width of [10, 15, 16, 20, 35, 36, 54, 80, 120]) {
+    const output = widget.render(width);
+    assert.ok(output.length <= (width < 36 ? 1 : 4), `widget height at width ${width}`);
+    assert.ok(output.every((line) => visibleWidth(line) <= width), `widget width ${width}`);
+    assert.ok(output.some((line) => line.includes("1/3")), `task progress at width ${width}`);
+  }
 });
 
 test("runtime registers commands, shortcuts, and guarded producer tools", async () => {
