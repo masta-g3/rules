@@ -19,8 +19,8 @@ class WorkflowReferencesTest(unittest.TestCase):
             REPO_ROOT / "skills/plan-md/SKILL.md",
             REPO_ROOT / "skills/execute/SKILL.md",
             REPO_ROOT / "skills/commit/SKILL.md",
-            REPO_ROOT / "skills/workflow-orchestrator/SKILL.md",
-            REPO_ROOT / "skills/workflow-orchestrator/references/parallel-worktrees.md",
+            REPO_ROOT / "pi/skills/workflow-orchestrator/SKILL.md",
+            REPO_ROOT / "pi/skills/workflow-orchestrator/references/parallel-worktrees.md",
         ]
         combined = "\n".join(path.read_text() for path in files)
         self.assertIn("AGENT_WORKTREES_DIR", combined)

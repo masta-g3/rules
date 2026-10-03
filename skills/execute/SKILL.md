@@ -59,6 +59,7 @@ Fix issues within approved scope. Capture unrelated, non-blocking issues and con
 - Make the smallest, simplest change that fully solves the task. Prefer a fundamental fix in the owning layer over a localized patch, and replace obsolete code instead of leaving parallel paths.
 - Do not introduce another way to perform an existing operation because this case varies slightly. Use the established mechanism or its extension points; if they are genuinely inadequate, stop and justify changing the shared pattern rather than adding a competing one.
 - Do not stack hotfixes, workarounds, or conditional branches around an existing pattern. Fix the underlying code or shared pattern; if that exceeds the approved plan, consult the user instead of patching around it.
+- If two fixes fail the same test, stop patching. Explain why you expected them to work, then check that explanation against the code before trying again.
 - Do not add fallbacks, inferred defaults, mock functionality, or blanket exception handling. Let errors surface unless recovery is specific and intentional.
 - Tests must validate actual behavior — no dummy assertions or placeholders. Tautological tests are harmful.
 

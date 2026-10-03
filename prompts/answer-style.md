@@ -1,5 +1,4 @@
 ---
-name: answer-style
 description: Rewrite the previous response or shape the next one in simple, concise language.
 disable-model-invocation: true
 ---

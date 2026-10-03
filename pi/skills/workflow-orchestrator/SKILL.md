@@ -3,7 +3,7 @@ name: workflow-orchestrator
 description: Parent-controlled ticket workflow automation using persistent subagents, one ticket at a time or in parallel isolated worktrees.
 ---
 
-Use this skill when the user explicitly asks the parent agent to manage the feature workflow automatically instead of waiting for manual invocation of each step.
+Use this Pi-only skill when the user explicitly asks the parent agent to manage the feature workflow automatically instead of waiting for manual invocation of each step.
 
 The parent agent remains the orchestrator. Subagents execute exactly one workflow phase at a time and then stop for parent inspection.
 
@@ -19,7 +19,7 @@ The parent agent remains the orchestrator. Subagents execute exactly one workflo
   - optional allowlisted nested specialist launches from the child, when the phase skill or parent prompt explicitly calls for them;
   - stopping the child when the ticket is complete or blocked.
 - A clean or understood git worktree before starting each ticket.
-- `$SKILLS_ROOT` set for helper commands, e.g. Pi: `export SKILLS_ROOT="$HOME/.pi/agent/skills"`.
+- `$SKILLS_ROOT` set for helper commands, `export SKILLS_ROOT="$HOME/.agents/skills"`.
 
 ## Core rule
 

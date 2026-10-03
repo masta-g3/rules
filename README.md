@@ -39,27 +39,36 @@ Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, a
 | `skills/execute` | Implement with baseline verification |
 | `skills/explain-html` | Create self-contained HTML technical explainers |
 | `skills/unslop` | Remove AI writing patterns from a finished draft |
-| `skills/answer-style` | Reshape a response to the AGENTS.md communication style |
 | `skills/review` | Review finished work before reflection and commit |
 | `skills/reflect` | Update durable docs and agent guidance after review |
 | `skills/commit` | Archive plan, finalize tracked work, commit |
 | `skills/write-pr` | Write a concise, visual pull request title and body |
-| `skills/workflow-orchestrator` | Parent-gated persistent-subagent automation, per ticket or in parallel worktrees |
+| `pi/skills/workflow-orchestrator` | Pi-only parent-gated automation, per ticket or in parallel worktrees |
 | `skills/_lib/worktrees.sh` | Exact external agent-worktree create/register/inspect/state/remove operations; uses `AGENT_WORKTREES_DIR` |
 | `skills/test-coverage` | Analyze test coverage |
 | `skills/docs-health` | Assess durable documentation health |
 
+## Prompts
+
+`prompts/AGENTS.md` is the shared instruction template. Sync installs it as `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, and `~/.pi/agent/AGENTS.md`. Cursor receives `~/.cursor/rules/rules.mdc` with `alwaysApply: true`. Root `AGENTS.md` contains contributor guidance for this repository and is not deployed. The old `~/.cursor/AGENTS.md` is not a supported Cursor instruction entry point; sync leaves that untracked file untouched.
+
+`prompts/answer-style.md` provides a concise, plain-language answer shortcut. Sync installs it as a Claude command and Pi prompt (`/answer-style`), and generates one Codex skill (`$answer-style`) with explicit-only invocation metadata. Cursor gets a link to that generated skill, so its cross-harness discovery sees the same file, not duplicate copies. In Pi, use `/answer-style`, not `/skill:answer-style`.
+
+Generated prompt skills remain under `~/.codex/skills/`, which Codex 0.155.1 still supports but marks deprecated. Keeping this small harness-specific output outside the shared pool prevents Pi from discovering both a prompt and a skill. Ordinary skills use the current shared location below.
+
+Add standalone command prompts as direct `prompts/*.md` files with YAML frontmatter containing `description` and `disable-model-invocation: true`. The filename supplies the command name; omit `name` in the source. Do not reuse a shared skill name. `AGENTS.md` is reserved for the global template and excluded from command discovery. Keep procedures and automatically discovered guidance in `skills/`.
+
 ## Experimental
 
-`experimental/autopilot/` — Claude Code-only autopilot flow. Not part of the main workflow or `AGENTS.md`. See that directory for details.
+`experimental/autopilot/` — Claude Code-only autopilot flow. Not part of the main workflow or `prompts/AGENTS.md`. See that directory for details.
 
 ## Pi Runtime Assets
 
 Project-local Pi extensions live in `extensions/` and sync into `~/.pi/agent/extensions/` via `./sync-prompts.sh`. Pi auto-loads synced extensions on startup; use `/reload` in an existing Pi session after syncing.
 
-All shared subagents live in `agents/` and sync to Claude, Cursor, and Pi. Pi keeps the configured provider/model and context settings. Claude and Cursor copies omit Pi-specific model, thinking, and context settings and use their default models; sync also translates tool names.
+Specialist sources live in `agents/`. Pi keeps their Markdown, model, and context settings. Sync generates Claude Markdown with native tool names, Cursor Markdown with `readonly` for read-only roles, and Codex TOML with `developer_instructions` and a read-only sandbox for those roles. Non-Pi agents inherit their harness model; `second-opinion` does not guarantee a different model. Sync does not modify Codex's main configuration.
 
-Pi-only skills live in `pi/skills/` and overlay into `~/.pi/agent/skills/` after the shared `skills/` sync. Use this only for skills that depend on Pi runtime behavior and should not appear in Claude, Cursor, or Codex skill roots.
+Pi-only skills live in `pi/skills/` and install into `~/.pi/agent/skills/`. Keep their names distinct from shared skills. `workflow-orchestrator` stays here until its non-Pi lifecycle behavior is validated. Shared helpers still use `SKILLS_ROOT=~/.agents/skills`.
 
 The `start_focus` and `end_focus` tools control autonomous work on an approved, bounded task. Focus uses Execute scope when Execute is already active and standalone scope when no workflow step is active; it is rejected during planning, review, reflection, and commit. The agent can call `start_focus` from Execute or standalone work when the task is likely to require multiple turns without immediate user input. Focus does not start or advance workflow steps unless the user explicitly requests one. `extensions/workflow-runtime/` owns the pulsing `◆ Focus` / `◇ Focus` indicator and guarded continuation delivery. Every turn ending normally (`stop`) produces a compact, expandable continuation event that directs the agent back to Execute and the active plan or to the standalone user task; there is no turn limit or response marker. Esc/abort, provider errors, output limits, and other non-normal stops leave focus active but paused without scheduling another turn. Ordinary user input resumes it; recovery reminders after resumed input or overflow compaction are model-facing but hidden in the TUI. The agent ends the loop by calling `end_focus` with a `completed` or `blocked` outcome and summary. Changing workflow steps stops focus, compaction preserves it, and reload, restart/resume, new session, or fork requires explicit reinvocation.
 
@@ -184,18 +193,22 @@ Persist optional `depends_on`, `plan_file`, `discovered_from`, `references`, and
 ## Setup
 
 ```bash
-./sync-prompts.sh            # leaves Codex unprompted; copies workflow skills/subagents to Claude, Cursor, and Pi; overlays Pi-only skills/subagents/extensions into ~/.pi/agent
+./sync-prompts.sh            # deploy shared skills and native assets to Claude, Cursor, Codex, and Pi
 ./sync-prompts.sh --silent   # suppresses the sync summary
 ```
 
-Sync records what it deploys in per-directory `.rules-manifest-*` files and prunes repo-managed assets that were later deleted from the repo; user-installed skills, subagents, and extensions are never touched.
+Requires Bash 4.3+, `rsync`, `jq`, and `uv`. The staging helper uses the same uv-managed PyYAML dependency as the ticket helpers. `CODEX_HOME` overrides the Codex destination.
 
-Codex receives no `AGENTS.md`, skills, or subagents. Sync prunes repo-managed Codex prompt/workflow assets so Codex stays suitable for chat, browser-style research, and ad hoc tasks rather than tracked project workflow.
+Ordinary `skills/` content, including `_lib/`, installs once at `~/.agents/skills/`. Pi, current Cursor, and Codex discover it directly. Claude receives individual symlinks under `~/.claude/skills/`. Set `SKILLS_ROOT="$HOME/.agents/skills"` for shared helpers. These are deployed copies, not links into this checkout, so editing the repo does not change installed instructions until sync runs.
 
-Sync also ensures `npm:pi-tmux-subagents` and `~/.pi/agent/skills` are listed in `~/.pi/agent/settings.json`. If a configured local package has the name `pi-tmux-subagents` in its `package.json`, sync keeps that install instead of adding the npm entry.
+Sync records deployed files and links in `.rules-manifest-*` files. Migration removes old manifest-owned skill copies before creating links. Unrelated personal files remain. If a personal file or directory blocks a link, or a same-name skill lacks ownership metadata, preflight stops and names the conflict. Resolve it explicitly rather than deleting whole harness directories. Untracked legacy assets are not automatically adopted or removed.
+
+This layout targets local use with current clients. Cursor editor 3.21.9 follows skill symlinks and deduplicates their real paths; the January 2026 Cursor CLI does not support this layout and must be upgraded separately. Cursor cloud sync only includes `~/.cursor/skills`, not the shared skill pool. No cloud distribution or non-Pi workflow-runtime integration is provided.
+
+Sync also ensures `npm:pi-tmux-subagents` is configured in Pi. It removes the redundant skill paths previously installed by Rules (`~/.claude/skills` and `~/.pi/agent/skills`); native discovery supplies shared and Pi-only skills. Other configured paths remain. If a configured local package has the name `pi-tmux-subagents` in its `package.json`, sync keeps that install instead of adding the npm entry.
 
 If `~/.claude/settings.json` exists, sync also refreshes the Claude statusline command.
 
-See `AGENTS.md` for coding style and behavioral guidelines.
+See `prompts/AGENTS.md` for shared coding style and behavioral guidelines, and root `AGENTS.md` for Rules contributor guidance.
 See `PRINCIPLES.md` for distilled principles on working with coding agents.
 See `docs/STRUCTURE.md` for project architecture.

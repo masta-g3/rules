@@ -17,7 +17,7 @@ class SyncPromptsTest(unittest.TestCase):
     def test_package_sync_respects_local_install(self) -> None:
         if not shutil.which("jq"):
             self.skipTest("jq is unavailable")
-        helpers = SYNC_PROMPTS.read_text().split('remove_path "${codex_root}/AGENTS.md"', 1)[0]
+        helpers = SYNC_PROMPTS.read_text().split("# Prepare and check every new destination", 1)[0]
         for source_kind in ("relative", "absolute", "object", "missing"):
             with self.subTest(source=source_kind), tempfile.TemporaryDirectory() as home:
                 root = Path(home)
@@ -40,113 +40,83 @@ class SyncPromptsTest(unittest.TestCase):
                 self.assertEqual(result["packages"], expected)
                 self.assertEqual(result["theme"], "keep")
 
-    def test_claude_and_cursor_subagents_do_not_receive_gpt_provider_config(self) -> None:
-        source = SYNC_PROMPTS.read_text()
-
-        self.assertIn("sync_sanitized_subagents()", source)
-        self.assertIn('model:[[:space:]]*(openai-codex|claude-bridge)', source)
-        self.assertIn('sync_sanitized_subagents "${repo_root}/agents/" "${claude_root}/agents/"', source)
-        self.assertIn('sync_sanitized_subagents "${repo_root}/agents/" "${cursor_root}/agents/"', source)
-        self.assertNotIn('sync_dir "${repo_root}/agents/" "${claude_root}/agents/" "subagents"', source)
-        self.assertNotIn('sync_dir "${repo_root}/agents/" "${cursor_root}/agents/" "subagents"', source)
-
-    def test_sync_sanitizes_claude_subagents_but_leaves_pi_provider_config(self) -> None:
-        if not shutil.which("rsync") or not shutil.which("jq"):
-            self.skipTest("sync-prompts.sh dependencies are unavailable")
-
+    def test_sync_sanitizes_subagents_but_leaves_pi_provider_config(self) -> None:
         with tempfile.TemporaryDirectory() as home:
-            env = {**os.environ, "HOME": home}
-            subprocess.run([str(SYNC_PROMPTS), "--silent"], cwd=REPO_ROOT, env=env, check=True)
-
-            claude_agent = Path(home) / ".claude" / "agents" / "code-critic.md"
-            cursor_agent = Path(home) / ".cursor" / "agents" / "code-critic.md"
-            pi_agent = Path(home) / ".pi" / "agent" / "agents" / "code-critic.md"
-
-            pi_text = pi_agent.read_text()
-
-            for sanitized in (claude_agent.read_text(), cursor_agent.read_text()):
-                self.assertNotIn("openai-codex/gpt-5.6-sol", sanitized)
-                self.assertNotIn("thinking: high", sanitized)
-                self.assertIn("tools: Read, Grep, Glob, Bash", sanitized)
-                self.assertNotIn("tools: read, grep, find, bash", sanitized)
-            self.assertIn("openai-codex/gpt-5.6-sol", pi_text)
-            self.assertNotIn("openai-codex/gpt-5.5", pi_text)
-            self.assertIn("thinking: high", pi_text)
-            self.assertIn("tools: read, grep, find, bash", pi_text)
+            subprocess.run([str(SYNC_PROMPTS), "--silent"], cwd=REPO_ROOT,
+                           env={**os.environ, "HOME": home, "CODEX_HOME": home + "/.codex"}, check=True)
+            root = Path(home)
+            claude = (root / ".claude/agents/code-critic.md").read_text()
+            cursor = (root / ".cursor/agents/code-critic.md").read_text()
+            pi = (root / ".pi/agent/agents/code-critic.md").read_text()
+            for text in (claude, cursor):
+                self.assertNotIn("openai-codex/gpt-5.6-sol", text)
+                self.assertNotIn("thinking: high", text)
+                self.assertNotIn("tools: read, grep, find, bash", text)
+            self.assertIn("tools: Read, Grep, Glob, Bash", claude)
+            self.assertIn("readonly: true", cursor)
+            self.assertIn("openai-codex/gpt-5.6-sol", pi)
+            self.assertIn("thinking: high", pi)
+            self.assertIn("tools: read, grep, find, bash", pi)
 
     def test_shared_specialists_migrate_from_pi_only_manifest(self) -> None:
-        if not shutil.which("rsync") or not shutil.which("jq"):
-            self.skipTest("sync dependencies are unavailable")
         with tempfile.TemporaryDirectory() as home:
             root = Path(home)
-            pi_agents = root / ".pi" / "agent" / "agents"
+            pi_agents = root / ".pi/agent/agents"
             pi_agents.mkdir(parents=True)
             legacy = pi_agents / ".rules-manifest-pi_subagents"
             legacy.write_text("frontend-designer.md\nsecond-opinion.md\n")
             (pi_agents / "personal.md").write_text("keep")
             for _ in range(2):
                 subprocess.run([str(SYNC_PROMPTS), "--silent"], cwd=REPO_ROOT,
-                               env={**os.environ, "HOME": home}, check=True)
+                               env={**os.environ, "HOME": home, "CODEX_HOME": home + "/.codex"}, check=True)
                 self.assertFalse(legacy.exists())
                 self.assertEqual((pi_agents / "personal.md").read_text(), "keep")
                 for name in ("frontend-designer", "second-opinion"):
                     original = (REPO_ROOT / "agents" / f"{name}.md").read_text()
                     self.assertEqual((pi_agents / f"{name}.md").read_text(), original)
-                    self.assertIn("model: claude-bridge/claude-opus-5-5", original)
                     self.assertIn(f"{name}.md", (pi_agents / ".rules-manifest-subagents").read_text())
                     for harness in (".claude", ".cursor"):
                         text = (root / harness / "agents" / f"{name}.md").read_text()
                         for field in ("model:", "thinking:", "systemPromptMode:", "inheritProjectContext:", "inheritSkills:"):
                             self.assertNotIn(field, text)
-                        self.assertNotIn("Opus 5 delegate", text)
                         if name == "frontend-designer":
-                            self.assertIn("tools: Read, Grep, Glob, LS", text)
+                            expected = "tools: Read, Grep, Glob, LS" if harness == ".claude" else "readonly: true"
+                            self.assertIn(expected, text)
 
     def test_manifest_prunes_stale_repo_skills_but_keeps_user_skills(self) -> None:
-        if not shutil.which("rsync") or not shutil.which("jq"):
-            self.skipTest("sync-prompts.sh dependencies are unavailable")
-
         with tempfile.TemporaryDirectory() as home:
-            claude_skills = Path(home) / ".claude" / "skills"
+            claude_skills = Path(home) / ".claude/skills"
             (claude_skills / "workflow-migrate").mkdir(parents=True)
-            (claude_skills / "workflow-migrate" / "SKILL.md").write_text("stale seeded skill")
-            (claude_skills / "user-skill").mkdir()
-            (claude_skills / "user-skill" / "SKILL.md").write_text("mine")
-
-            env = {**os.environ, "HOME": home}
-            subprocess.run([str(SYNC_PROMPTS), "--silent"], cwd=REPO_ROOT, env=env, check=True)
-
+            (claude_skills / "workflow-migrate/SKILL.md").write_text("stale managed skill")
             manifest = claude_skills / ".rules-manifest-skills"
-            self.assertFalse((claude_skills / "workflow-migrate").exists())
-            self.assertEqual((claude_skills / "user-skill" / "SKILL.md").read_text(), "mine")
-            self.assertIn("plan-md", manifest.read_text())
-            self.assertNotIn("user-skill", manifest.read_text())
-
-            # A manifest entry whose source disappears from the repo is pruned on the next run.
-            (claude_skills / "old-thing").mkdir()
-            (claude_skills / "old-thing" / "SKILL.md").write_text("previously synced")
-            manifest.write_text(manifest.read_text() + "old-thing/SKILL.md\n")
+            manifest.write_text("workflow-migrate/SKILL.md\n")
+            (claude_skills / "user-skill").mkdir()
+            (claude_skills / "user-skill/SKILL.md").write_text("mine")
+            env = {**os.environ, "HOME": home, "CODEX_HOME": home + "/.codex"}
             subprocess.run([str(SYNC_PROMPTS), "--silent"], cwd=REPO_ROOT, env=env, check=True)
-
+            self.assertFalse((claude_skills / "workflow-migrate").exists())
+            self.assertEqual((claude_skills / "user-skill/SKILL.md").read_text(), "mine")
+            self.assertIn("plan-md", (claude_skills / ".rules-manifest-skill_links").read_text())
+            self.assertNotIn("user-skill", manifest.read_text())
+            (claude_skills / "old-thing").mkdir()
+            (claude_skills / "old-thing/SKILL.md").write_text("previously synced")
+            manifest.write_text("old-thing/SKILL.md\n")
+            subprocess.run([str(SYNC_PROMPTS), "--silent"], cwd=REPO_ROOT, env=env, check=True)
             self.assertFalse((claude_skills / "old-thing").exists())
-            self.assertEqual((claude_skills / "user-skill" / "SKILL.md").read_text(), "mine")
-            self.assertNotIn("old-thing", manifest.read_text())
+            self.assertEqual((claude_skills / "user-skill/SKILL.md").read_text(), "mine")
 
     def test_recursive_manifest_cleanup_and_migration(self) -> None:
-        if not shutil.which("rsync"):
-            self.skipTest("rsync is unavailable")
-
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             src, dst = root / "source", root / "target"
-            (src / "skill" / "assets").mkdir(parents=True)
-            (src / "skill" / "SKILL.md").write_text("current")
-            (src / "skill" / "assets" / "old.html").write_text("asset")
+            (src / "skill/assets").mkdir(parents=True)
+            (src / "skill/SKILL.md").write_text("current")
+            (src / "skill/assets/old.html").write_text("asset")
             (dst / "skill").mkdir(parents=True)
-            (dst / "skill" / "local.md").write_text("mine")
+            (dst / "skill/local.md").write_text("mine")
             manifest = dst / ".rules-manifest-test"
             manifest.write_text("skill\n")
-            helpers = SYNC_PROMPTS.read_text().split("sync_sanitized_subagents()", 1)[0]
+            helpers = SYNC_PROMPTS.read_text().split("ensure_pi_setting_array_value()", 1)[0]
             script = root / "sync.sh"
             script.write_text(helpers + '\nprune_and_record "$SRC/" "$DST/" test\nsync_dir "$SRC/" "$DST/" test\n')
             env = {**os.environ, "HOME": tmp, "SRC": str(src), "DST": str(dst)}
@@ -158,48 +128,38 @@ class SyncPromptsTest(unittest.TestCase):
             sync()
             self.assertIn("skill/assets/old.html", manifest.read_text())
             self.assertNotIn("local.md", manifest.read_text())
-            (src / "skill" / "assets" / "old.html").unlink()
-            (src / "skill" / "assets").rmdir()
+            (src / "skill/assets/old.html").unlink()
+            (src / "skill/assets").rmdir()
             sync()
-            self.assertFalse((dst / "skill" / "assets").exists())
-            self.assertEqual((dst / "skill" / "local.md").read_text(), "mine")
+            self.assertFalse((dst / "skill/assets").exists())
+            self.assertEqual((dst / "skill/local.md").read_text(), "mine")
             shutil.rmtree(src)
             sync()
-            self.assertFalse((dst / "skill" / "SKILL.md").exists())
-            self.assertEqual((dst / "skill" / "local.md").read_text(), "mine")
+            self.assertFalse((dst / "skill/SKILL.md").exists())
+            self.assertEqual((dst / "skill/local.md").read_text(), "mine")
             self.assertEqual(manifest.read_text(), "")
             sync()
 
     def test_extension_sync_migrates_legacy_runtime_without_deleting_user_extensions(self) -> None:
-        if not shutil.which("rsync") or not shutil.which("jq"):
-            self.skipTest("sync-prompts.sh dependencies are unavailable")
-
         for clean_arg in ([], ["--clean"]):
-            with self.subTest(mode="clean" if clean_arg else "default"), tempfile.TemporaryDirectory() as home:
-                pi_root = Path(home) / ".pi" / "agent"
+            with self.subTest(mode=clean_arg), tempfile.TemporaryDirectory() as home:
+                pi_root = Path(home) / ".pi/agent"
                 extensions = pi_root / "extensions"
                 extensions.mkdir(parents=True)
                 (extensions / "workflow-indicator.ts").write_text("legacy indicator")
                 (extensions / "long-execute.ts").write_text("legacy controller")
                 (extensions / "user-extension.ts").write_text("keep me")
-                old_skill = pi_root / "skills" / "long-execute"
+                old_skill = pi_root / "skills/long-execute"
                 old_skill.mkdir(parents=True)
                 (old_skill / "SKILL.md").write_text("legacy skill")
-
-                env = {**os.environ, "HOME": home}
-                subprocess.run(
-                    [str(SYNC_PROMPTS), "--silent", *clean_arg],
-                    cwd=REPO_ROOT,
-                    env=env,
-                    check=True,
-                )
-
-                self.assertTrue((extensions / "workflow-runtime" / "index.ts").is_file())
-                self.assertTrue((extensions / "workflow-runtime" / "core.ts").is_file())
+                subprocess.run([str(SYNC_PROMPTS), "--silent", *clean_arg], cwd=REPO_ROOT,
+                               env={**os.environ, "HOME": home, "CODEX_HOME": home + "/.codex"}, check=True)
+                self.assertTrue((extensions / "workflow-runtime/index.ts").is_file())
+                self.assertTrue((extensions / "workflow-runtime/core.ts").is_file())
                 self.assertFalse((extensions / "workflow-indicator.ts").exists())
                 self.assertFalse((extensions / "long-execute.ts").exists())
                 self.assertEqual((extensions / "user-extension.ts").read_text(), "keep me")
-                self.assertFalse((pi_root / "skills" / "focus").exists())
+                self.assertFalse((pi_root / "skills/focus").exists())
                 self.assertFalse(old_skill.exists())
 
 

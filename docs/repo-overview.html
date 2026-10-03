@@ -152,7 +152,7 @@ pre .dim{color:var(--muted)}
 </ol></div>
 <div class="inner" style="gap:var(--s3)">
 <h3>Why the rules exist</h3>
-<p class="caption">Each rule answers a known agent failure, from <code>PRINCIPLES.md</code> and <code>AGENTS.md</code>.</p>
+<p class="caption">Each rule answers a known agent failure, from <code>PRINCIPLES.md</code> and <code>prompts/AGENTS.md</code>.</p>
 <ul class="counter">
 <li><span class="problem">Agents drift local and duplicate code</span><span class="arrow">→</span><span>Reuse first; plan and code critics check fit</span></li>
 <li><span class="problem">Agents over-build and over-abstract</span><span class="arrow">→</span><span>Smallest viable change; functional style where it fits</span></li>
@@ -295,14 +295,14 @@ history/<span class="hl">auth-001.md</span></pre></li>
 <li><code>explain-html</code><small>Visual HTML explainers</small></li>
 <li><code>write-pr</code><small>Pull request title and body</small></li>
 <li><code>unslop</code><small>Remove AI writing patterns</small></li>
-<li><code>answer-style</code><small>Reshape an answer to plain style</small></li>
+<li><code>/answer-style</code><small>Standalone prompt: reshape an answer to plain style</small></li>
 </ul></section>
 <section><h3>Maintain</h3><p class="when-use">Periodic health checks</p><ul class="skill-list">
 <li><code>docs-health</code><small>Audit durable docs, apply approved fixes</small></li>
 <li><code>test-coverage</code><small>Find gaps, propose critical tests</small></li>
 </ul></section>
 <section><h3>Automate</h3><p class="when-use">Only when you ask</p><ul class="skill-list">
-<li><code>workflow-orchestrator</code><small>A parent agent runs each ticket step through a persistent subagent, one phase at a time. Works one ticket at a time or in parallel worktrees.</small></li>
+<li><code>workflow-orchestrator</code><small>Pi-only. A parent agent runs each ticket step through a persistent subagent, one phase at a time. Works one ticket at a time or in parallel worktrees.</small></li>
 </ul></section>
 </div>
 <div class="inner" style="gap:var(--s3)">
@@ -321,22 +321,23 @@ history/<span class="hl">auth-001.md</span></pre></li>
 <section class="slide" id="deploy" aria-labelledby="deploy-title"><div class="inner">
 <p class="eyebrow">05 / Deployment</p>
 <h2 id="deploy-title">Edit here. Sync copies it out.</h2>
-<div class="flowline" aria-label="Deployment flow"><span>edit source in this repo</span><span class="arrow">→</span><span>./sync-prompts.sh</span><span class="arrow">→</span><span>~/.claude · ~/.cursor · ~/.pi/agent</span><span class="arrow">→</span><span>Pi: /reload</span></div>
+<div class="flowline" aria-label="Deployment flow"><span>edit source in this repo</span><span class="arrow">→</span><span>./sync-prompts.sh</span><span class="arrow">→</span><span>~/.agents · native harness assets</span><span class="arrow">→</span><span>Pi: /reload</span></div>
 <table class="deploy">
 <caption class="caption" style="text-align:left;padding-bottom:var(--s2)">What each harness receives</caption>
 <thead><tr><th scope="col">Source</th><th scope="col">Claude</th><th scope="col">Cursor</th><th scope="col">Pi</th><th scope="col" class="codex">Codex</th></tr></thead>
 <tbody>
-<tr><th scope="row"><code>AGENTS.md</code></th><td class="yes">✓ as CLAUDE.md</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">— removed</td></tr>
-<tr><th scope="row"><code>skills/</code></th><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">— removed</td></tr>
-<tr><th scope="row"><code>agents/</code></th><td class="yes">✓ default model</td><td class="yes">✓ default model</td><td class="yes">✓ keeps model + thinking</td><td class="no">— removed</td></tr>
+<tr><th scope="row"><code>prompts/AGENTS.md</code></th><td class="yes">✓ as CLAUDE.md</td><td class="yes">✓ user .mdc rule</td><td class="yes">✓ AGENTS.md</td><td class="yes">✓ AGENTS.md</td></tr>
+<tr><th scope="row">Other <code>prompts/*.md</code></th><td class="yes">✓ commands</td><td class="yes">✓ linked generated skills</td><td class="yes">✓ prompts</td><td class="yes">✓ generated skills</td></tr>
+<tr><th scope="row"><code>skills/</code></th><td class="yes">✓ links to shared</td><td class="yes">✓ shared discovery</td><td class="yes">✓ shared discovery</td><td class="yes">✓ shared discovery</td></tr>
+<tr><th scope="row"><code>agents/</code></th><td class="yes">✓ native Markdown</td><td class="yes">✓ native Markdown</td><td class="yes">✓ keeps model + thinking</td><td class="yes">✓ native TOML</td></tr>
 <tr><th scope="row"><code>extensions/</code>, <code>pi/skills/</code></th><td class="no">—</td><td class="no">—</td><td class="yes">✓ Pi only</td><td class="no">—</td></tr>
 <tr><th scope="row"><code>statusline/</code></th><td class="yes">✓ if settings exist</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
 </tbody></table>
 <div class="split">
 <article><h3>Safe pruning</h3><p class="caption">Sync writes a <code>.rules-manifest-*</code> file per target. When you delete an asset here, the next sync removes its copy. Skills, agents, and extensions you installed yourself stay untouched.</p></article>
-<article><h3>Why Codex gets nothing</h3><p class="caption">Codex stays a plain tool for chat, research, and quick tasks. Tracked project workflow runs in Claude, Cursor, or Pi.</p></article>
+<article><h3>One shared skill installation</h3><p class="caption">Ordinary skills and helpers live in <code>~/.agents/skills</code>. Claude links to them. Pi-only orchestration and runtime assets stay separate. This is local deployment, not cloud sync.</p></article>
 </div>
-<div class="footer"><span>Sync also registers <code>pi-tmux-subagents</code> and the skills path in Pi settings.</span><a href="#pi">Next: Pi runtime →</a></div>
+<div class="footer"><span>Sync registers <code>pi-tmux-subagents</code>; Pi discovers shared skills natively.</span><a href="#pi">Next: Pi runtime →</a></div>
 </div></section>
 
 <section class="slide" id="pi" aria-labelledby="pi-title"><div class="inner">
@@ -365,7 +366,9 @@ history/<span class="hl">auth-001.md</span></pre></li>
 <table class="where">
 <thead><tr><th scope="col">To change…</th><th scope="col">Edit</th><th scope="col">Keep in mind</th></tr></thead>
 <tbody>
-<tr><td>Agent behavior everywhere</td><td><code>AGENTS.md</code></td><td>Short, durable rules. Deployed to every harness.</td></tr>
+<tr><td>Shared agent behavior</td><td><code>prompts/AGENTS.md</code></td><td>Deployed to Claude, Cursor, Codex, and Pi.</td></tr>
+<tr><td>Rules contributor guidance</td><td><code>AGENTS.md</code></td><td>Repo-local; not deployed.</td></tr>
+<tr><td>Explicit prompt shortcuts</td><td><code>prompts/&lt;name&gt;.md</code></td><td>One source; native outputs where formats differ.</td></tr>
 <tr><td>How one task is done</td><td><code>skills/&lt;name&gt;/SKILL.md</code></td><td>Keep portable. Pi-only skills go in <code>pi/skills/</code>.</td></tr>
 <tr><td>Ticket or worktree operations</td><td><code>skills/_lib/</code></td><td>Use the helpers; do not copy their logic into prompts.</td></tr>
 <tr><td>Reviewer behavior</td><td><code>agents/*.md</code></td><td>Sync adapts models and tool names per harness.</td></tr>
