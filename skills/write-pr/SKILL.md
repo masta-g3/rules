@@ -91,10 +91,13 @@ function expandSkill(command: string): string {
 ```
 
 - For a change with visible UI effects, direct or indirect, show a before/after table with uploaded images or video. For benchmarks, always show a before/after table: baseline from the target branch, candidate from the PR.
+- For other behavior changes, show before/after execution evidence: the test that now passes, or the changed output.
 
 ## Guidance
 
 Place each visual next to the short text it supports. Keep only the calls, files, props, states, and boundaries needed to explain the change. Code refs are welcome.
+
+State the merge risk in one line: two-way door (easy to roll back) or one-way door (destructive or hard to reverse), and the blast radius.
 
 You may use one of these, you may use several, it is unlikely you will use all of them. Use your judgement and don't overwhelm the reader.
 

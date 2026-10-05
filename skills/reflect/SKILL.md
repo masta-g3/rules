@@ -22,13 +22,14 @@ When the tools are available:
 Review only docs and sections related to the current work. If reading the relevant code answers the question, do not document it. Keep only durable general guidance that changes future decisions. Before adding text, remove duplicates and delete or rewrite outdated or overly specific guidance. Leave out temporary status, pending work, session history, and implementation details.
 
 1. Read the active plan, including `Reflection Candidates`, review output, user conversation, and session logs.
-2. Review the findings for friction, mistakes, and wrong assumptions. Distinguish guidance problems from code or interface problems. Propose the smallest correction at the source. If no useful correction is warranted, take no action. Route guidance proposals to the owning file:
+2. Review the findings for friction (slow file discovery, expensive tool calls, missing logs or service access), mistakes, and wrong assumptions. Distinguish guidance problems from code, interface, or tooling problems. Propose the smallest correction at the source. If no useful correction is warranted, take no action. Route guidance proposals to the owning file:
    - project purpose, target user, project type, project stage, operating assumptions, or shared terminology → `CONTEXT.md`
    - user or operator instructions → `README.md`
    - non-obvious code locations, relationships, or placement boundaries → `docs/STRUCTURE.md`
    - external constraints or decision rationale absent from code → the relevant domain doc
    - durable project-wide execution rules with no better home → the project-local `AGENTS.md`. Normally leave it unchanged; recurrence alone does not justify a rule.
    - repeatable project workflows already defined in local skills or agent configuration → the owning file. Do not create skills or change user-global configuration unless explicitly requested.
+   - mechanical mistakes (banned API, import shape, file location) → propose a deterministic check (lint rule, test, hook, or CI job) as follow-up work instead of a written rule. Read the repo's existing check commands first; an unwired or broken check is itself the finding.
 3. Apply guidance changes under the approval rules below. For substantive guidance edits, invoke the `docs-critic` subagent afterward. Skip the critic for no guidance edits or minor fixes to typos, links, paths, or formatting. Follow the critic rule in `AGENTS.md`. Delete an update if the critique shows it is not worth keeping. Use the same approval rules for critic-driven changes.
 
 ### Follow-up work

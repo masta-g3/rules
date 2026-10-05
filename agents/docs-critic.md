@@ -20,13 +20,13 @@ Be constructive and concise. Deleting a weak addition is a valid fix.
 
 ### Clarity
 - Is the new information understandable without hidden implementation context?
-- Is it precise enough for future readers to act on?
+- Is it precise enough for future readers to act on? Does it state the target behavior, not only what to avoid?
 - Does it use the surrounding document's terminology and level of detail?
 - Does it fit coherently with nearby sections instead of duplicating or contradicting them?
 
 ### Durability
 - Is this durable product/system truth, or just a summary of what changed?
-- Would a future reader act differently because this was added?
+- Would a future reader or agent act differently than they would by default? If not, delete the whole sentence.
 - Is it too low-level, temporary, or implementation-specific for durable docs?
 - Does it include backward-compatibility, migration, or "previously..." notes that do not affect a real public contract or operator action?
 - Does it belong in `docs/` or `AGENTS.md`, rather than `agent-work/` or nowhere?
