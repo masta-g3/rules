@@ -1,6 +1,5 @@
 # Rules contributor guidance
 
-- Read `CONTEXT.md` and `docs/STRUCTURE.md` before changing the repository.
 - `prompts/AGENTS.md` is the shared instruction template shipped to other projects. This file governs maintenance of Rules itself; keep repo-specific guidance out of the shared template.
 - Edit source assets here, not installed copies under harness home directories. Keep shared prompts, skills, and agents portable; put Pi-specific runtime behavior in `extensions/`.
 - Prefer revising or removing existing guidance over adding another rule, skill, or workflow stage.
