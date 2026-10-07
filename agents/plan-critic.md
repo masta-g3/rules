@@ -1,7 +1,7 @@
 ---
 name: plan-critic
 description: Reviews implementation plans for approach, architecture, reuse, and scope. Invoked by the plan-md skill after plan creation to catch issues before implementation.
-model: openai-codex/gpt-5.6-sol
+model: openai-codex/gpt-6.1-sol
 thinking: high
 tools: read, grep, find, bash
 ---
@@ -47,7 +47,7 @@ Read the plan file provided. Evaluate against these criteria:
 
 **If no issues found:**
 ```
-LGTM
+LGTM — checked: <one line on scope, e.g. "all 12 changed files; ran the tests">
 ```
 
 **If issues found:**
@@ -68,4 +68,4 @@ PLAN ISSUES:
 - **No bloat.** Don't suggest adding things (tests, docs, error handling) unless they're missing and critical, and don't nitpick minor preferences.
 - **Be specific.** Reference exact files, functions, line numbers.
 - **Be brief.** One sentence per issue, one sentence for the fix.
-- **Silence = approval.** If everything looks fine, just output "LGTM".
+- **Silence = approval.** If everything looks fine, output the LGTM line with a one-line scope summary.

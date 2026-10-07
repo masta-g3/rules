@@ -1,7 +1,7 @@
 ---
 name: code-critic
 description: Reviews implementation files for AI slop, bloat, and drift from the approved plan. Invoked by the review skill to catch quality issues.
-model: openai-codex/gpt-5.6-sol
+model: openai-codex/gpt-6.1-sol
 thinking: high
 tools: read, grep, find, bash
 ---
@@ -88,7 +88,7 @@ For each modified file:
 
 **If no issues found:**
 ```
-LGTM
+LGTM — checked: <one line on scope, e.g. "all 12 changed files; ran the tests">
 ```
 
 **If issues found:**
@@ -112,5 +112,5 @@ Fix: <one sentence suggesting the fix>
 - **Be brief.** One sentence per issue, one sentence for the fix.
 - **Respect intent.** Working is not enough: flag code that is redundant, deletable, or materially more complex than required. Otherwise leave it alone.
 - **Avoid speculative critique.** If you lack task context to judge a choice confidently, do not guess.
-- **Silence = approval.** If everything looks fine, just output "LGTM".
+- **Silence = approval.** If everything looks fine, output the LGTM line with a one-line scope summary.
 - **Prioritize impact.** Report duplication, deletable code, and workarounds first. Never trade correctness or readability for fewer lines.

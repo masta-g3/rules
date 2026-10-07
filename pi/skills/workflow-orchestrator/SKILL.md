@@ -1,186 +1,87 @@
 ---
 name: workflow-orchestrator
-description: Parent-controlled ticket workflow automation using persistent subagents, one ticket at a time or in parallel isolated worktrees.
+description: Parent-controlled ticket workflow automation using persistent subagents, for one ticket or a set of tickets such as an epic, run in dependency order in isolated worktrees.
 ---
 
-Use this Pi-only skill when the user explicitly asks the parent agent to manage the feature workflow automatically instead of waiting for manual invocation of each step.
+Use this Pi-only skill only when the user asks the parent agent to run the feature workflow for them. The user aligns at kickoff, steps away, and reviews once at the end. The parent acts for the user in between, inside limits the user approved.
 
-The parent agent remains the orchestrator. Subagents execute exactly one workflow phase at a time and then stop for parent inspection.
-
-## Requirements
-
-- A tracked backlog at `agent-work/features.yaml` using the standard feature schema.
-- Workflow skills available in the active harness: `next-feature`, `plan-md`, `execute`, `review`, `reflect`, `commit`.
-- A persistent subagent mechanism, preferably `pi-tmux-subagents`, that supports:
-  - launching one child per ticket;
-  - sending follow-up prompts and user answers to the same child session;
-  - waiting for a specific follow-up turn to complete;
-  - reading child output/results;
-  - optional allowlisted nested specialist launches from the child, when the phase skill or parent prompt explicitly calls for them;
-  - stopping the child when the ticket is complete or blocked.
-- A clean or understood git worktree before starting each ticket.
-- `$SKILLS_ROOT` set for helper commands, `export SKILLS_ROOT="$HOME/.agents/skills"`.
+Launch each child as the `ticket-runner` agent. Requires `tmux_subagent` and `$SKILLS_ROOT` (`export SKILLS_ROOT="$HOME/.agents/skills"`).
 
 ## Core rule
 
-Do **not** give a child subagent the whole workflow. Give it one phase only:
+The parent orchestrates. Each child owns one ticket and runs one phase per turn:
 
 ```text
 plan-md → execute → review → reflect → commit
 ```
 
-After each child response, the parent inspects the output, changed files, git status, and handoff label before deciding the next phase.
+After each turn, the parent checks the gate before sending the next phase. Children never orchestrate tickets or phases.
 
-## Ticket flow
+Launch each child with `allowNestedSubagents: true` and `nestedAgentAllowlist: ["plan-critic", "code-critic", "docs-critic"]`; the allowlist is fixed at launch.
 
-Use when the user names a ticket or asks to try the automation on the next ticket.
+## Kickoff (user present)
 
-1. Select the ticket:
-   - If the user supplied an ID, inspect it with `$SKILLS_ROOT/_lib/features_yaml.sh get <id> --output json`.
-   - Otherwise run `$SKILLS_ROOT/_lib/features_yaml.sh next --output json` and use the recommended feature.
-2. Verify the current checkout is safe. Stop if unrelated changes make the commit boundary unsafe.
-3. Resolve the worktree decision before launching the child:
-   - ask whether to use a worktree unless the user already decided;
-   - if approved, confirm the start branch and PR target;
-   - reuse a Hub-supplied mapping as Hub-owned, without a Rules record;
-   - otherwise create an exact Rules-owned external record with `$SKILLS_ROOT/_lib/worktrees.sh create`; use `AGENT_WORKTREES_DIR` or its default `~/.local/share/agent-worktrees`;
-   - register an existing worktree only by explicit path and verified identity; never scan, migrate, or adopt by ticket name;
-   - copy only required inspected local configuration and keep its contents out of metadata.
-4. Launch one persistent child for the ticket with:
-   - `cwd` set to the approved exact worktree, or the current checkout when no worktree was approved;
-   - the owner and absolute Rules record path when Rules owns it, with instructions to bind that path through `set_workflow_ticket` and never fall back to the source checkout;
-   - `autoStopOnComplete: false`;
-   - nested specialists enabled only when needed through a narrow allowlist.
-5. Send exactly one phase prompt at a time:
-   - `plan-md` for `<ticket-id>`; require `READY FOR EXECUTE`.
-   - `execute` for `<ticket-id>` and `agent-work/plans/<ticket-id>.md`; require `READY FOR REVIEW`.
-   - `review`; require `READY FOR REFLECT`.
-   - `reflect`; require `READY FOR COMMIT`.
-   - `commit`; require `WORKFLOW COMPLETE` or `WORKFLOW COMPLETE — PENDING PR MERGE`, plus a commit hash.
-6. During `plan-md`, relay expected interview questions to the user one at a time:
-   - keep the child alive while waiting;
-   - send the user's answer back to the same child;
-   - continue until planning succeeds or a real blocker occurs.
-7. After planning, verify that the plan's `Worktree`, `Start branch`, and `PR target` match the approved preflight decisions.
-8. Run parent Git inspections in the child's recorded checkout.
-9. Stop the child after completion or blockage.
-10. Report only the final outcome unless the user asked for live updates or a stop condition occurs.
+1. Select the tickets: the ones the user named, an epic, or `$SKILLS_ROOT/_lib/features_yaml.sh next --output json`. Read `depends_on` to know the order. For an epic, read its `{epic}-000.md` doc. With multiple tickets, pass its absolute path in the integration worktree in every phase prompt.
+2. Confirm the start branch and PR target. For more than one ticket, the user's request to run them together approves an integration branch, its worktrees, pushing it, and one draft PR.
+3. Run `plan-md` for every ticket in the run, including dependent ones. Relay each interview question to the user and return the answer to the same child. The user approves each plan's acceptance criteria. If a plan needs a human action, such as an account, credentials, or hardware, do it now with the user or mark that ticket parked.
+4. Confirm the AFK limits. Default: the parent may answer from approved plans, make reversible implementation choices that keep acceptance criteria intact, and log discovered work as tickets. It may not change acceptance criteria, widen scope, add dependencies, or touch data or external systems.
 
-To process several tickets, repeat this mode per next actionable feature (new child per ticket) within the boundary the user set — epic prefix, ticket count, or stop-on-first-failure — then summarize completed, blocked, and remaining work.
+A ticket whose plan is approved and whose dependencies are done may start `execute` during kickoff. Stop other planned children and `resume` each when its ticket becomes ready.
 
-`WORKFLOW COMPLETE — PENDING PR MERGE` completes the commit turn. Report the open PR and retained worktree as pending cleanup; do not report the ticket as blocked. Workflow completion and worktree cleanup are independent. After approved integration and explicit artifact dispositions, use the owning closeout path and verify terminal cleanup rather than inferring it from Commit.
+## AFK (user away)
 
-## Parallel tickets
+Handle each child question or reported deviation this way:
 
-Only when the user explicitly asks to run independent tickets in parallel, follow `references/parallel-worktrees.md` in this skill directory: worktree isolation, prompt boundaries, extra inspection gates, and PR closeout.
+| Question or deviation | Parent action |
+| --- | --- |
+| The plan or AFK limits settle it | Answer with a pointer to the plan and continue. |
+| Reversible judgment call | Take the child's recommendation, log it as decided for the user with the alternative, and continue. |
+| Changes acceptance criteria or scope, or is not reversible | Park that ticket, queue the question, and continue the others. |
 
-## Preferred `tmux_subagent` control path
+Read each plan's `Discovered Work` at every gate and log new items. Keep the decision log, discovered work, and parked questions in the draft PR body, or in the final report if no PR exists.
 
-When `tmux_subagent` supports persistent follow-up actions, prefer the package API over raw tmux commands:
+When a decision affects other tickets, add one line under the epic doc's Decisions, commit it on the integration branch, and tell affected running children to re-read it.
 
-```text
-launch: tmux_subagent({
-  agent,
-  task: initialPhasePrompt,
-  background: true,
-  autoStopOnComplete: false,
-  allowNestedSubagents: true,
-  nestedAgentAllowlist: ["plan-critic", "code-critic", "frontend-designer"],
-  maxNestedDepth: 2
-})
-advance: tmux_subagent({ action: "send", childId, message: nextPhasePrompt, wait: true, timeoutMs })
-inspect: tmux_subagent({ action: "status", childId })
-wait:    tmux_subagent({ action: "wait", childId, timeoutMs })
-stop:    tmux_subagent({ action: "stop", childId })
-```
+## Single ticket
 
-Use `allowNestedSubagents: true` only when the active phase may legitimately need specialists; otherwise omit it. Keep `nestedAgentAllowlist` to the smallest set needed for the ticket/phase. Common examples are `plan-critic` during `plan-md`, `code-critic` during `review`, and `frontend-designer` for UI planning/execution. Nested agents must remain advisory unless the parent prompt explicitly allows file edits.
+Launch one child in the current checkout, or in the worktree that `plan-md` approved. Advance phases with `send(..., wait: true)`. The commit phase follows the commit skill, including any PR.
 
-Use `send(..., wait: true)` for normal phase advancement so the parent receives the completed turn result and avoids manual sleep/poll loops. Use raw `tmux paste-buffer` / `send-keys` only as a fallback when the installed package lacks `send`/`wait` support or the API is unavailable.
+## Multiple tickets
 
-## Phase prompt contract
+Tickets run in `depends_on` order: a chain runs one at a time, and independent tickets run at once. Run at most 3 children at once, or the user's number.
 
-Each phase prompt to the child must include:
+1. Commit the ticket entries and the epic doc on the start branch, so every ticket branch sees the same backlog and epic doc. Create the integration branch `<epic>-integration` from the start branch in its own worktree, targeting the PR target. Create one worktree per ticket with branch `<ticket-id>`, based on and targeting the integration branch. Use `$SKILLS_ROOT/_lib/worktrees.sh create` (records under `AGENT_WORKTREES_DIR`) and keep each exact record path; reuse Hub-supplied mappings instead.
+2. Launch or resume a background child for each ready ticket, up to the limit, with `cwd` set to its worktree and `autoStopOnComplete: false`.
+3. Before `execute`, the child merges the integration branch tip into its branch. Before reporting its commit, it merges the tip again and resolves conflicts in its own ticket.
+4. Use `wait` without a `childId` to handle whichever child finishes next. Check its gate, then send its next phase.
+5. After its commit, merge the ticket branch into the integration branch and push. Open the draft PR after the first merge. Then launch or resume tickets that just became ready.
+6. When all tickets are merged, run `code-critic` on the integration diff against the PR target. Send the clear, high-impact findings to one child that fixes them in the integration worktree.
+7. Mark the PR ready. After verifying each ticket merge, use `$SKILLS_ROOT/_lib/worktrees.sh remove` for Rules-owned ticket worktrees following `$SKILLS_ROOT/_lib/worktrees.md`, with the integration worktree as the surviving authored root; use Hub closeout for Hub-owned mappings. Keep the integration worktree until the user merges the PR.
 
-- ticket ID and description;
-- exact skill file to read/follow for this phase;
-- explicit boundary: "run only this phase";
-- relevant plan path or prior handoff summary;
-- project-specific constraints from `AGENTS.md`;
-- validation expectations;
-- instruction not to stage unrelated files;
-- required final label;
-- confirmed worktree, start-branch, and PR-target decisions;
-- for `plan-md`, instruction to ask only unresolved interview questions, one per turn, and wait for the answer;
-- whether nested specialist subagents are allowed for this phase, the allowed agent names, and the requirement to report nested agent used/skipped, job ID/result path, and feedback accepted/rejected.
+Never run two writable children in one checkout. Do not merge into the PR target.
 
-Example phase boundary:
+## Phase prompt
 
-```text
-Run ONLY the execute workflow step for tracked ticket <id>.
-Do not run review, reflect, commit, archive, or mark the feature done.
-Use and follow: <SKILLS_ROOT>/execute/SKILL.md.
-End with READY FOR REVIEW if successful.
-```
+Send pointers, not restated context:
 
-## Parent inspection gates
+- ticket ID, phase skill path, plan path, and epic doc path if any (the integration worktree copy);
+- worktree path and branch, and "do not touch other checkouts";
+- "Run ONLY the <phase> step. End with the skill's final label.";
+- for `commit` with multiple tickets: "Archive the plan, update the ticket, and commit to the ticket branch only. Do not push, open a PR, or clean up the worktree; the parent owns integration and closeout. Return COMMITTED FOR INTEGRATION with the commit hash instead of the commit skill's completion label.";
 
-Before advancing, the parent checks:
+## Gate
 
-- child final label matches the expected next step;
-- no blocker/question was reported;
-- child output and changed files still align with the approved plan and user intent;
-- `git status --short` has only expected files plus known ignored/local artifacts;
-- Git status was inspected in the checkout recorded by the plan;
-- the recorded worktree, start branch, and PR target match the approved decisions;
-- validation evidence is adequate for the phase;
-- hardware/domain claims follow project rules;
-- commit phase produced a commit hash and left no staged ticket files.
+Advance only when the expected phase label (or `COMMITTED FOR INTEGRATION` for a multi-ticket commit) is present, the diff matches the plan, required verification for the phase is complete, and `git status` in the child's worktree shows no surprises or unresolved questions. Before commit, acceptance checks must pass; only the user may approve deferring them.
 
-If the label is missing or inconsistent, inspect the child transcript/result before proceeding.
+Keep parent verification lightweight: read the child's summary, inspect diff scope and Git status, and check whether the evidence proves the agreed outcome through the highest practical existing seam, such as a CLI command, API, or user flow—not merely that implementation tests pass. Open relevant code or run a targeted check only for a gap, inconsistency, or cross-ticket risk. Do not repeat passing checks or load full transcripts by default; keep details in the plan and evidence files.
 
-## Stop conditions
+## Stop
 
-Stop the workflow and notify the user when:
+Stop the run and report when tooling fails (a child cannot be launched, resumed, or stopped reliably), a validation failure falls outside approved scope, a child drifts outside its phase, the user's limit is reached, or only parked tickets remain. Stop each child when its ticket completes, parks, or fails.
 
-- the child asks a product, scope, architecture, hardware/domain, or commit-boundary question that cannot be resolved through the expected `plan-md` interview;
-- the user cancels or cannot answer a required planning question;
-- tests or baseline validation fail and the fix is not clearly within the approved ticket scope;
-- the worktree contains unrelated changes that make staging/commit unsafe;
-- dependencies are blocked or no actionable tickets remain;
-- parent inspection suggests the work rests on unresolved product/design ambiguity or no longer matches the approved plan/user intent;
-- the child drifts outside the requested phase;
-- a persistent subagent cannot be launched, resumed, inspected, or stopped reliably;
-- the requested ticket boundary or user-defined limit is reached.
+## Report
 
-Do not stop just to provide routine progress updates.
-
-An expected `plan-md` interview question pauses the phase; it does not block the workflow or terminate the child.
-
-## Domain-specific validation tools
-
-Use specialized validation tools only when the ticket's domain requires them. Examples include browser automation for web UI flows, API clients for endpoint changes, database queries for data migrations, or device/simulator checks for hardware workflows.
-
-Do not require every child to report availability for unrelated tools. Ask about a tool only when it is relevant to the ticket's validation contract.
-
-## Child lifecycle
-
-- Use one persistent child per ticket.
-- Reuse that child for every phase of that ticket via `send(..., wait: true)` when available.
-- Kill/stop the child after either workflow-complete label, `BLOCKED`, `FAILED`, or unsafe drift.
-- Do not let children orchestrate tickets or workflow phases through nested subagents.
-- Children may launch only explicitly allowed nested specialist agents for the current phase. Nested agents must not stage, commit, merge, push, or modify files unless the phase prompt explicitly allows it.
-- Require the child to report whether each expected nested specialist was used or skipped, plus the nested job ID/result path and which feedback was accepted/rejected.
-
-## Output
-
-Report:
-
-- ticket ID;
-- final status;
-- commit hash if complete;
-- PR URL and pending cleanup state when the PR is not yet merged;
-- validation summary;
-- blocked question or follow-up if any.
-
-For multi-ticket runs, also report completed ticket IDs with commit hashes, blocked/skipped tickets with reasons, and the next recommended ticket.
+- per ticket, by ID and title: status, commit hash, and parked question if any;
+- PR URL and the integration worktree pending merge;
+- decision log and discovered work;
+- validation summary and next action.

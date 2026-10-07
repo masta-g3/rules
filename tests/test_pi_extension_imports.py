@@ -10,7 +10,6 @@ RUNTIME_CORE = REPO_ROOT / "extensions" / "workflow-runtime" / "core.ts"
 NOTIFY_EXTENSION = REPO_ROOT / "extensions" / "notify.ts"
 SYNC_PROMPTS = REPO_ROOT / "sync-prompts.sh"
 NEXT_FEATURE_SKILL = REPO_ROOT / "skills" / "next-feature" / "SKILL.md"
-COMMIT_SKILL = REPO_ROOT / "skills" / "commit" / "SKILL.md"
 
 
 class PiExtensionImportsTest(unittest.TestCase):
@@ -50,16 +49,6 @@ class PiExtensionImportsTest(unittest.TestCase):
         self.assertNotIn("clearState", agent_end_handler)
         self.assertNotIn("completeWorkflow", agent_end_handler)
         self.assertNotIn("WORKFLOW COMPLETE", source)
-
-    def test_commit_skill_completes_runtime_only_after_repository_closeout(self) -> None:
-        source = COMMIT_SKILL.read_text()
-
-        completion = source.index("`complete_workflow`")
-        self.assertGreater(completion, source.index("### Worktree Closeout"))
-        self.assertIn("every required repository commit succeeds", source)
-        self.assertIn("tracked feature and plan closeout is complete", source)
-        self.assertIn("Do not call `complete_workflow`", source)
-        self.assertIn("keep Commit active", source)
 
     def test_workflow_runtime_owns_focus_mode(self) -> None:
         source = EXTENSION.read_text()

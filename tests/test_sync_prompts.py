@@ -49,12 +49,12 @@ class SyncPromptsTest(unittest.TestCase):
             cursor = (root / ".cursor/agents/code-critic.md").read_text()
             pi = (root / ".pi/agent/agents/code-critic.md").read_text()
             for text in (claude, cursor):
-                self.assertNotIn("openai-codex/gpt-5.6-sol", text)
+                self.assertNotIn("openai-codex/gpt-6.1-sol", text)
                 self.assertNotIn("thinking: high", text)
                 self.assertNotIn("tools: read, grep, find, bash", text)
             self.assertIn("tools: Read, Grep, Glob, Bash", claude)
             self.assertIn("readonly: true", cursor)
-            self.assertIn("openai-codex/gpt-5.6-sol", pi)
+            self.assertIn("openai-codex/gpt-6.1-sol", pi)
             self.assertIn("thinking: high", pi)
             self.assertIn("tools: read, grep, find, bash", pi)
 

@@ -1,7 +1,7 @@
 ---
 name: docs-critic
 description: Reviews durable documentation edits for clarity, usefulness, and fit. Invoked during reflect after non-trivial doc or agent-guidance changes.
-model: openai-codex/gpt-5.6-sol
+model: openai-codex/gpt-6.1-sol
 thinking: medium
 tools: read, grep, find, bash
 ---
@@ -42,7 +42,7 @@ Be constructive and concise. Deleting a weak addition is a valid fix.
 
 **If no issues found:**
 ```
-LGTM
+LGTM — checked: <one line on scope, e.g. "all 12 changed files; ran the tests">
 ```
 
 **If issues found:**
