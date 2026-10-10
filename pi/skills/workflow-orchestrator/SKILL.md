@@ -9,24 +9,24 @@ Launch each child as the `ticket-runner` agent. Requires `tmux_subagent` and `$S
 
 ## Core rule
 
-The parent orchestrates. Each child owns one ticket and runs one phase per turn:
+The parent owns `plan-md` and orchestration. Each child owns one ticket from `execute` onward and runs one phase per turn:
 
 ```text
-plan-md → execute → review → reflect → commit
+parent: plan-md → child: execute → review → reflect → commit
 ```
 
 After each turn, the parent checks the gate before sending the next phase. Children never orchestrate tickets or phases.
 
-Launch each child with `allowNestedSubagents: true` and `nestedAgentAllowlist: ["plan-critic", "code-critic", "docs-critic"]`; the allowlist is fixed at launch.
+Launch each child with `allowNestedSubagents: true` and `nestedAgentAllowlist: ["code-critic", "docs-critic"]`; the allowlist is fixed at launch.
 
 ## Kickoff (user present)
 
 1. Select the tickets: the ones the user named, an epic, or `$SKILLS_ROOT/_lib/features_yaml.sh next --output json`. Read `depends_on` to know the order. For an epic, read its `{epic}-000.md` doc. With multiple tickets, pass its absolute path in the integration worktree in every phase prompt.
 2. Confirm the start branch and PR target. For more than one ticket, the user's request to run them together approves an integration branch, its worktrees, pushing it, and one draft PR.
-3. Run `plan-md` for every ticket in the run, including dependent ones. Relay each interview question to the user and return the answer to the same child. The user approves each plan's acceptance criteria. If a plan needs a human action, such as an account, credentials, or hardware, do it now with the user or mark that ticket parked.
+3. The parent runs `plan-md` for every ticket, including dependent ones, and interviews the user directly. Set up approved worktrees before planning there. Use read-only scouts for code facts; keep their summaries in context and read code only where needed. Follow `plan-md`, including plan-critic and user approval of acceptance criteria; write each plan in its ticket checkout. If a plan needs a human action, such as an account, credentials, or hardware, do it now with the user or mark that ticket parked.
 4. Confirm the AFK limits. Default: the parent may answer from approved plans, make reversible implementation choices that keep acceptance criteria intact, and log discovered work as tickets. It may not change acceptance criteria, widen scope, add dependencies, or touch data or external systems.
 
-A ticket whose plan is approved and whose dependencies are done may start `execute` during kickoff. Stop other planned children and `resume` each when its ticket becomes ready.
+Once its plan and AFK limits are approved and its dependencies are done, launch the ticket child at `execute`; it may work while the parent plans the next ticket. Do not launch children for tickets still waiting on dependencies.
 
 ## AFK (user away)
 
@@ -44,14 +44,14 @@ When a decision affects other tickets, add one line under the epic doc's Decisio
 
 ## Single ticket
 
-Launch one child in the current checkout, or in the worktree that `plan-md` approved. Advance phases with `send(..., wait: true)`. The commit phase follows the commit skill, including any PR.
+After the parent finishes `plan-md`, launch one child at `execute` in the current checkout, or in the worktree that `plan-md` approved. Advance phases with `send(..., wait: true)`. The commit phase follows the commit skill, including any PR.
 
 ## Multiple tickets
 
 Tickets run in `depends_on` order: a chain runs one at a time, and independent tickets run at once. Run at most 3 children at once, or the user's number.
 
 1. Commit the ticket entries and the epic doc on the start branch, so every ticket branch sees the same backlog and epic doc. Create the integration branch `<epic>-integration` from the start branch in its own worktree, targeting the PR target. Create one worktree per ticket with branch `<ticket-id>`, based on and targeting the integration branch. Use `$SKILLS_ROOT/_lib/worktrees.sh create` (records under `AGENT_WORKTREES_DIR`) and keep each exact record path; reuse Hub-supplied mappings instead.
-2. Launch or resume a background child for each ready ticket, up to the limit, with `cwd` set to its worktree and `autoStopOnComplete: false`.
+2. Launch a background child at `execute` for each approved, ready ticket, up to the limit, with `cwd` set to its worktree and `autoStopOnComplete: false`.
 3. Before `execute`, the child merges the integration branch tip into its branch. Before reporting its commit, it merges the tip again and resolves conflicts in its own ticket.
 4. Use `wait` without a `childId` to handle whichever child finishes next. Check its gate, then send its next phase.
 5. After its commit, merge the ticket branch into the integration branch and push. Open the draft PR after the first merge. Then launch or resume tickets that just became ready.
