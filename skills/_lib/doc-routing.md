@@ -2,7 +2,7 @@
 
 Put each piece of durable guidance in the file that owns it. When text is duplicated, keep the owner's copy and remove the others.
 
-- project purpose, target user, project type, project stage, operating assumptions, or shared terminology → `CONTEXT.md`
+- project purpose, target user, project type, project stage, success criteria, operating assumptions, out-of-scope boundaries, or shared terminology → `CONTEXT.md`
 - user or operator instructions → `README.md`
 - non-obvious code locations, relationships, or placement boundaries → `docs/STRUCTURE.md`
 - external constraints or decision rationale absent from code → the relevant domain doc

@@ -6,6 +6,8 @@ argument-hint: "[optional focus]"
 
 Create or update only root `CONTEXT.md`. Do not scaffold projects, create tickets, or edit other docs.
 
+If given a focus, investigate and interview only that area.
+
 ### 1. Investigate
 
 Inspect relevant docs and code. Find facts yourself; ask about intent and decisions. Treat inferred purpose, audience, and stage as assumptions.
@@ -22,13 +24,13 @@ Use the ask-user tool to check your framing:
 
 - **Mostly right**: clarify missing, uncertain, or high-impact details.
 - **Partly wrong**: resolve the core misunderstanding first.
-- **Mostly wrong**: restart from purpose, user, stage, success, and language.
+- **Mostly wrong**: ask about purpose first, then user, stage, success, and language.
 
 Do not write `CONTEXT.md` until the user confirms the framing.
 
 ### 4. Interview
 
-Ask one decision question at a time, with a recommendation and brief rationale. Resolve dependent decisions in order; wait for each answer.
+Ask decision questions with a recommendation and brief rationale. Batch independent questions; ask dependent ones in order and wait for each answer.
 
 Ask only unresolved questions. Skip confirmed topics. Stop when context is clear, not when every topic has been covered.
 
@@ -43,9 +45,11 @@ Include only useful sections:
 - Success criteria
 - Operating assumptions
 - Out of scope
-- Language: project-specific terms, definitions, and synonyms to avoid when useful
+- Language: project terms, their meanings, and wrong synonyms to avoid
 
-Prefer precise edits over rewrites. Keep good content; remove stale context, generic definitions, and text that merely repeats code. Do not duplicate `README.md` or `docs/STRUCTURE.md`.
+Prefer precise edits over rewrites. Keep good content; remove stale context, generic definitions, and text that merely repeats code. Leave content owned by other docs per [doc routing](../_lib/doc-routing.md).
+
+Agents read `CONTEXT.md` every session. Keep it short enough to read in full; cut sections that would not change an agent's decisions.
 
 Exclude implementation history, temporary notes, file indexes, and architecture details.
 

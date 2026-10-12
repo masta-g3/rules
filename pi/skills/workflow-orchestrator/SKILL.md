@@ -1,6 +1,7 @@
 ---
 name: workflow-orchestrator
 description: Parent-controlled ticket workflow automation using persistent subagents, for one ticket or a set of tickets such as an epic, run in dependency order in isolated worktrees.
+disable-model-invocation: true
 ---
 
 Use this Pi-only skill only when the user asks the parent agent to run the feature workflow for them. The user aligns at kickoff, steps away, and reviews once at the end. The parent acts for the user in between, inside limits the user approved.
