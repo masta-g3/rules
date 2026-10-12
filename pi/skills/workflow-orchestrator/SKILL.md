@@ -73,6 +73,8 @@ Send pointers, not restated context:
 
 Advance only when the expected phase label (or `COMMITTED FOR INTEGRATION` for a multi-ticket commit) is present, the diff matches the plan, required verification for the phase is complete, and `git status` in the child's worktree shows no surprises or unresolved questions. Before commit, acceptance checks must pass; only the user may approve deferring them.
 
+A child turn that ends without the label, a question, or a blocker is a progress report, not a finished phase. If the child has no background work still running, reply by naming the open plan items and asking it to continue or state what blocks them. After two such replies in one phase, park the ticket.
+
 Keep parent verification lightweight: read the child's summary, inspect diff scope and Git status, and check whether the evidence proves the agreed outcome through the highest practical existing seam, such as a CLI command, API, or user flow—not merely that implementation tests pass. Open relevant code or run a targeted check only for a gap, inconsistency, or cross-ticket risk. Do not repeat passing checks or load full transcripts by default; keep details in the plan and evidence files.
 
 ## Stop

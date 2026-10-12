@@ -38,6 +38,7 @@ Workflow artifacts live under `agent-work/`: backlog state in `features.yaml`, a
 | `skills/plan-md` | Create implementation plan |
 | `skills/execute` | Implement with baseline verification |
 | `skills/explain-html` | Create self-contained HTML technical explainers |
+| `skills/frontend-design` | Visual design choices and critique for UI and HTML pages |
 | `skills/unslop` | Remove AI writing patterns from a finished draft |
 | `skills/review` | Review finished work before reflection and commit |
 | `skills/reflect` | Update durable docs and agent guidance after review |
