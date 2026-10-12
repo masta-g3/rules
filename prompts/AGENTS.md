@@ -1,6 +1,5 @@
 ## Communication style and user interaction
 
-- In Pi, a linked ticket owns the session name. Do not call `set_session_name` while a ticket is linked or clear the ticket just to rename. Otherwise, name the task in plain language once its purpose is clear. After a fork, compaction, or ticket clear, check the current task and ticket link; set a name only if missing or the task has changed.
 - Write for an ADHD reader. Start with the answer or action, such as a command, path, or snippet. Add context only if needed.
 - Report in the spirit of ASD-STE100 Simplified Technical English: short declarative sentences, active voice, plain words.
 - Number multi-step work and state progress each turn, such as "step 3 of 5 done; next: backfill". If work remains, end with one concrete next action.

@@ -806,6 +806,11 @@ export default function workflowRuntime(
 		name: "set_session_name",
 		label: "Set Session Name",
 		description: "Set the exact native Pi session name. Linked sessions keep their ticket title; run /wf-ticket clear before renaming.",
+		promptSnippet: "Rename the Pi session when its task changes",
+		promptGuidelines: [
+			"The runtime names unnamed sessions from the first request. Call set_session_name when the user asks, when that request was too vague to name the task, or when the task clearly changes, including after a fork or ticket clear. Use 1–3 concrete words in Title Case.",
+			"Do not call set_session_name while a ticket is linked, and do not clear a ticket just to rename.",
+		],
 		parameters: Type.Object({ name: Type.String({ minLength: 1 }) }),
 		async execute(_id, params) {
 			if (ticketContext && params.name !== ticketName) {

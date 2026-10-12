@@ -18,6 +18,6 @@ Edit sources here, not deployed copies under harness home directories. `sync-pro
 
 ## Rules and Hub ownership
 
-Rules works without Hub. The workflow runtime publishes context that Hub can consume; this does not transfer Git or worktree ownership.
+Rules works without Hub. The workflow runtime publishes documented Pi entries; Hub is one consumer. Hub inputs such as `PI_AGENT_HUB_PRIMARY_CWD` are optional. Do not depend on Hub-specific behavior or formats, such as its default session titles. Publishing context does not transfer Git or worktree ownership.
 
 Rules-owned worktrees use `skills/_lib/worktrees.sh` and an exact external `worktree.json` record. Hub-owned worktrees remain under Hub operations; do not duplicate them in Rules records. Workflow completion does not mean a worktree was merged or removed.
