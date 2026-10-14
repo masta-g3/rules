@@ -26,14 +26,12 @@ import {
 	type WorkflowState,
 } from "./core.ts";
 import {
-	ATTENTION_PROMPT,
 	CONTEXT_ENTRY_TYPE,
 	NAMING_PROMPT,
-	attentionInput,
 	contextSnapshot,
 	effectiveProjectCwd,
+	handOffAttention,
 	normalizeText,
-	parseAttention,
 	parseContextSnapshot,
 	questionAttention,
 	readTicketContext,
@@ -346,7 +344,7 @@ function applyEffects(
 	}
 }
 
-type MetadataOperation = "session name" | "attention";
+type MetadataOperation = "session name";
 type MetadataStatus = MetadataIndicatorState & {
 	operation?: MetadataOperation;
 	result?: MetadataCallResult;
@@ -365,10 +363,8 @@ function rejectedMetadataText(raw: string | undefined): string {
 		: text;
 }
 
-function metadataParseContract(operation: MetadataOperation | undefined): string {
-	return operation === "attention"
-		? "null or JSON with kind, text, and confidence"
-		: "1–3 words, at most 32 characters, using letters and numbers only";
+function metadataParseContract(): string {
+	return "1–3 words, at most 32 characters, using letters and numbers only";
 }
 
 function metadataFailureNotice(kind: MetadataFailureKind | "parse"): string {
@@ -380,7 +376,7 @@ function metadataFailureNotice(kind: MetadataFailureKind | "parse"): string {
 }
 
 function metadataStatusReport(status: MetadataStatus): string {
-	if (status.state === "disabled") return "Session metadata extension: disabled\nSession naming and attention model calls are off for this session.";
+	if (status.state === "disabled") return "Session metadata extension: disabled\nSession naming model calls are off for this session.";
 	if (status.state === "ready") return "Session metadata extension: active\nNo metadata request has run in this session.";
 	if (status.state === "working") return `Session metadata: generating ${status.operation ?? "metadata"}`;
 	const result = status.result;
@@ -391,7 +387,7 @@ function metadataStatusReport(status: MetadataStatus): string {
 		result ? `Latency: ${result.latencyMs} ms` : undefined,
 		status.parsedResult ? `Parsed result: ${status.parsedResult}` : undefined,
 		status.failureKind === "parse" ? `Reason: The model response did not match the ${status.operation ?? "metadata"} contract.` : undefined,
-		status.failureKind === "parse" ? `Expected: ${metadataParseContract(status.operation)}` : undefined,
+		status.failureKind === "parse" ? `Expected: ${metadataParseContract()}` : undefined,
 		status.failureKind === "parse" ? `Received: ${rejectedMetadataText(result?.text)}` : undefined,
 		status.failureKind === "parse" ? "Action: No user action is required. Retry the operation; persistent failures need a prompt or parser fix." : undefined,
 		result?.failure?.message ? `Error: ${result.failure.message}` : undefined,
@@ -425,8 +421,6 @@ export default function workflowRuntime(
 	let generation = 0;
 	let automaticNamingStarted = false;
 	let currentAttention: SessionAttention | undefined;
-	let attentionGenerationDone = -1;
-	let latestUserRequest: string | undefined;
 	let deferredWorkflowInputs: Array<{ name: string; ticketId?: string; text: string }> = [];
 	let metadataEnabled = true;
 	let metadataStatus: MetadataStatus = { state: "ready" };
@@ -466,9 +460,7 @@ export default function workflowRuntime(
 		lastMetadataWarning = undefined;
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
-		latestUserRequest = undefined;
 		currentAttention = undefined;
-		attentionGenerationDone = -1;
 		automaticNamingStarted = false;
 		lastAdvanceShortcutAt = 0;
 		ticketContext = undefined;
@@ -746,7 +738,7 @@ export default function workflowRuntime(
 	});
 
 	pi.registerCommand("session-metadata-disable", {
-		description: "Disable session naming and attention model calls",
+		description: "Disable session naming model calls",
 		handler: async (_args, ctx) => {
 			if (!metadataEnabled) return ctx.ui.notify("Session metadata is already disabled.", "info");
 			metadataEnabled = false;
@@ -761,7 +753,7 @@ export default function workflowRuntime(
 	});
 
 	pi.registerCommand("session-metadata-enable", {
-		description: "Enable session naming and attention model calls",
+		description: "Enable session naming model calls",
 		handler: async (_args, ctx) => {
 			if (metadataEnabled) return ctx.ui.notify("Session metadata is already enabled.", "info");
 			metadataEnabled = true;
@@ -980,6 +972,39 @@ export default function workflowRuntime(
 		},
 	});
 
+	pi.registerTool({
+		name: "hand_off",
+		label: "Hand Off",
+		description: "Tell the user that work is ready for review or blocked, with an optional recommendation and evidence.",
+		promptSnippet: "Hand finished or blocked work back to the user",
+		promptGuidelines: [
+			"Call hand_off as the final action of a turn that hands work back: kind ready when a requested outcome is ready for review, kind blocked when you cannot continue without the user or an external dependency.",
+			"Do not call hand_off for progress updates or ordinary answers. Use ask_user_question for questions.",
+			"Set recommendation to the next action you advise. Set artifact to an existing file or URL that holds the evidence, such as a plan, validation notes, or a pull request.",
+		],
+		parameters: Type.Object({
+			kind: StringEnum(["ready", "blocked"] as const),
+			text: Type.String({ minLength: 1, description: "What is ready or what blocks progress" }),
+			recommendation: Type.Optional(Type.String({ minLength: 1, description: "The next action you advise" })),
+			artifact: Type.Optional(Type.String({ minLength: 1, description: "Existing file path or URL holding the evidence" })),
+		}),
+		async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+			const attention = await handOffAttention(toolCallId, params, ctx.cwd);
+			// A continuation turn would clear the handoff, so a handoff ends focus.
+			if (state.execution) {
+				recoveryPending = false;
+				state = setState(pi, ctx, transition(state, { type: "end-focus" }).state);
+				ctx.ui.notify(`Focus mode ended: ${params.kind === "ready" ? "completed" : "blocked"}.`, "info");
+			}
+			currentAttention = attention;
+			publishContext(attention);
+			return {
+				content: [{ type: "text", text: `Handoff published (${params.kind}). Give the user a final response now.` }],
+				details: attention,
+			};
+		},
+	});
+
 	pi.registerShortcut(ADVANCE_SHORTCUT, {
 		description: "Run the next workflow skill, or dismiss completed Commit, on double press",
 		handler: async (ctx) => {
@@ -1017,7 +1042,6 @@ export default function workflowRuntime(
 			}
 
 			generation += 1;
-			latestUserRequest = command;
 			state = setState(pi, ctx, startWorkflowStep(state, nextStep, "shortcut"));
 			pi.sendUserMessage(command);
 		},
@@ -1025,7 +1049,6 @@ export default function workflowRuntime(
 
 	const processInput = async (text: string, streaming: boolean, ctx: ExtensionContext) => {
 		generation += 1;
-		latestUserRequest = text;
 
 		const skillName = extractSkill(text);
 		if (skillName === FOCUS_SKILL) {
@@ -1155,29 +1178,13 @@ export default function workflowRuntime(
 	pi.on("agent_end", async (event, ctx) => {
 		const requestGeneration = generation;
 		const stopReason = finalAssistantStopReason(event.messages);
-		const assistant = [...event.messages].reverse().find((message) => message.role === "assistant") as { content?: string | Array<{ type?: string; text?: string }> } | undefined;
-		const assistantText = typeof assistant?.content === "string" ? assistant.content : assistant?.content?.filter((part) => part.type === "text").map((part) => part.text ?? "").join("\n");
-		const input = attentionInput(latestUserRequest, assistantText, ticketContext, state.activity?.label);
 		await refreshPlan(ctx);
-		if (requestGeneration !== generation) return;
-		if (state.execution) {
-			const result = transition(state, { type: "agent-end", stopReason });
-			if (result.effects.length) {
-				state = setState(pi, ctx, result.state);
-				applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
-				return;
-			}
+		if (requestGeneration !== generation || !state.execution) return;
+		const result = transition(state, { type: "agent-end", stopReason });
+		if (result.effects.length) {
+			state = setState(pi, ctx, result.state);
+			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
 		}
-		if (attentionGenerationDone === requestGeneration || stopReason !== "stop" || !input) return;
-		attentionGenerationDone = requestGeneration;
-		void (async () => {
-			const accepted = await callMetadata(ctx, "attention", ATTENTION_PROMPT, input, 128, parseAttention);
-			if (requestGeneration !== generation) return;
-			if (accepted) {
-				currentAttention = accepted;
-				publishContext(accepted);
-			}
-		})();
 	});
 
 	pi.on("before_agent_start", async (event) => {

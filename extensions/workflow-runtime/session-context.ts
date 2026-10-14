@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { isAbsolute, resolve, sep } from "node:path";
 import { parseWorktreeLifecycleSnapshot, type WorktreeLifecycleSnapshot } from "./worktree-context.ts";
 
@@ -10,6 +10,8 @@ export const MAX_SUBTITLE = 64;
 export const MAX_DESCRIPTION = 240;
 export const MAX_ATTENTION = 150;
 export const MAX_REQUEST_ID = 64;
+export const MAX_RECOMMENDATION = 150;
+export const MAX_ARTIFACT = 1_024;
 const MAX_PROJECT_CWD = 4_096;
 
 export function effectiveProjectCwd(cwd: string, primaryCwd = process.env.PI_AGENT_HUB_PRIMARY_CWD): string {
@@ -18,7 +20,13 @@ export function effectiveProjectCwd(cwd: string, primaryCwd = process.env.PI_AGE
 		: cwd;
 }
 
-export type SessionAttention = { requestId?: string; kind: "ready" | "question" | "blocked"; text: string };
+export type SessionAttention = {
+	requestId?: string;
+	kind: "ready" | "question" | "blocked";
+	text: string;
+	recommendation?: string;
+	artifact?: string;
+};
 export type TicketContext = { id: string; title?: string; subtitle?: string; description?: string; planFile?: string };
 export type PiAgentHubContextV1 = {
 	version: 1;
@@ -37,10 +45,6 @@ Maximum 32 characters.
 Return only the name.
 Do not include a ticket ID, label, quote, or punctuation.`;
 
-export const ATTENTION_PROMPT = `Decide whether the completed turn explicitly needs human attention.
-Return JSON only: null, or {"kind":"ready|question|blocked","text":"exact action or reason","confidence":0.0}.
-Use ready only for an explicit reviewable handoff, question only for an explicit answer or decision, and blocked only for an explicit inability to proceed. Otherwise return null.`;
-
 export function normalizeText(value: unknown, max: number): string | undefined {
 	if (typeof value !== "string") return undefined;
 	const text = value.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim();
@@ -50,6 +54,42 @@ export function normalizeText(value: unknown, max: number): string | undefined {
 export function stableRequestId(toolCallId: unknown): string | undefined {
 	if (typeof toolCallId !== "string" || !toolCallId) return undefined;
 	return createHash("sha256").update(toolCallId).digest("hex");
+}
+
+// Artifacts are paths or URLs: keep internal whitespace, but reject terminal controls.
+export function rawArtifact(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
+	const text = value.trim();
+	return text && [...text].length <= MAX_ARTIFACT && !/[\x00-\x1f\x7f-\x9f]/u.test(text) ? text : undefined;
+}
+
+export async function handOffAttention(
+	toolCallId: string,
+	params: { kind: unknown; text: unknown; recommendation?: unknown; artifact?: unknown },
+	cwd: string,
+): Promise<SessionAttention> {
+	if (params.kind !== "ready" && params.kind !== "blocked") throw new Error("hand_off kind must be ready or blocked.");
+	const text = normalizeText(params.text, MAX_ATTENTION + 1);
+	if (!text || [...text].length > MAX_ATTENTION) throw new Error(`hand_off text must be 1–${MAX_ATTENTION} characters.`);
+	let recommendation: string | undefined;
+	if (params.recommendation !== undefined) {
+		recommendation = normalizeText(params.recommendation, MAX_RECOMMENDATION + 1);
+		if (!recommendation || [...recommendation].length > MAX_RECOMMENDATION) throw new Error(`hand_off recommendation must be 1–${MAX_RECOMMENDATION} characters.`);
+	}
+	let artifact: string | undefined;
+	if (params.artifact !== undefined) {
+		const raw = rawArtifact(params.artifact);
+		if (!raw) throw new Error(`hand_off artifact must be a path or URL of at most ${MAX_ARTIFACT} characters without control characters.`);
+		if (/^https?:\/\//iu.test(raw)) artifact = raw;
+		else {
+			const path = resolve(cwd, raw);
+			try { await stat(path); } catch { throw new Error(`hand_off artifact not found: ${path}`); }
+			artifact = rawArtifact(path);
+			if (!artifact) throw new Error(`hand_off artifact path exceeds ${MAX_ARTIFACT} characters.`);
+		}
+	}
+	const requestId = stableRequestId(toolCallId);
+	return { ...(requestId ? { requestId } : {}), kind: params.kind, text, ...(recommendation ? { recommendation } : {}), ...(artifact ? { artifact } : {}) };
 }
 
 export function questionAttention(toolCallId: unknown, args: unknown): SessionAttention | undefined {
@@ -156,7 +196,17 @@ export function parseContextSnapshot(value: unknown): PiAgentHubContextV1 | unde
 		if (raw.requestId !== undefined && (!requestId || requestId !== raw.requestId)) return undefined;
 		const text = normalizeText(raw.text, MAX_ATTENTION);
 		if (!text || text !== raw.text) return undefined;
-		attention = { ...(requestId ? { requestId } : {}), kind: raw.kind as SessionAttention["kind"], text };
+		const recommendation = raw.recommendation === undefined ? undefined : normalizeText(raw.recommendation, MAX_RECOMMENDATION);
+		if (raw.recommendation !== undefined && (!recommendation || recommendation !== raw.recommendation)) return undefined;
+		const artifact = raw.artifact === undefined ? undefined : rawArtifact(raw.artifact);
+		if (raw.artifact !== undefined && (!artifact || artifact !== raw.artifact)) return undefined;
+		attention = {
+			...(requestId ? { requestId } : {}),
+			kind: raw.kind as SessionAttention["kind"],
+			text,
+			...(recommendation ? { recommendation } : {}),
+			...(artifact ? { artifact } : {}),
+		};
 	}
 	const worktree = parseWorktreeLifecycleSnapshot(item.worktree);
 	return { version: 1, updatedAt: item.updatedAt, ...(ticket ? { ticket } : {}), ...(attention ? { attention } : {}), ...(worktree ? { worktree } : {}) };
@@ -206,25 +256,4 @@ export function sanitizeSessionName(raw: string): string | undefined {
 	name = name.replace(/^```(?:text)?\s*/i, "").replace(/^(?:title|name):\s*/i, "").replace(/^['"`]+|['"`]+$/g, "").trim();
 	if (!name || [...name].length > MAX_TITLE || !/^[\p{L}\p{N}]+(?: [\p{L}\p{N}]+){0,2}$/u.test(name)) return undefined;
 	return name.split(/\s+/).map((word) => word ? word[0]!.toLocaleUpperCase() + word.slice(1).toLocaleLowerCase() : word).join(" ");
-}
-
-export function parseAttention(raw: string): SessionAttention | null | undefined {
-	let value: unknown;
-	try { value = JSON.parse(raw.trim()); } catch { return undefined; }
-	if (value === null) return null;
-	if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-	const item = value as Record<string, unknown>;
-	if (!(["ready", "question", "blocked"] as unknown[]).includes(item.kind)) return undefined;
-	if (typeof item.confidence !== "number" || item.confidence < 0.5 || item.confidence > 1) return undefined;
-	const text = normalizeText(item.text, MAX_ATTENTION);
-	if (!text || [...String(item.text).replace(/\s+/g, " ").trim()].length > MAX_ATTENTION) return undefined;
-	return { kind: item.kind as SessionAttention["kind"], text };
-}
-
-export function attentionInput(user: string | undefined, assistant: string | undefined, ticket?: TicketContext, activity?: string): string | undefined {
-	const request = normalizeText(user, 1_000);
-	const response = normalizeText(assistant, 1_500);
-	if (!request || !response) return undefined;
-	const context = normalizeText([ticket?.title, ticket?.subtitle, ticket?.description, activity].filter(Boolean).join(" · "), 1_000);
-	return `User request: ${request}\nFinal assistant response: ${response}${context ? `\nCurrent context: ${context}` : ""}`;
 }

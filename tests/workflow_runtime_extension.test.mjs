@@ -498,7 +498,7 @@ test("workflow clear commands durably unlink the right projection and release na
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
-test("unlink invalidates stale naming, attention, and deferred workflow input", async () => {
+test("unlink invalidates stale naming, handoffs, and deferred workflow input", async () => {
   const cwd = await project();
   const delayed = delayedModel();
   try {
@@ -522,17 +522,11 @@ test("unlink invalidates stale naming, attention, and deferred workflow input", 
     assert.equal(selecting.latest("pi-agent-hub-context").ticket, undefined);
     assert.equal(selecting.name, undefined);
 
-    const attention = delayedModel();
-    const linked = harness(cwd, [], "Existing", attention.call);
+    const linked = harness(cwd, [], "Existing");
     await linked.commands.get("wf-ticket").handler("meta-001", linked.ctx);
-    await linked.emit("input", { source: "interactive", text: "Finish old work" });
-    const ending = linked.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
-    await ending;
-    await settle();
-    assert.equal(attention.calls.length, 1);
+    await linked.tools.get("hand_off").execute("old-handoff", { kind: "ready", text: "Old work" }, undefined, undefined, linked.ctx);
+    assert.equal(linked.latest("pi-agent-hub-context").attention.text, "Old work");
     await linked.commands.get("wf-ticket").handler("clear", linked.ctx);
-    attention.calls[0].resolve('{"kind":"ready","text":"Stale attention","confidence":0.9}');
-    await settle();
     assert.equal(linked.latest("pi-agent-hub-context").ticket, undefined);
     assert.equal(linked.latest("pi-agent-hub-context").attention, undefined);
   } finally { await rm(cwd, { recursive: true, force: true }); }
@@ -1307,19 +1301,19 @@ test("invalidating newer work restores a valid older settled result", async () =
   const cwd = await project();
   try {
     const delayed = delayedModel();
-    const runtime = harness(cwd, [], undefined, delayed.call);
+    const runtime = harness(cwd, [{ type: "message", message: { role: "user", content: "Name this optional operation" } }], undefined, delayed.call);
     await runtime.emit("session_start", { reason: "new" });
     await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
-    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
-    await settle();
-    assert.equal(delayed.calls.length, 2);
-
     delayed.calls[0].resolve("Settled Name");
     await settle();
+    const refresh = runtime.commands.get("session-name-refresh").handler("", runtime.ctx);
+    await settle();
+    assert.equal(delayed.calls.length, 2);
     assert.match(runtime.renderWorkflow(80), /◆ meta/);
 
-    await runtime.emit("input", { source: "interactive", text: "Invalidate the pending attention request" });
-    delayed.calls[1].resolve('{"kind":"ready","text":"Stale attention","confidence":0.9}');
+    await runtime.emit("input", { source: "interactive", text: "Invalidate the pending refresh request" });
+    delayed.calls[1].resolve("Stale Name");
+    await refresh;
     await settle();
 
     assert.match(runtime.renderWorkflow(80), /◇ meta/);
@@ -1348,16 +1342,17 @@ test("an older metadata request cannot overwrite the latest badge state", async 
   const cwd = await project();
   try {
     const delayed = delayedModel();
-    const runtime = harness(cwd, [], undefined, delayed.call);
+    const runtime = harness(cwd, [{ type: "message", message: { role: "user", content: "Name this optional operation" } }], undefined, delayed.call);
     await runtime.emit("session_start", { reason: "new" });
     await runtime.emit("input", { source: "interactive", text: "Name this optional operation" });
     assert.equal(delayed.calls.length, 1);
     assert.match(runtime.renderWorkflow(80), /◆ meta/);
-    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
+    const refresh = runtime.commands.get("session-name-refresh").handler("", runtime.ctx);
     await settle();
     assert.equal(delayed.calls.length, 2);
 
-    delayed.calls[1].resolve('{"kind":"ready","text":"Review the patch","confidence":0.9}');
+    delayed.calls[1].resolve("Fresh Name");
+    await refresh;
     await settle();
     assert.match(runtime.renderWorkflow(80), /◇ meta/);
 
@@ -1371,19 +1366,6 @@ test("an older metadata request cannot overwrite the latest badge state", async 
     });
     await settle();
     assert.match(runtime.renderWorkflow(80), /◇ meta/);
-  } finally { await rm(cwd, { recursive: true, force: true }); }
-});
-
-test("a valid null attention result is not a parse failure", async () => {
-  const cwd = await project();
-  try {
-    const runtime = harness(cwd, [], "Existing", async () => metadataSuccess("null"));
-    await runtime.emit("input", { source: "interactive", text: "Explain the current state" });
-    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "The extension is active." }] });
-    await settle();
-    assert.match(runtime.renderWorkflow(80), /◇ meta/);
-    await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
-    assert.match(runtime.operations.at(-1).message, /success/i);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -1401,24 +1383,6 @@ test("metadata status records parse failures separately from model failures", as
     assert.match(report, /Expected: 1–3 words, at most 32 characters, using letters and numbers only/);
     assert.match(report, /Received: This response has too many title words/);
     assert.match(report, /No user action is required/);
-  } finally { await rm(cwd, { recursive: true, force: true }); }
-});
-
-test("attention parse status shows its contract and bounds rejected output", async () => {
-  const cwd = await project();
-  try {
-    const rejected = `not-json ${"x".repeat(600)}`;
-    const runtime = harness(cwd, [], "Existing", async () => metadataSuccess(rejected));
-    await runtime.emit("input", { source: "interactive", text: "Finish this operation" });
-    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
-    await settle();
-
-    await runtime.commands.get("session-metadata-status").handler("", runtime.ctx);
-    const report = runtime.operations.at(-1).message;
-    assert.match(report, /Operation: attention/);
-    assert.match(report, /Expected: null or JSON with kind, text, and confidence/);
-    assert.match(report, /Received: not-json/);
-    assert.ok(report.length < 1_000);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -1446,14 +1410,6 @@ test("optional model operations quietly absorb resolver and injected call failur
     await settle();
     assert.equal(unnamed.name, undefined);
 
-    const attention = delayedModel();
-    const completed = harness(cwd, [], "Existing", attention.call);
-    await completed.emit("input", { source: "interactive", text: "Finish this operation" });
-    await completed.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
-    attention.calls[0].resolve(Promise.reject(new Error("attention failed")));
-    await settle();
-    assert.equal(completed.latest("pi-agent-hub-context"), undefined);
-
     const refresh = delayedModel();
     const explicit = harness(cwd, [{ type: "message", message: { role: "user", content: "Refresh this name" } }], "Old Name", refresh.call);
     const request = explicit.commands.get("session-name-refresh").handler("", explicit.ctx);
@@ -1468,65 +1424,6 @@ test("optional model operations quietly absorb resolver and injected call failur
     process.off("unhandledRejection", recordUnhandled);
     await rm(cwd, { recursive: true, force: true });
   }
-});
-
-test("shortcut-started turns invalidate prior attention and get their own request", async () => {
-  const cwd = await project();
-  try {
-    const delayed = delayedModel();
-    const runtime = harness(cwd, [], "Metadata redesign", delayed.call);
-    await runtime.emit("input", { source: "interactive", text: "/skill:review meta-001" });
-    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Review complete." }] });
-    assert.equal(delayed.calls.length, 1);
-
-    const advance = runtime.shortcuts.get("ctrl+shift+right");
-    await advance.handler(runtime.ctx);
-    await advance.handler(runtime.ctx);
-    delayed.calls[0].resolve('{"kind":"ready","text":"Review stale work","confidence":0.9}');
-    await settle();
-    assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
-
-    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Reflection complete." }] });
-    assert.equal(delayed.calls.length, 2);
-    assert.match(delayed.calls[1].input, /\/skill:reflect meta-001/);
-  } finally { await rm(cwd, { recursive: true, force: true }); }
-});
-
-test("agent-end plan reads cannot pair an old response with newer input", async () => {
-  const cwd = await project();
-  try {
-    const delayed = delayedModel();
-    const runtime = harness(cwd, [], "Metadata redesign", delayed.call);
-    await runtime.emit("input", { source: "interactive", text: "/skill:review meta-001" });
-    const ending = runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Old turn complete." }] });
-    await runtime.emit("input", { source: "interactive", text: "Start newer work" });
-    await ending;
-    assert.equal(delayed.calls.length, 0);
-  } finally { await rm(cwd, { recursive: true, force: true }); }
-});
-
-test("final-turn attention is detached and stale after new input", async () => {
-  const cwd = await project();
-  try {
-    const delayed = delayedModel();
-    const runtime = harness(cwd, [], "Existing", delayed.call);
-    await runtime.emit("input", { source: "interactive", text: "Finish the review" });
-    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
-    assert.equal(delayed.calls.length, 1);
-    assert.equal(runtime.latest("pi-agent-hub-context"), undefined);
-    delayed.calls[0].resolve('{"kind":"ready","text":"Review the patch","confidence":0.9}');
-    await settle();
-    assert.deepEqual(runtime.latest("pi-agent-hub-context").attention, { kind: "ready", text: "Review the patch" });
-
-    const stale = delayedModel();
-    const changed = harness(cwd, [], "Existing", stale.call);
-    await changed.emit("input", { source: "interactive", text: "Finish the review" });
-    await changed.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
-    await changed.emit("input", { source: "interactive", text: "One more change" });
-    stale.calls[0].resolve('{"kind":"ready","text":"Review stale work","confidence":0.9}');
-    await settle();
-    assert.equal(changed.latest("pi-agent-hub-context"), undefined);
-  } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
 test("structured question starts publish bounded attention and matching completion clears it", async () => {
@@ -1800,5 +1697,101 @@ test("activity passes persist on resume and reset on same-skill reinvocation", a
     await resumed.emit("input", { source: "interactive", text: "/skill:plan-md meta-001" });
     await resumed.tools.get("set_workflow_activity").execute("4", { activityId: "reviewing-plan" }, undefined, undefined, resumed.ctx);
     assert.equal(resumed.latest("workflow-runtime").activity.pass, undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("hand_off publishes explicit handoffs with recommendation and evidence", async () => {
+  const cwd = await project();
+  try {
+    await mkdir(join(cwd, "agent-work/tickets/meta  001"), { recursive: true });
+    await writeFile(join(cwd, "agent-work/tickets/meta  001/validation.md"), "ok\n");
+    const runtime = harness(cwd, [], "Existing");
+    const handOff = runtime.tools.get("hand_off");
+    const result = await handOff.execute("call-ready", {
+      kind: "ready",
+      text: "  Send form   supports Steer ",
+      recommendation: "Commit,\n then reload",
+      artifact: "agent-work/tickets/meta  001/validation.md",
+    }, undefined, undefined, runtime.ctx);
+    const ready = runtime.latest("pi-agent-hub-context").attention;
+    assert.deepEqual(ready, {
+      requestId: ready.requestId,
+      kind: "ready",
+      text: "Send form supports Steer",
+      recommendation: "Commit, then reload",
+      artifact: join(cwd, "agent-work/tickets/meta  001/validation.md"),
+    });
+    assert.match(ready.requestId, /^[0-9a-f]{64}$/);
+    assert.match(result.content[0].text, /final response/i);
+
+    await handOff.execute("call-blocked", { kind: "blocked", text: "Needs a token", artifact: "https://github.com/o/r/pull/1" }, undefined, undefined, runtime.ctx);
+    const blocked = runtime.latest("pi-agent-hub-context").attention;
+    assert.equal(blocked.kind, "blocked");
+    assert.equal(blocked.artifact, "https://github.com/o/r/pull/1");
+    assert.equal(blocked.recommendation, undefined);
+    assert.notEqual(blocked.requestId, ready.requestId);
+
+    const resumed = harness(cwd, runtime.branch, "Existing");
+    await resumed.emit("session_start", { reason: "resume" });
+    assert.deepEqual(resumed.latest("pi-agent-hub-context").attention, blocked);
+    await handOff.execute("call-spaces", { kind: "ready", text: "Done", artifact: "agent-work/tickets/meta  001/validation.md" }, undefined, undefined, runtime.ctx);
+    const reloaded = harness(cwd, runtime.branch, "Existing");
+    await reloaded.emit("session_start", { reason: "reload" });
+    assert.equal(reloaded.latest("pi-agent-hub-context").attention.artifact, join(cwd, "agent-work/tickets/meta  001/validation.md"));
+
+    await runtime.emit("before_agent_start", { systemPrompt: "base" });
+    assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("hand_off rejects invalid input without publishing", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Existing");
+    const handOff = runtime.tools.get("hand_off");
+    const cases = [
+      [{ kind: "ready", text: "   " }, /text/i],
+      [{ kind: "ready", text: "x".repeat(151) }, /text/i],
+      [{ kind: "ready", text: "Done", recommendation: "x".repeat(151) }, /recommendation/i],
+      [{ kind: "ready", text: "Done", artifact: "missing/file.md" }, /artifact.*not found|does not exist/i],
+      [{ kind: "ready", text: "Done", artifact: "agent-work/\u001b[31mplans" }, /artifact/i],
+      [{ kind: "ready", text: "Done", artifact: `/${"x".repeat(1_024)}` }, /artifact/i],
+      [{ kind: "question", text: "Done" }, /kind/i],
+    ];
+    for (const [params, message] of cases) {
+      await assert.rejects(handOff.execute("bad", params, undefined, undefined, runtime.ctx), message);
+    }
+    assert.equal(runtime.latest("pi-agent-hub-context"), undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("hand_off ends focus so the handoff survives the turn", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    await runtime.emit("input", { source: "interactive", text: "/skill:execute meta-001" });
+    await runtime.tools.get("start_focus").execute("focus", {}, undefined, undefined, runtime.ctx);
+    assert.ok(runtime.latest("workflow-runtime").execution);
+    const before = runtime.operations.length;
+    await runtime.tools.get("hand_off").execute("call", { kind: "blocked", text: "Needs credentials" }, undefined, undefined, runtime.ctx);
+    assert.equal(runtime.latest("workflow-runtime").execution, undefined);
+    assert.ok(runtime.operations.slice(before).some((item) => item.kind === "notify" && /Focus mode ended: blocked/.test(item.message)));
+    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Blocked." }] });
+    await settle();
+    assert.equal(runtime.operations.slice(before).filter((item) => item.kind === "send-message" || item.kind === "send-user").length, 0);
+    assert.equal(runtime.latest("pi-agent-hub-context").attention.kind, "blocked");
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("completed turns make no attention model call", async () => {
+  const cwd = await project();
+  try {
+    const delayed = delayedModel();
+    const runtime = harness(cwd, [], "Existing", delayed.call);
+    await runtime.emit("input", { source: "interactive", text: "Finish the review" });
+    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Ready for review." }] });
+    await settle();
+    assert.equal(delayed.calls.length, 0);
+    assert.equal(runtime.latest("pi-agent-hub-context"), undefined);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });

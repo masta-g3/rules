@@ -25,10 +25,8 @@ import {
 } from "../extensions/workflow-runtime/core.ts";
 
 import {
-  attentionInput,
   contextSnapshot,
   effectiveProjectCwd,
-  parseAttention,
   parseContextSnapshot,
   questionAttention,
   readTicketContext,
@@ -154,17 +152,14 @@ test("session context bounds transcript, names, and attention", () => {
   assert.equal(recentTranscript(entries).split("\n\n").length, 4);
   assert.equal(sanitizeSessionName('"metadata redesign"'), "Metadata Redesign");
   assert.equal(sanitizeSessionName("four word session name"), undefined);
-  assert.deepEqual(parseAttention('{"kind":"ready","text":"Review the patch","confidence":0.8}'), { kind: "ready", text: "Review the patch" });
   for (const length of [97, 150]) {
-    const text = "x".repeat(length);
-    const attention = { kind: "ready", text };
-    assert.deepEqual(parseAttention(JSON.stringify({ ...attention, confidence: 0.99 })), attention);
+    const attention = { kind: "ready", text: "x".repeat(length) };
     assert.deepEqual(parseContextSnapshot({ version: 1, updatedAt: 1, attention })?.attention, attention);
   }
-  assert.equal(parseAttention(JSON.stringify({ kind: "ready", text: "x".repeat(151), confidence: 0.99 })), undefined);
-  assert.equal(parseAttention("null"), null);
-  assert.equal(parseAttention('{"kind":"ready","text":"Maybe","confidence":0.4}'), undefined);
-  assert.ok(attentionInput("request", "done", { id: "x-001", description: "Outcome" }, "Plan ready").includes("Current context"));
+  const handoff = { requestId: "a".repeat(64), kind: "ready", text: "Review it", recommendation: "Commit it", artifact: "/tmp/agent  work/validation.md" };
+  assert.deepEqual(parseContextSnapshot(contextSnapshot(undefined, handoff, 3))?.attention, handoff);
+  assert.equal(parseContextSnapshot({ version: 1, updatedAt: 1, attention: { ...handoff, artifact: "/tmp/\u001b[31mx" } }), undefined);
+  assert.equal(parseContextSnapshot({ version: 1, updatedAt: 1, attention: { ...handoff, recommendation: "x".repeat(151) } }), undefined);
   const snapshot = { version: 1, updatedAt: 7, ticket: { id: "x-001", subtitle: "Scan context", future: true }, attention: { kind: "ready", text: "Review it" }, future: true };
   assert.deepEqual(parseContextSnapshot(snapshot), { version: 1, updatedAt: 7, ticket: { id: "x-001", subtitle: "Scan context" }, attention: { kind: "ready", text: "Review it" } });
   assert.equal(parseContextSnapshot({ ...snapshot, version: 2 }), undefined);
