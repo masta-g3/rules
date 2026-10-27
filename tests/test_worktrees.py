@@ -239,6 +239,35 @@ def test_remove_verifies_surviving_handoff_before_artifact_or_worktree_deletion(
     assert (source / plan).exists()
 
 
+def test_integration_worktree_closes_without_a_ticket_plan(tmp_path):
+    source = repo(tmp_path)
+    made = json.loads(run("create", "--ticket", "epic-integration", "--integration", "--root", tmp_path / "records",
+        "--repo", spec(label="app", source=str(source), branch="epic-integration", base="main", target="main", role="primary")).stdout)
+    path = Path(made["recordPath"])
+    worktree = Path(made["authoredRoot"])
+    assert made["kind"] == "integration"
+    with_plan = run("remove", "--record", path, "--outcome", "merged", "--artifact-dispositions", "[]",
+        "--authored-root", source, "--plan-file", "agent-work/history/none.md", check=False)
+    assert with_plan.returncode and "no plan file" in with_plan.stderr
+    assert worktree.exists()
+    done = json.loads(run("remove", "--record", path, "--outcome", "merged", "--artifact-dispositions", "[]",
+        "--authored-root", source).stdout)
+    assert done["state"] == "cleaned" and not worktree.exists()
+    assert done["authoredRoot"] == str(source.resolve())
+    assert "archivedPlanFile" not in done
+
+
+def test_ticket_worktree_still_requires_a_plan_file(tmp_path):
+    source = repo(tmp_path)
+    workflow(source, "ticket-001")
+    made = json.loads(run("create", "--ticket", "ticket-001", "--root", tmp_path / "records",
+        "--repo", spec(label="app", source=str(source), branch="ticket-task", base="main", target="main", role="primary")).stdout)
+    result = run("remove", "--record", made["recordPath"], "--outcome", "merged", "--artifact-dispositions", "[]",
+        "--authored-root", source, check=False)
+    assert result.returncode and "--plan-file" in result.stderr
+    assert Path(made["authoredRoot"]).exists()
+
+
 def test_remove_requires_ticket_pointer_to_approved_surviving_plan(tmp_path):
     source = repo(tmp_path)
     canonical = workflow(source, "pointer-001")

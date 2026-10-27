@@ -51,13 +51,13 @@ After the parent finishes `plan-md`, launch one child at `execute` in the curren
 
 Tickets run in `depends_on` order: a chain runs one at a time, and independent tickets run at once. Run at most 3 children at once, or the user's number.
 
-1. Commit the ticket entries and the epic doc on the start branch, so every ticket branch sees the same backlog and epic doc. Create the integration branch `<epic>-integration` from the start branch in its own worktree, targeting the PR target. Create one worktree per ticket with branch `<ticket-id>`, based on and targeting the integration branch. Use `$SKILLS_ROOT/_lib/worktrees.sh create` (records under `AGENT_WORKTREES_DIR`) and keep each exact record path; reuse Hub-supplied mappings instead.
+1. Commit the ticket entries and the epic doc on the start branch, so every ticket branch sees the same backlog and epic doc. Create the integration branch `<epic>-integration` from the start branch in its own worktree with `$SKILLS_ROOT/_lib/worktrees.sh create --integration`, targeting the PR target. Create one worktree per ticket with branch `<ticket-id>`, based on and targeting the integration branch. Use `$SKILLS_ROOT/_lib/worktrees.sh create` (records under `AGENT_WORKTREES_DIR`) and keep each exact record path; reuse Hub-supplied mappings instead.
 2. Launch a background child at `execute` for each approved, ready ticket, up to the limit, with `cwd` set to its worktree and `autoStopOnComplete: false`.
 3. Before `execute`, the child merges the integration branch tip into its branch. Before reporting its commit, it merges the tip again and resolves conflicts in its own ticket.
 4. Use `wait` without a `childId` to handle whichever child finishes next. Check its gate, then send its next phase.
 5. After its commit, merge the ticket branch into the integration branch and push. Open the draft PR after the first merge. Then launch or resume tickets that just became ready.
 6. When all tickets are merged, run `code-critic` on the integration diff against the PR target. Send the clear, high-impact findings to one child that fixes them in the integration worktree.
-7. Mark the PR ready. After verifying each ticket merge, use `$SKILLS_ROOT/_lib/worktrees.sh remove` for Rules-owned ticket worktrees following `$SKILLS_ROOT/_lib/worktrees.md`, with the integration worktree as the surviving authored root; use Hub closeout for Hub-owned mappings. Keep the integration worktree until the user merges the PR.
+7. Mark the PR ready. After verifying each ticket merge, use `$SKILLS_ROOT/_lib/worktrees.sh remove` for Rules-owned ticket worktrees following `$SKILLS_ROOT/_lib/worktrees.md`, with the integration worktree as the surviving authored root; use Hub closeout for Hub-owned mappings. Keep the integration worktree until the user merges the PR, then remove it with `--outcome merged` and no `--plan-file`.
 
 Never run two writable children in one checkout. Do not merge into the PR target.
 

@@ -217,10 +217,11 @@ def validate_record_location(record_path: Path, repos: list[dict]) -> None:
             fail(f"Durable worktree record must remain outside registered worktree {worktree}")
 
 
-def initial_record(ticket: str, task_id: str, path: Path, repos: list[dict]) -> dict:
+def initial_record(ticket: str, task_id: str, path: Path, repos: list[dict], integration: bool = False) -> dict:
     primary = next(item for item in repos if item["role"] == "primary")
     return {
         "version": VERSION, "id": task_id, "revision": 0, "owner": OWNER,
+        **({"kind": "integration"} if integration else {}),
         "ticket": ticket.lower(), "recordPath": str(path), "primaryRepository": primary["label"],
         "authoredRoot": primary.get("worktree"), "state": "active", "terminalOutcome": None,
         "verifiedAt": None, "issue": None, "artifactDispositions": [], "repositories": repos,
@@ -252,7 +253,7 @@ def create(args: argparse.Namespace) -> dict:
         if destination in destinations or destination.exists(): fail("Worktree destination collision")
         destinations.add(destination)
         mapped.append({**item, "worktree": str(destination), "start": git(Path(item["source"]), "rev-parse", item["base"]).stdout.strip(), "state": "active", "outcome": None, "verifiedAt": None, "issue": None})
-    record = initial_record(args.ticket, task_id, path, mapped)
+    record = initial_record(args.ticket, task_id, path, mapped, args.integration)
     with locked(path):
         save(path, record)
         created: list[dict] = []
@@ -435,10 +436,15 @@ def ticket_plan_file(feature_text: str, ticket: str) -> str | None:
     return None
 
 
-def verify_surviving_handoff(record: dict, authored_value: str, plan_file: str) -> tuple[Path, Path]:
+def verify_surviving_handoff(record: dict, authored_value: str, plan_file: str | None) -> Path:
     authored = absolute(authored_value, "authored root")
     primary = next(item for item in record["repositories"] if item["role"] == "primary")
     if authored != Path(primary["source"]): fail("Authored root must be the surviving primary source checkout")
+    # An integration branch owns no ticket; its tickets' plans close with their own worktrees.
+    if record.get("kind") == "integration":
+        if plan_file: fail("Integration worktrees have no plan file")
+        return authored
+    if not plan_file: fail("--plan-file is required for ticket worktrees")
     relative_plan = Path(plan_file)
     if relative_plan.is_absolute() or ".." in relative_plan.parts: fail("Surviving authored plan path must be source-relative")
     candidate = (authored / relative_plan).resolve()
@@ -450,7 +456,7 @@ def verify_surviving_handoff(record: dict, authored_value: str, plan_file: str) 
     recorded_plan = ticket_plan_file(feature_text, record["ticket"])
     if recorded_plan is None: fail("Surviving canonical ticket or its plan_file is missing")
     if recorded_plan != plan_file: fail("Surviving canonical ticket plan_file does not match the approved archived plan")
-    return authored, candidate
+    return authored
 
 
 def remove(args: argparse.Namespace) -> dict:
@@ -482,7 +488,7 @@ def remove(args: argparse.Namespace) -> dict:
                 repo["issue"] = None
         save(path, record)
         try:
-            authored, _plan = verify_surviving_handoff(record, args.authored_root, args.plan_file)
+            authored = verify_surviving_handoff(record, args.authored_root, args.plan_file)
         except ValueError as exc:
             record["issue"] = str(exc)[:MAX_TEXT]
             for repo in record["repositories"]:
@@ -531,7 +537,7 @@ def remove(args: argparse.Namespace) -> dict:
                 record["issue"] = repo["issue"]
                 save(path, record)
                 raise
-        record["archivedPlanFile"] = args.plan_file
+        if args.plan_file: record["archivedPlanFile"] = args.plan_file
         record.update(authoredRoot=str(authored), state="cleaned", verifiedAt=now(), issue=None)
         save(path, record)
     return record
@@ -543,10 +549,11 @@ def parser() -> argparse.ArgumentParser:
     for name in ("create", "register"):
         item = subs.add_parser(name)
         item.add_argument("--ticket", required=True); item.add_argument("--root"); item.add_argument("--repo", action="append", required=True); item.add_argument("--hub-owned", action="store_true", help="Refuse a mapping known to be Hub-owned")
+        if name == "create": item.add_argument("--integration", action="store_true", help="Epic integration branch with no ticket plan of its own")
         item.set_defaults(run=create if name == "create" else register)
     item = subs.add_parser("inspect", aliases=["verify"]); item.add_argument("--record", required=True); item.set_defaults(run=inspect_record)
     item = subs.add_parser("state"); item.add_argument("--record", required=True); item.add_argument("--state", required=True); item.add_argument("--reason"); item.set_defaults(run=set_state)
-    item = subs.add_parser("remove"); item.add_argument("--record", required=True); item.add_argument("--outcome", required=True); item.add_argument("--artifact-dispositions"); item.add_argument("--authored-root", required=True); item.add_argument("--plan-file", required=True); item.set_defaults(run=remove)
+    item = subs.add_parser("remove"); item.add_argument("--record", required=True); item.add_argument("--outcome", required=True); item.add_argument("--artifact-dispositions"); item.add_argument("--authored-root", required=True); item.add_argument("--plan-file"); item.set_defaults(run=remove)
     return result
 
 

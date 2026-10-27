@@ -34,6 +34,8 @@ Exactly one repository must have role `primary`. Confirm the base and target wit
   --repo '{"source":"/absolute/project","worktree":"/absolute/existing-worktree","label":"app","branch":"example-001","target":"main","role":"primary"}'
 ```
 
+Add `--integration` to `create` for an epic integration branch. It owns no ticket, so its closeout omits `--plan-file`; each ticket's plan closes with that ticket's own worktree.
+
 Creation makes a unique task directory containing `worktree.json` and the worktrees. Registration preserves and validates an existing approved location, including an explicitly approved nested checkout. Neither operation authorizes taking over an externally owned worktree.
 
 ## Validate before use
@@ -66,7 +68,7 @@ This helper's cleanup requires a surviving ticket in `agent-work/features.yaml` 
    ```
 
 4. Ask whether integration is complete and cleanup is approved. Until then, retain the worktree and record `awaiting-merge` or `cleanup-pending`. Workflow completion, merge outcome, and cleanup are independent states. The helper trusts the declared merge outcome; it does not verify integration into the target.
-5. After confirmation, update the surviving source checkout's ticket `plan_file` and verify its canonical archived plan exists. Then run:
+5. After confirmation, update the surviving source checkout's ticket `plan_file` and verify its canonical archived plan exists. Skip this for an integration record and omit `--plan-file`. Then run:
 
    ```bash
    "$SKILLS_ROOT/_lib/worktrees.sh" remove --record /absolute/worktree.json \
