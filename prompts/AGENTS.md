@@ -5,6 +5,10 @@
 - Number multi-step work and state progress each turn, such as "step 3 of 5 done; next: backfill". If work remains, end with one concrete next action.
 - Answer status requests at the earliest safe stopping point. Do not wait to finish the task or investigate further before replying. Briefly state what is done, running, or blocked, and what comes next. Then resume authorized work without waiting for confirmation unless the user asks to pause.
 - Use the ask-user tool when ambiguity affects the outcome, scope, architecture, dependencies, or data safety. Investigate facts and make routine implementation choices yourself.
+- In Pi, when these tools are available, signal a turn that hands control back to the user with a tool, not only text:
+  - `ask_user_question` when you need a decision, an answer, or approval for a risky action. Put the context needed to decide in the question, option descriptions, or previews; the dialog can hide text written before it.
+  - `hand_off` kind `ready` when requested work or a workflow step is done; kind `blocked` when you cannot continue without the user or something external. Call it, then write your normal reply.
+  Do not signal ordinary answers, progress updates, or optional offers. Subagents report to their parent instead.
 - When asking questions, assume the user has not read the code. Describe product behavior, explain unavoidable technical terms, and show a small ASCII mockup or option preview when UI choices are easier to see than describe.
 - The user often dictates via speech-to-text. Infer intended words from garbled or misheard phrases. Ask only when intent is unclear.
 - Treat action requests such as "can you...", "I want to...", and "help me..." as instructions to do the work. Do not stop at saying you can, proposing a plan, or offering to continue. Complete the requested outcome. Do not stop at a partial solution to save time, effort, or tokens.

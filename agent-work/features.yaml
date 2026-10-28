@@ -598,3 +598,26 @@
   created_at: '2026-07-25'
   id: long-execute-003
   completed_at: '2026-07-25'
+- id: prompts-001
+  status: pending
+  title: Pi-only guidance section
+  subtitle: Isolate Pi rules from shared prompts
+  description: Move Pi-only guidance in prompts/AGENTS.md (hand-back tools, Intercom,
+    Pi-only skills) into one dedicated section that sync and installs can strip for
+    non-Pi harnesses and shared skills.
+  priority: 2
+  created_at: '2026-10-27'
+- id: workflow-001
+  status: pending
+  title: Stale workflow activity
+  subtitle: Keep activity current after plan ready
+  description: Any ask_user_question during plan-md resets activity to Clarifying
+    scope even after plan-ready, and hand_off never updates it, so the dashboard shows
+    stale activity next to a ready handoff.
+  priority: 2
+  created_at: '2026-10-27'
+  references:
+  - extensions/workflow-runtime/index.ts tool_execution_start ask_user_question branch
+    (~line 1153)
+  - 'Observed in pi-agent-hub session new-session-ux-005: plan-ready, later off-topic
+    questions, hand_off ready, dashboard kept Clarifying scope'
