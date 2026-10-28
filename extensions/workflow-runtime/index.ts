@@ -13,6 +13,7 @@ import {
 	positionalMarker,
 	recoverFocus,
 	setWorkflowActivity,
+	restoreReachedDone,
 	setWorkflowTicketState,
 	shouldNormalizeWorkflowDefinition,
 	startWorkflowStep,
@@ -995,6 +996,10 @@ export default function workflowRuntime(
 				recoveryPending = false;
 				state = setState(pi, ctx, transition(state, { type: "end-focus" }).state);
 				ctx.ui.notify(`Focus mode ended: ${params.kind === "ready" ? "completed" : "blocked"}.`, "info");
+			}
+			if (params.kind === "ready") {
+				const restored = restoreReachedDone(state);
+				if (restored !== state) state = setState(pi, ctx, restored);
 			}
 			currentAttention = attention;
 			publishContext(attention);

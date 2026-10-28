@@ -608,7 +608,7 @@
   priority: 2
   created_at: '2026-10-27'
 - id: workflow-001
-  status: pending
+  status: done
   title: Stale workflow activity
   subtitle: Keep activity current after plan ready
   description: Any ask_user_question during plan-md resets activity to Clarifying
@@ -621,3 +621,5 @@
     (~line 1153)
   - 'Observed in pi-agent-hub session new-session-ux-005: plan-ready, later off-topic
     questions, hand_off ready, dashboard kept Clarifying scope'
+  plan_file: agent-work/history/20261027_workflow-001_restore_done_label.md
+  completed_at: '2026-10-27'

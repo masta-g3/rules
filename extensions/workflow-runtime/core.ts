@@ -121,7 +121,8 @@ export function setWorkflowActivity(state: WorkflowState, activityId: string): W
 		throw new Error(`Activity ${activityId} does not belong to ${state.activeStep}.${owner ? ` Call set_workflow_step with stepId "${owner.id}" first, only if the user authorized that step.` : ""}`);
 	}
 	const passes = { ...(state.activityPasses ?? {}) };
-	if (definition.review) passes[activityId] = (passes[activityId] ?? 0) + 1;
+	// Terminal publishes are counted too, so a ready hand-back can restore a done label this step run reached.
+	if (definition.review || definition.terminal) passes[activityId] = (passes[activityId] ?? 0) + 1;
 	const pass = definition.review ? (passes[activityId] ?? 1) : undefined;
 	return {
 		...state,
@@ -129,6 +130,12 @@ export function setWorkflowActivity(state: WorkflowState, activityId: string): W
 		activity: { id: definition.id, label: definition.label, ...(pass && pass > 1 ? { pass } : {}) },
 		currentStepComplete: definition.terminal ? true : undefined,
 	};
+}
+
+export function restoreReachedDone(state: WorkflowState): WorkflowState {
+	if (!state.activeStep || state.currentStepComplete) return state;
+	const done = (WORKFLOW_ACTIVITIES[state.activeStep] as readonly { id: string; terminal?: boolean }[]).find((item) => item.terminal);
+	return done && state.activityPasses?.[done.id] ? setWorkflowActivity(state, done.id) : state;
 }
 
 export type WorkflowRuntimeEntryData = WorkflowState & {

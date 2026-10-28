@@ -455,7 +455,7 @@ test("workflow clear commands durably unlink the right projection and release na
     assert.equal(unlinked.activeStep, "review");
     assert.deepEqual(unlinked.activity, { id: "review-complete", label: "Review complete" });
     assert.equal(unlinked.currentStepComplete, true);
-    assert.deepEqual(unlinked.activityPasses, { "reviewing-implementation": 1 });
+    assert.deepEqual(unlinked.activityPasses, { "reviewing-implementation": 1, "review-complete": 1 });
     assert.equal(unlinked.ticketId, undefined);
     assert.equal(unlinked.plan, undefined);
     assert.equal(unlinked.execution, undefined);
@@ -1741,6 +1741,42 @@ test("hand_off publishes explicit handoffs with recommendation and evidence", as
 
     await runtime.emit("before_agent_start", { systemPrompt: "base" });
     assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("ready hand_off restores a done label the step already reached", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    const activity = (id) => runtime.tools.get("set_workflow_activity").execute(id, { activityId: id }, undefined, undefined, runtime.ctx);
+    const handOff = (kind) => runtime.tools.get("hand_off").execute(`call-${kind}`, { kind, text: "Handed back" }, undefined, undefined, runtime.ctx);
+    const question = () => runtime.emit("tool_execution_start", { toolCallId: "q", toolName: "ask_user_question", args: { questions: [{ question: "Ticket?" }] } });
+    const current = () => runtime.latest("workflow-runtime");
+
+    await runtime.emit("input", { source: "interactive", text: "/skill:plan-md meta-001" });
+    await activity("writing-plan");
+    await handOff("ready");
+    assert.equal(current().activity.id, "writing-plan");
+    assert.equal(current().currentStepComplete, undefined);
+
+    await activity("plan-ready");
+    await question();
+    assert.equal(current().activity.id, "clarifying-requirements");
+    await handOff("blocked");
+    assert.equal(current().activity.id, "clarifying-requirements");
+    await handOff("ready");
+    assert.equal(current().activity.id, "plan-ready");
+    assert.equal(current().currentStepComplete, true);
+
+    await runtime.emit("input", { source: "interactive", text: "/skill:review meta-001" });
+    await handOff("ready");
+    assert.equal(current().activity.id, "reviewing-implementation");
+    await activity("review-complete");
+    await runtime.emit("tool_execution_start", { toolName: "tmux_subagent", args: { agent: "code-critic" } });
+    assert.equal(current().activity.id, "reviewing-implementation");
+    await handOff("ready");
+    assert.equal(current().activity.id, "review-complete");
+    assert.equal(current().currentStepComplete, true);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
