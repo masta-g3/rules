@@ -1,7 +1,7 @@
 ---
 name: ticket-runner
 description: Runs one workflow phase per turn for one ticket under a parent orchestrator. Launched by the workflow-orchestrator skill.
-model: openai-codex/gpt-6.1-sol
+model: openai/gpt-6.1-sol
 thinking: high
 tools: read, grep, find, ls, bash, edit, write
 systemPromptMode: append

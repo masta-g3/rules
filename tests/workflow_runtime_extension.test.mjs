@@ -1060,16 +1060,16 @@ test("explicit session-name-refresh awaits its model result and reports", async 
 });
 
 test("session metadata models are fixed to Luna then Spark", async () => {
-  const active = { provider: "openai-codex", id: "gpt-5.6-sol" };
+  const active = { provider: "openai", id: "gpt-5.6-sol" };
   const candidates = new Map([
-    ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
-    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
+    ["gpt-5.3-codex-spark", { provider: "openai", id: "gpt-5.3-codex-spark" }],
+    ["gpt-6-luna", { provider: "openai", id: "gpt-6-luna" }],
   ]);
   const authenticated = [];
   const resolved = await resolveSessionModels({
     model: active,
     modelRegistry: {
-      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
+      find(provider, id) { return provider === "openai" ? candidates.get(id) : undefined; },
       async getApiKeyAndHeaders(model) {
         authenticated.push(model.id);
         return { ok: true, apiKey: "test-key" };
@@ -1084,8 +1084,8 @@ test("session metadata models are fixed to Luna then Spark", async () => {
 
 test("metadata calls use medium reasoning, five seconds, and skip unsupported models", async () => {
   const candidates = new Map([
-    ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
-    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
+    ["gpt-5.3-codex-spark", { provider: "openai", id: "gpt-5.3-codex-spark" }],
+    ["gpt-6-luna", { provider: "openai", id: "gpt-6-luna" }],
   ]);
   const options = [];
   let clock = 0;
@@ -1102,7 +1102,7 @@ test("metadata calls use medium reasoning, five seconds, and skip unsupported mo
   });
   const ctx = {
     modelRegistry: {
-      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
+      find(provider, id) { return provider === "openai" ? candidates.get(id) : undefined; },
       async getApiKeyAndHeaders() { return { ok: true, apiKey: "test-key" }; },
     },
   };
@@ -1131,8 +1131,8 @@ test("metadata calls use medium reasoning, five seconds, and skip unsupported mo
 
 test("a reset isolates unsupported-model state from an older in-flight call", async () => {
   const candidates = new Map([
-    ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
-    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
+    ["gpt-5.3-codex-spark", { provider: "openai", id: "gpt-5.3-codex-spark" }],
+    ["gpt-6-luna", { provider: "openai", id: "gpt-6-luna" }],
   ]);
   const attempted = [];
   let finishOldLuna;
@@ -1150,7 +1150,7 @@ test("a reset isolates unsupported-model state from an older in-flight call", as
   });
   const ctx = {
     modelRegistry: {
-      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
+      find(provider, id) { return provider === "openai" ? candidates.get(id) : undefined; },
       async getApiKeyAndHeaders() { return { ok: true, apiKey: "test-key" }; },
     },
   };
@@ -1169,13 +1169,13 @@ test("a reset isolates unsupported-model state from an older in-flight call", as
 
 test("metadata model resolution distinguishes missing authentication", async () => {
   const candidates = new Map([
-    ["gpt-5.3-codex-spark", { provider: "openai-codex", id: "gpt-5.3-codex-spark" }],
-    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
+    ["gpt-5.3-codex-spark", { provider: "openai", id: "gpt-5.3-codex-spark" }],
+    ["gpt-6-luna", { provider: "openai", id: "gpt-6-luna" }],
   ]);
   const call = createSessionModelCall({ complete: async () => assert.fail("completion must not run") });
   const result = await call({
     modelRegistry: {
-      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
+      find(provider, id) { return provider === "openai" ? candidates.get(id) : undefined; },
       async getApiKeyAndHeaders() { return { ok: false }; },
     },
   }, "prompt", "input", 64);
@@ -1273,7 +1273,7 @@ test("authentication failures use the auth badge and login advice", async () => 
     await settle();
     assert.match(runtime.renderWorkflow(80), /◇× meta/);
     const warning = runtime.operations.find((item) => item.kind === "notify" && item.level === "warning");
-    assert.match(warning.message, /\/login openai-codex/);
+    assert.match(warning.message, /\/login openai\./);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 

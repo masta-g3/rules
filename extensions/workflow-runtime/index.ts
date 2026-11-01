@@ -369,7 +369,7 @@ function metadataParseContract(): string {
 }
 
 function metadataFailureNotice(kind: MetadataFailureKind | "parse"): string {
-	if (kind === "authentication") return "Session metadata authentication failed. Run /login openai-codex.";
+	if (kind === "authentication") return "Session metadata authentication failed. Run /login openai.";
 	if (kind === "unsupported") return "Session metadata unavailable. The configured model is unsupported for this account.";
 	if (kind === "timeout") return "Session metadata request timed out. The extension remains active.";
 	if (kind === "parse") return "Session metadata returned an invalid result. Run /session-metadata-status for details.";
