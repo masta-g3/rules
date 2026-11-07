@@ -107,10 +107,12 @@ def main():
         (stage / "cursor_links" / prompt.stem).symlink_to(codex / "skills" / prompt.stem)
 
     tool_names = {"read": "Read", "grep": "Grep", "find": "Glob", "ls": "LS", "bash": "Bash", "edit": "Edit", "write": "Write"}
+    # Pi workflow-runtime tools have no Claude or Cursor equivalent; only the Pi copy keeps them.
+    pi_only_tools = {"set_workflow_step", "set_workflow_ticket", "set_workflow_activity", "complete_workflow"}
     for agent in sorted((repo / "agents").glob("*.md")):
         metadata, body = frontmatter(agent)
         identity = {key: metadata[key] for key in ("name", "description")}
-        tools = [tool.strip() for tool in metadata.get("tools", "").split(",") if tool.strip()]
+        tools = [tool.strip() for tool in metadata.get("tools", "").split(",") if tool.strip() and tool.strip() not in pi_only_tools]
         read_only = bool(tools) and not any(tool in tools for tool in ("edit", "write"))
         claude = dict(identity)
         if tools:

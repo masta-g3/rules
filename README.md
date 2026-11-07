@@ -67,7 +67,7 @@ Add standalone command prompts as direct `prompts/*.md` files with YAML frontmat
 
 Project-local Pi extensions live in `extensions/` and sync into `~/.pi/agent/extensions/` via `./sync-prompts.sh`. Pi auto-loads synced extensions on startup; use `/reload` in an existing Pi session after syncing.
 
-Specialist sources live in `agents/`. Pi keeps their Markdown, model, and context settings. Sync generates Claude Markdown with native tool names, Cursor Markdown with `readonly` for read-only roles, and Codex TOML with `developer_instructions` and a read-only sandbox for those roles. Non-Pi agents inherit their harness model; `second-opinion` does not guarantee a different model. Sync does not modify Codex's main configuration.
+Specialist sources live in `agents/`. Pi keeps their Markdown, model, and context settings. Sync generates Claude Markdown with native tool names (Pi-only workflow tools such as `set_workflow_step` stay only in the Pi copy), Cursor Markdown with `readonly` for read-only roles, and Codex TOML with `developer_instructions` and a read-only sandbox for those roles. Non-Pi agents inherit their harness model; `second-opinion` does not guarantee a different model. Sync does not modify Codex's main configuration.
 
 Pi-only skills live in `pi/skills/` and install into `~/.pi/agent/skills/`. Keep their names distinct from shared skills. `workflow-orchestrator` stays here until its non-Pi lifecycle behavior is validated. Shared helpers still use `SKILLS_ROOT=~/.agents/skills`.
 

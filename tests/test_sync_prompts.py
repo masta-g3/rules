@@ -58,6 +58,19 @@ class SyncPromptsTest(unittest.TestCase):
             self.assertIn("thinking: high", pi)
             self.assertIn("tools: read, grep, find, bash", pi)
 
+    def test_pi_only_workflow_tools_stay_in_pi_agents(self) -> None:
+        with tempfile.TemporaryDirectory() as home:
+            subprocess.run([str(SYNC_PROMPTS), "--silent"], cwd=REPO_ROOT,
+                           env={**os.environ, "HOME": home, "CODEX_HOME": home + "/.codex"}, check=True)
+            root = Path(home)
+            workflow_tools = "set_workflow_step, set_workflow_ticket, set_workflow_activity, complete_workflow"
+            self.assertIn(f"tools: read, grep, find, ls, bash, edit, write, {workflow_tools}",
+                          (root / ".pi/agent/agents/ticket-runner.md").read_text())
+            claude = (root / ".claude/agents/ticket-runner.md").read_text()
+            self.assertIn("tools: Read, Grep, Glob, LS, Bash, Edit, Write\n", claude)
+            self.assertNotIn("set_workflow", claude)
+            self.assertNotIn("readonly", (root / ".cursor/agents/ticket-runner.md").read_text())
+
     def test_shared_specialists_migrate_from_pi_only_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as home:
             root = Path(home)
