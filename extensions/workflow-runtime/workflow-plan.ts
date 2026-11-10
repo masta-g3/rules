@@ -7,9 +7,12 @@ export type WorkflowPlan = { sections: PlanSection[]; completed: number; total: 
 export type PlanProjection = {
 	phase?: { index: number; count: number; title: string };
 	tasks: { completed: number; total: number };
-	phases?: Array<{ completed: number; total: number }>;
+	phases?: Array<{ completed: number; total: number; title?: string }>;
 	nextStep?: string;
+	current?: { tasks: PlanTask[]; before: number; after: number };
 };
+
+const CURRENT_TASKS = 12;
 
 const clean = (value: string) => value.replace(/\s+/g, " ").trim();
 const bounded = (value: string, max: number) => [...value].slice(0, max).join("");
@@ -18,6 +21,14 @@ function projectPath(cwd: string, relative: string): string | undefined {
 	const root = resolve(cwd);
 	const path = resolve(root, relative);
 	return path === root || path.startsWith(`${root}${sep}`) ? path : undefined;
+}
+
+// A fixed window that keeps a little completed context above the first open task.
+function currentWindow(tasks: PlanTask[]): NonNullable<PlanProjection["current"]> {
+	const open = tasks.findIndex((task) => !task.done);
+	const start = Math.max(0, Math.min((open < 0 ? tasks.length : open) - 3, tasks.length - CURRENT_TASKS));
+	const shown = tasks.slice(start, start + CURRENT_TASKS);
+	return { tasks: shown.map((task) => ({ done: task.done, text: bounded(task.text, 100) })), before: start, after: tasks.length - start - shown.length };
 }
 
 export function parseWorkflowPlan(text: string): { plan?: WorkflowPlan; projection?: PlanProjection } {
@@ -61,8 +72,9 @@ export function parseWorkflowPlan(text: string): { plan?: WorkflowPlan; projecti
 	const projection: PlanProjection = {
 		...(section ? { phase: { index: selected + 1, count: populated.length, title: bounded(section.title!, 80) } } : {}),
 		tasks: { completed: plan.completed, total: plan.total },
-		...(populated.length ? { phases: populated.slice(0, 100).map((item) => ({ completed: item.tasks.filter((task) => task.done).length, total: item.tasks.length })) } : {}),
+		...(populated.length ? { phases: populated.slice(0, 100).map((item) => ({ completed: item.tasks.filter((task) => task.done).length, total: item.tasks.length, title: bounded(item.title!, 80) })) } : {}),
 		...(tasks.find((task) => !task.done) ? { nextStep: bounded(tasks.find((task) => !task.done)!.text, 120) } : {}),
+		current: currentWindow(planSections[selected]!.tasks),
 	};
 	return { plan, projection };
 }

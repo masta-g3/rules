@@ -1831,3 +1831,78 @@ test("completed turns make no attention model call", async () => {
     assert.equal(runtime.latest("pi-agent-hub-context"), undefined);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
+
+test("finished turns publish a progress note that survives later publishes and resume", async () => {
+  const cwd = await project();
+  const previousJob = process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+  delete process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+  try {
+    const delayed = delayedModel();
+    const runtime = harness(cwd, [], undefined, delayed.call);
+    await runtime.commands.get("wf-ticket").handler("meta-001", runtime.ctx);
+    runtime.branch.push(
+      { type: "message", message: { role: "user", content: "Add the contract" } },
+      { type: "message", message: { role: "assistant", content: "Added the contract type." } },
+    );
+    const end = { messages: [{ role: "assistant", stopReason: "stop", content: "Added the contract type." }] };
+
+    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "aborted" }] });
+    assert.equal(delayed.calls.length, 0);
+    await runtime.emit("agent_end", end);
+    await runtime.emit("agent_end", end);
+    assert.equal(delayed.calls.length, 1);
+    assert.match(delayed.calls[0].prompt, /"done"/);
+    assert.match(delayed.calls[0].input, /^Ticket: meta-001[\s\S]*Assistant: Added the contract type\.$/);
+    delayed.calls[0].resolve('```json\n{"done":"Added the contract type.","next":"Write the tests."}\n```');
+    await settle();
+    const progress = runtime.latest("pi-agent-hub-context").progress;
+    assert.deepEqual({ ...progress, updatedAt: 0 }, { done: "Added the contract type.", next: "Write the tests.", updatedAt: 0 });
+    assert.equal(typeof progress.updatedAt, "number");
+
+    await runtime.tools.get("hand_off").execute("call", { kind: "ready", text: "Contract ready" }, undefined, undefined, runtime.ctx);
+    assert.deepEqual(runtime.latest("pi-agent-hub-context").progress, progress);
+
+    await runtime.emit("agent_end", end);
+    await runtime.emit("input", { source: "interactive", text: "Something else" });
+    delayed.calls[1].resolve('{"done":"Stale.","next":""}');
+    await settle();
+    assert.deepEqual(runtime.latest("pi-agent-hub-context").progress, progress);
+
+    const resumed = harness(cwd, runtime.branch, "Metadata redesign", delayed.call);
+    await resumed.emit("session_start", { reason: "resume" });
+    await resumed.tools.get("hand_off").execute("next", { kind: "blocked", text: "Needs review" }, undefined, undefined, resumed.ctx);
+    assert.deepEqual(resumed.latest("pi-agent-hub-context").progress, progress);
+    await resumed.commands.get("wf-ticket").handler("clear", resumed.ctx);
+    assert.equal(resumed.latest("pi-agent-hub-context").progress, undefined);
+
+    process.env.PI_TMUX_SUBAGENTS_JOB_ID = "job";
+    const calls = delayed.calls.length;
+    await resumed.emit("agent_end", end);
+    assert.equal(delayed.calls.length, calls);
+  } finally {
+    if (previousJob === undefined) delete process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+    else process.env.PI_TMUX_SUBAGENTS_JOB_ID = previousJob;
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("switching tickets drops the previous ticket's progress note", async () => {
+  const cwd = await project();
+  const previousJob = process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+  delete process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+  try {
+    const runtime = harness(cwd, [], undefined, async () => metadataSuccess('{"done":"Added the contract.","next":""}'));
+    await runtime.commands.get("wf-ticket").handler("meta-001", runtime.ctx);
+    runtime.branch.push({ type: "message", message: { role: "assistant", content: "Added the contract." } });
+    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop" }] });
+    await settle();
+    assert.equal(runtime.latest("pi-agent-hub-context").progress.done, "Added the contract.");
+    await runtime.commands.get("wf-ticket").handler("other-001", runtime.ctx);
+    assert.equal(runtime.latest("pi-agent-hub-context").ticket.id, "other-001");
+    assert.equal(runtime.latest("pi-agent-hub-context").progress, undefined);
+  } finally {
+    if (previousJob === undefined) delete process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+    else process.env.PI_TMUX_SUBAGENTS_JOB_ID = previousJob;
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
