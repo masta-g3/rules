@@ -12,6 +12,7 @@ export const MAX_ATTENTION = 150;
 export const MAX_REQUEST_ID = 64;
 export const MAX_RECOMMENDATION = 150;
 export const MAX_ARTIFACT = 1_024;
+export const MAX_PROGRESS = 120;
 const MAX_PROJECT_CWD = 4_096;
 
 export function effectiveProjectCwd(cwd: string, primaryCwd = process.env.PI_AGENT_HUB_PRIMARY_CWD): string {
@@ -27,6 +28,7 @@ export type SessionAttention = {
 	recommendation?: string;
 	artifact?: string;
 };
+export type ProgressNote = { done?: string; next?: string; updatedAt: number };
 export type TicketContext = { id: string; title?: string; subtitle?: string; description?: string; planFile?: string };
 export type PiAgentHubContextV1 = {
 	version: 1;
@@ -34,6 +36,7 @@ export type PiAgentHubContextV1 = {
 	ticket?: { id: string; subtitle?: string; description?: string };
 	attention?: SessionAttention;
 	worktree?: WorktreeLifecycleSnapshot;
+	progress?: ProgressNote;
 };
 
 type MessageContent = string | Array<{ type?: string; text?: string }>;
@@ -44,6 +47,16 @@ Use 1–3 concrete words in Title Case.
 Maximum 32 characters.
 Return only the name.
 Do not include a ticket ID, label, quote, or punctuation.`;
+
+export const PROGRESS_PROMPT = `Summarize an agent's progress from the ticket, if any, and the recent conversation.
+Return only a JSON object: {"done":"…","next":"…"}.
+done: what the agent has concretely achieved so far in this task.
+next: what the agent will do or is waiting for next.
+Each value is one plain sentence of at most 120 characters, stating present or past facts.
+Start with the verb and name no subject: "Fixed the login redirect.", not "The assistant fixed…".
+Name the concrete thing changed, found, or awaited, so the sentence is useful on its own.
+Do not include ticket IDs, markdown, or speculation.
+Use an empty string when unknown.`;
 
 export function normalizeText(value: unknown, max: number): string | undefined {
 	if (typeof value !== "string") return undefined;
@@ -172,6 +185,30 @@ export async function readTicketContext(cwd: string, ticketId: string): Promise<
 	};
 }
 
+function progressFields(value: Record<string, unknown>): { done?: string; next?: string } | undefined {
+	const done = normalizeText(value.done, MAX_PROGRESS);
+	const next = normalizeText(value.next, MAX_PROGRESS);
+	return done || next ? { ...(done ? { done } : {}), ...(next ? { next } : {}) } : undefined;
+}
+
+export function parseProgressNote(raw: string): { done?: string; next?: string } | undefined {
+	const text = raw.replace(/```(?:json)?/giu, "");
+	const start = text.indexOf("{");
+	const end = text.lastIndexOf("}");
+	if (start < 0 || end < start) return undefined;
+	let value: unknown;
+	try { value = JSON.parse(text.slice(start, end + 1)); } catch { return undefined; }
+	return value && typeof value === "object" && !Array.isArray(value) ? progressFields(value as Record<string, unknown>) : undefined;
+}
+
+function parseProgress(value: unknown): ProgressNote | undefined {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+	const raw = value as Record<string, unknown>;
+	if (typeof raw.updatedAt !== "number" || !Number.isFinite(raw.updatedAt)) return undefined;
+	const fields = progressFields(raw);
+	return fields ? { ...fields, updatedAt: raw.updatedAt } : undefined;
+}
+
 export function parseContextSnapshot(value: unknown): PiAgentHubContextV1 | undefined {
 	if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
 	const item = value as Record<string, unknown>;
@@ -209,16 +246,18 @@ export function parseContextSnapshot(value: unknown): PiAgentHubContextV1 | unde
 		};
 	}
 	const worktree = parseWorktreeLifecycleSnapshot(item.worktree);
-	return { version: 1, updatedAt: item.updatedAt, ...(ticket ? { ticket } : {}), ...(attention ? { attention } : {}), ...(worktree ? { worktree } : {}) };
+	const progress = parseProgress(item.progress);
+	return { version: 1, updatedAt: item.updatedAt, ...(ticket ? { ticket } : {}), ...(attention ? { attention } : {}), ...(worktree ? { worktree } : {}), ...(progress ? { progress } : {}) };
 }
 
-export function contextSnapshot(ticket?: TicketContext, attention?: SessionAttention, updatedAt = Date.now(), worktree?: WorktreeLifecycleSnapshot): PiAgentHubContextV1 {
+export function contextSnapshot(ticket?: TicketContext, attention?: SessionAttention, updatedAt = Date.now(), worktree?: WorktreeLifecycleSnapshot, progress?: ProgressNote): PiAgentHubContextV1 {
 	return {
 		version: 1,
 		updatedAt,
 		...(ticket ? { ticket: { id: ticket.id, ...(ticket.subtitle ? { subtitle: ticket.subtitle } : {}), ...(ticket.description ? { description: ticket.description } : {}) } } : {}),
 		...(attention ? { attention } : {}),
 		...(worktree ? { worktree } : {}),
+		...(progress ? { progress } : {}),
 	};
 }
 

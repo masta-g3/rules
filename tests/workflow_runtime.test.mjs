@@ -28,6 +28,7 @@ import {
   contextSnapshot,
   effectiveProjectCwd,
   parseContextSnapshot,
+  parseProgressNote,
   questionAttention,
   readTicketContext,
   stableRequestId,
@@ -232,12 +233,53 @@ test("deterministic plan projection handles phases, fences, and flat lists", () 
 
   const scoped = parseWorkflowPlan("### Phase 1: Foundation\n- [ ] Phase task\n\n## Verification\n- [ ] Outside phase\n\n### Phase 2: Finish\n- [ ] Final task");
   assert.deepEqual(scoped.projection.tasks, { completed: 0, total: 2 });
-  assert.deepEqual(scoped.projection.phases, [{ completed: 0, total: 1 }, { completed: 0, total: 1 }]);
+  assert.deepEqual(scoped.projection.phases, [{ completed: 0, total: 1, title: "Foundation" }, { completed: 0, total: 1, title: "Finish" }]);
 
   const hundredPhases = Array.from({ length: 100 }, (_, index) => `### Phase ${index + 1}: P${index + 1}\n- [ ] Task ${index + 1}`).join("\n");
   const bounded = parseWorkflowPlan(hundredPhases).projection;
   assert.equal(bounded.phase.count, 100);
   assert.equal(bounded.phases.length, 100);
+});
+
+test("plan projection publishes a bounded window of current section tasks", () => {
+  const short = parseWorkflowPlan("### Phase 1: Build\n- [x] A\n- [x] B\n### Phase 2: Ship\n- [x] C\n- [ ] D").projection;
+  assert.deepEqual(short.current, { tasks: [{ done: true, text: "C" }, { done: false, text: "D" }], before: 0, after: 0 });
+  assert.deepEqual(short.phases.map((phase) => phase.title), ["Build", "Ship"]);
+
+  const lines = (count, done) => Array.from({ length: count }, (_, index) => `- [${index < done ? "x" : " "}] Task ${index}`).join("\n");
+  const middle = parseWorkflowPlan(`### Phase 1: Long\n${lines(20, 6)}`).projection.current;
+  assert.deepEqual(middle.tasks.map((task) => task.text), Array.from({ length: 12 }, (_, index) => `Task ${index + 3}`));
+  assert.deepEqual([middle.before, middle.after], [3, 5]);
+  const early = parseWorkflowPlan(`### Phase 1: Long\n${lines(20, 1)}`).projection.current;
+  assert.deepEqual([early.tasks[0].text, early.before, early.after], ["Task 0", 0, 8]);
+  const late = parseWorkflowPlan(`### Phase 1: Long\n${lines(20, 19)}`).projection.current;
+  assert.deepEqual([late.tasks[0].text, late.tasks.length, late.before, late.after], ["Task 8", 12, 8, 0]);
+  const finished = parseWorkflowPlan(`### Phase 1: Long\n${lines(20, 20)}`).projection.current;
+  assert.deepEqual([finished.tasks.at(-1).text, finished.tasks.every((task) => task.done), finished.before, finished.after], ["Task 19", true, 8, 0]);
+
+  const flat = parseWorkflowPlan(`# Plan\n${lines(3, 1)}\n- [ ] ${"y".repeat(130)}`).projection;
+  assert.equal(flat.phases, undefined);
+  assert.deepEqual(flat.current.tasks.slice(0, 2), [{ done: true, text: "Task 0" }, { done: false, text: "Task 1" }]);
+  assert.equal(flat.current.tasks.at(-1).text, "y".repeat(100));
+  assert.equal(parseWorkflowPlan(`### Phase 1: ${"t".repeat(90)}\n- [ ] A`).projection.phases[0].title, "t".repeat(80));
+});
+
+test("progress notes parse tolerant JSON and round trip through context", () => {
+  assert.deepEqual(parseProgressNote('{"done":"Added the parser.","next":"Run the tests."}'), { done: "Added the parser.", next: "Run the tests." });
+  assert.deepEqual(parseProgressNote('Here:\n```json\n{"done":"  Added\\n tests ","next":""}\n```'), { done: "Added tests" });
+  assert.equal(parseProgressNote("not json"), undefined);
+  assert.equal(parseProgressNote("{broken"), undefined);
+  assert.equal(parseProgressNote('{"done":"","next":"  "}'), undefined);
+  assert.equal(parseProgressNote('["done"]'), undefined);
+  assert.deepEqual(parseProgressNote(JSON.stringify({ done: "d".repeat(130), next: "n".repeat(121) })), { done: "d".repeat(120), next: "n".repeat(120) });
+
+  const progress = { done: "Added the parser.", next: "Run the tests.", updatedAt: 5 };
+  assert.deepEqual(parseContextSnapshot(contextSnapshot({ id: "x-001" }, undefined, 7, undefined, progress)), { version: 1, updatedAt: 7, ticket: { id: "x-001" }, progress });
+  assert.deepEqual(parseContextSnapshot(contextSnapshot({ id: "x-001" }, undefined, 7)), { version: 1, updatedAt: 7, ticket: { id: "x-001" } });
+  const attention = { kind: "ready", text: "Review it" };
+  for (const malformed of [null, "text", { done: "x" }, { updatedAt: 1 }, { done: 3, next: [], updatedAt: 1 }, { done: "x", updatedAt: Infinity }]) {
+    assert.deepEqual(parseContextSnapshot({ version: 1, updatedAt: 7, attention, progress: malformed }), { version: 1, updatedAt: 7, attention });
+  }
 });
 
 test("plan phases end at sibling headings but retain nested checklists", () => {
