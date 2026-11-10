@@ -1,7 +1,7 @@
 ---
 name: code-critic
 description: Reviews implementation files for AI slop, bloat, and drift from the approved plan. Invoked by the review skill to catch quality issues.
-model: openai/gpt-6.1-sol
+model: openai-codex/gpt-6.1-sol
 thinking: high
 tools: read, grep, find, bash
 ---
