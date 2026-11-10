@@ -43,8 +43,9 @@ export type WorkflowActivityDisplay = { id: string; label: string; pass?: number
 export type WorkflowPlanDisplay = {
 	phase?: { index: number; count: number; title: string };
 	tasks: { completed: number; total: number };
-	phases?: Array<{ completed: number; total: number }>;
+	phases?: Array<{ completed: number; total: number; title?: string }>;
 	nextStep?: string;
+	current?: { tasks: Array<{ done: boolean; text: string }>; before: number; after: number };
 };
 
 export const WORKFLOW_ACTIVITIES = {

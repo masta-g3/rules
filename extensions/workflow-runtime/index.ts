@@ -28,11 +28,13 @@ import {
 import {
 	CONTEXT_ENTRY_TYPE,
 	NAMING_PROMPT,
+	PROGRESS_PROMPT,
 	contextSnapshot,
 	effectiveProjectCwd,
 	handOffAttention,
 	normalizeText,
 	parseContextSnapshot,
+	parseProgressNote,
 	questionAttention,
 	readTicketContext,
 	recentTranscript,
@@ -40,6 +42,7 @@ import {
 	stableRequestId,
 	ticketNamingInput,
 	type PiAgentHubContextV1,
+	type ProgressNote,
 	type SessionAttention,
 	type TicketContext,
 	type TranscriptEntry,
@@ -344,7 +347,7 @@ function applyEffects(
 	}
 }
 
-type MetadataOperation = "session name";
+type MetadataOperation = "session name" | "progress note";
 type MetadataStatus = MetadataIndicatorState & {
 	operation?: MetadataOperation;
 	result?: MetadataCallResult;
@@ -363,8 +366,10 @@ function rejectedMetadataText(raw: string | undefined): string {
 		: text;
 }
 
-function metadataParseContract(): string {
-	return "1–3 words, at most 32 characters, using letters and numbers only";
+function metadataParseContract(operation?: MetadataOperation): string {
+	return operation === "progress note"
+		? "a JSON object with a non-empty done or next sentence"
+		: "1–3 words, at most 32 characters, using letters and numbers only";
 }
 
 function metadataFailureNotice(kind: MetadataFailureKind | "parse"): string {
@@ -376,7 +381,7 @@ function metadataFailureNotice(kind: MetadataFailureKind | "parse"): string {
 }
 
 function metadataStatusReport(status: MetadataStatus): string {
-	if (status.state === "disabled") return "Session metadata extension: disabled\nSession naming model calls are off for this session.";
+	if (status.state === "disabled") return "Session metadata extension: disabled\nSession naming and progress model calls are off for this session.";
 	if (status.state === "ready") return "Session metadata extension: active\nNo metadata request has run in this session.";
 	if (status.state === "working") return `Session metadata: generating ${status.operation ?? "metadata"}`;
 	const result = status.result;
@@ -387,7 +392,7 @@ function metadataStatusReport(status: MetadataStatus): string {
 		result ? `Latency: ${result.latencyMs} ms` : undefined,
 		status.parsedResult ? `Parsed result: ${status.parsedResult}` : undefined,
 		status.failureKind === "parse" ? `Reason: The model response did not match the ${status.operation ?? "metadata"} contract.` : undefined,
-		status.failureKind === "parse" ? `Expected: ${metadataParseContract()}` : undefined,
+		status.failureKind === "parse" ? `Expected: ${metadataParseContract(status.operation)}` : undefined,
 		status.failureKind === "parse" ? `Received: ${rejectedMetadataText(result?.text)}` : undefined,
 		status.failureKind === "parse" ? "Action: No user action is required. Retry the operation; persistent failures need a prompt or parser fix." : undefined,
 		result?.failure?.message ? `Error: ${result.failure.message}` : undefined,
@@ -421,6 +426,9 @@ export default function workflowRuntime(
 	let generation = 0;
 	let automaticNamingStarted = false;
 	let currentAttention: SessionAttention | undefined;
+	let currentProgress: ProgressNote | undefined;
+	let progressTicketId: string | undefined;
+	let progressPending = false;
 	let deferredWorkflowInputs: Array<{ name: string; ticketId?: string; text: string }> = [];
 	let metadataEnabled = true;
 	let metadataStatus: MetadataStatus = { state: "ready" };
@@ -461,6 +469,7 @@ export default function workflowRuntime(
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
 		currentAttention = undefined;
+		currentProgress = undefined;
 		automaticNamingStarted = false;
 		lastAdvanceShortcutAt = 0;
 		ticketContext = undefined;
@@ -552,7 +561,7 @@ export default function workflowRuntime(
 	};
 
 	const publishContext = (attention?: SessionAttention) => {
-		const snapshot = contextSnapshot(ticketContext, attention, Date.now(), worktreeLifecycle);
+		const snapshot = contextSnapshot(ticketContext, attention, Date.now(), worktreeLifecycle, currentProgress);
 		const comparable = JSON.stringify({ ...snapshot, updatedAt: 0 });
 		if (comparable === lastPublishedContext) return;
 		lastPublishedContext = comparable;
@@ -597,6 +606,7 @@ export default function workflowRuntime(
 		applyBindingRead(bindingRead, bindingIssue);
 		const freshTicket = requestedTicket ?? (requestedTicketId ? { id: requestedTicketId } : undefined);
 		if (JSON.stringify(freshTicket) !== JSON.stringify(ticketContext)) {
+			if (freshTicket?.id !== progressTicketId) currentProgress = undefined;
 			ticketContext = freshTicket;
 			publishContext(currentAttention);
 		}
@@ -622,6 +632,7 @@ export default function workflowRuntime(
 		applyBindingRead(bindingRead, requestedBinding && !bindingRead.broken && !selectedTicket ? "Bound authored root does not contain the workflow ticket" : undefined);
 		const selected = selectedTicket ?? { id: ticketId };
 		const previousTicketName = ticketContext?.id === ticketId ? ticketName : undefined;
+		if (progressTicketId !== ticketId) currentProgress = undefined;
 		ticketContext = selected;
 		ticketName = selected.title ?? previousTicketName ?? (!rename ? pi.getSessionName() : undefined);
 		currentAttention = attention;
@@ -669,9 +680,28 @@ export default function workflowRuntime(
 		const initialName = pi.getSessionName();
 		const name = await callMetadata(ctx, "session name", NAMING_PROMPT, source, 64, sanitizeSessionName);
 		if (!name || requestGeneration !== generation || pi.getSessionName() !== initialName) return false;
-		if (explicit) { ticketContext = undefined; ticketName = undefined; publishContext(); }
+		if (explicit) { ticketContext = undefined; ticketName = undefined; currentProgress = undefined; publishContext(); }
 		pi.setSessionName(name);
 		return true;
+	};
+
+	const noteProgress = async (ctx: ExtensionContext) => {
+		if (!metadataEnabled || progressPending || process.env.PI_TMUX_SUBAGENTS_JOB_ID) return;
+		const transcript = recentTranscript(ctx.sessionManager.getBranch() as TranscriptEntry[]);
+		const input = ticketContext ? ticketNamingInput(ticketContext, transcript) : transcript;
+		if (!input) return;
+		const requestGeneration = generation;
+		const ticketId = ticketContext?.id;
+		progressPending = true;
+		try {
+			const note = await callMetadata(ctx, "progress note", PROGRESS_PROMPT, input, 128, parseProgressNote);
+			if (!note || requestGeneration !== generation) return;
+			currentProgress = { ...note, updatedAt: Date.now() };
+			progressTicketId = ticketId;
+			publishContext(currentAttention);
+		} finally {
+			progressPending = false;
+		}
 	};
 
 	pi.registerMessageRenderer(EVENT_TYPE, (message, { expanded }, theme) => {
@@ -738,7 +768,7 @@ export default function workflowRuntime(
 	});
 
 	pi.registerCommand("session-metadata-disable", {
-		description: "Disable session naming model calls",
+		description: "Disable session naming and progress model calls",
 		handler: async (_args, ctx) => {
 			if (!metadataEnabled) return ctx.ui.notify("Session metadata is already disabled.", "info");
 			metadataEnabled = false;
@@ -753,7 +783,7 @@ export default function workflowRuntime(
 	});
 
 	pi.registerCommand("session-metadata-enable", {
-		description: "Enable session naming model calls",
+		description: "Enable session naming and progress model calls",
 		handler: async (_args, ctx) => {
 			if (metadataEnabled) return ctx.ui.notify("Session metadata is already enabled.", "info");
 			metadataEnabled = true;
@@ -1179,12 +1209,15 @@ export default function workflowRuntime(
 		const requestGeneration = generation;
 		const stopReason = finalAssistantStopReason(event.messages);
 		await refreshPlan(ctx);
-		if (requestGeneration !== generation || !state.execution) return;
-		const result = transition(state, { type: "agent-end", stopReason });
-		if (result.effects.length) {
-			state = setState(pi, ctx, result.state);
-			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
+		if (requestGeneration !== generation) return;
+		if (state.execution) {
+			const result = transition(state, { type: "agent-end", stopReason });
+			if (result.effects.length) {
+				state = setState(pi, ctx, result.state);
+				applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
+			}
 		}
+		if (stopReason !== "aborted") void noteProgress(ctx);
 	});
 
 	pi.on("before_agent_start", async (event) => {
@@ -1246,6 +1279,8 @@ export default function workflowRuntime(
 		const branchContext = findLatestContext(branch);
 		const restoredContext = startsEmpty ? undefined : branchContext;
 		worktreeLifecycle = compactForkStartup || event.reason === "fork" ? branchContext?.worktree : restoredContext?.worktree;
+		currentProgress = restoredContext?.progress;
+		progressTicketId = restoredContext?.ticket?.id;
 		lastPublishedContext = branchContext ? JSON.stringify({ ...branchContext, updatedAt: 0 }) : "";
 		const restoredRequestQuestion = restoredContext?.attention?.kind === "question" && restoredContext.attention.requestId !== undefined;
 		currentAttention = restoredRequestQuestion ? undefined : restoredContext?.attention;
