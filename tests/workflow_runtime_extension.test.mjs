@@ -707,6 +707,39 @@ test("ticket context precedes native name, ordinary turns stay stable, and plan 
     await runtime.emit("tool_execution_end", { toolName: "edit" });
     assert.deepEqual(runtime.latest("workflow-runtime").plan.tasks, { completed: 1, total: 2 });
     assert.equal(runtime.latest("workflow-runtime").plan.nextStep, "Add tests");
+    assert.equal(runtime.latest("workflow-runtime").plan.current, undefined);
+    assert.deepEqual(runtime.latest("workflow-runtime").lens, {
+      doing: "Add tests",
+      stages: [{ label: "1", state: "active" }],
+      progress: { completed: 1, total: 2, unit: "tasks" },
+      list: { label: "PLAN", head: "Foundation", items: [{ state: "done", text: "Add contract" }, { state: "active", text: "Add tests" }], before: 0, after: 0 },
+    });
+    assert.ok(runtime.ctx.ui && runtime.renderWorkflow(80));
+    await runtime.commands.get("wf-todos").handler("", runtime.ctx);
+    assert.equal(runtime.operations.at(-1).kind, "custom");
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("a reload never republishes a stored lens after completion or unlinking", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    await runtime.emit("input", { source: "interactive", text: "/skill:commit meta-001" });
+    assert.equal(runtime.latest("workflow-runtime").lens.doing, "Archiving plan");
+    await runtime.tools.get("complete_workflow").execute("done", {}, undefined, undefined, runtime.ctx);
+    assert.equal(runtime.latest("workflow-runtime").lens, undefined);
+
+    const stale = { doing: "Stale work", progress: { completed: 1, total: 2 } };
+    for (const data of [
+      { activeStep: "commit", currentStepComplete: true, activity: { id: "commit-complete", label: "Commit complete" }, lens: stale },
+      { activeStep: "execute", lens: stale },
+    ]) {
+      // No steps forces a normalizing publish of the restored state on reload.
+      const reloaded = harness(cwd, [{ type: "custom", customType: "workflow-runtime", data }]);
+      await reloaded.emit("session_start", { reason: "reload" });
+      assert.equal(reloaded.branch.filter((entry) => entry.customType === "workflow-runtime").length, 2);
+      assert.equal(reloaded.latest("workflow-runtime").lens, undefined);
+    }
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
