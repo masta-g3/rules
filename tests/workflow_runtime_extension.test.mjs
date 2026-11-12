@@ -1060,16 +1060,16 @@ test("explicit session-name-refresh awaits its model result and reports", async 
 });
 
 test("session metadata models are fixed to Luna then Spark", async () => {
-  const active = { provider: "openai", id: "gpt-5.6-sol" };
+  const active = { provider: "openai-codex", id: "gpt-5.6-sol" };
   const candidates = new Map([
-    ["gpt-5.3-codex-spark", { provider: "openai", id: "gpt-5.3-codex-spark" }],
-    ["gpt-6-luna", { provider: "openai", id: "gpt-6-luna" }],
+    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
   ]);
   const authenticated = [];
   const resolved = await resolveSessionModels({
     model: active,
     modelRegistry: {
-      find(provider, id) { return provider === "openai" ? candidates.get(id) : undefined; },
+      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
       async getApiKeyAndHeaders(model) {
         authenticated.push(model.id);
         return { ok: true, apiKey: "test-key" };
@@ -1077,15 +1077,15 @@ test("session metadata models are fixed to Luna then Spark", async () => {
     },
   });
 
-  assert.deepEqual(resolved.map(({ model }) => model.id), ["gpt-6-luna", "gpt-5.3-codex-spark"]);
-  assert.deepEqual(authenticated, ["gpt-6-luna", "gpt-5.3-codex-spark"]);
+  assert.deepEqual(resolved.map(({ model }) => model.id), ["gpt-6-luna", "gpt-5.6-luna"]);
+  assert.deepEqual(authenticated, ["gpt-6-luna", "gpt-5.6-luna"]);
   assert.equal(authenticated.includes(active.id), false);
 });
 
 test("metadata calls use medium reasoning, five seconds, and skip unsupported models", async () => {
   const candidates = new Map([
-    ["gpt-5.3-codex-spark", { provider: "openai", id: "gpt-5.3-codex-spark" }],
-    ["gpt-6-luna", { provider: "openai", id: "gpt-6-luna" }],
+    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
   ]);
   const options = [];
   let clock = 0;
@@ -1102,37 +1102,37 @@ test("metadata calls use medium reasoning, five seconds, and skip unsupported mo
   });
   const ctx = {
     modelRegistry: {
-      find(provider, id) { return provider === "openai" ? candidates.get(id) : undefined; },
+      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
       async getApiKeyAndHeaders() { return { ok: true, apiKey: "test-key" }; },
     },
   };
 
   const first = await call(ctx, "prompt", "input", 64);
   assert.equal(first.outcome, "success");
-  assert.equal(first.model, "gpt-5.3-codex-spark");
+  assert.equal(first.model, "gpt-5.6-luna");
   assert.deepEqual(first.attempts.map((attempt) => [attempt.model, attempt.failure?.kind ?? attempt.outcome]), [
     ["gpt-6-luna", "unsupported"],
-    ["gpt-5.3-codex-spark", "success"],
+    ["gpt-5.6-luna", "success"],
   ]);
   assert.ok(options.every((item) => item.reasoningEffort === "medium" && item.timeoutMs === 5_000));
 
   options.length = 0;
   const second = await call(ctx, "prompt", "input", 64);
   assert.equal(second.outcome, "success");
-  assert.deepEqual(options.map((item) => item.model), ["gpt-5.3-codex-spark"]);
+  assert.deepEqual(options.map((item) => item.model), ["gpt-5.6-luna"]);
   assert.deepEqual(second.skippedModels, ["gpt-6-luna"]);
 
   call.reset();
   options.length = 0;
   const afterReset = await call(ctx, "prompt", "input", 64);
   assert.equal(afterReset.outcome, "success");
-  assert.deepEqual(options.map((item) => item.model), ["gpt-6-luna", "gpt-5.3-codex-spark"]);
+  assert.deepEqual(options.map((item) => item.model), ["gpt-6-luna", "gpt-5.6-luna"]);
 });
 
 test("a reset isolates unsupported-model state from an older in-flight call", async () => {
   const candidates = new Map([
-    ["gpt-5.3-codex-spark", { provider: "openai", id: "gpt-5.3-codex-spark" }],
-    ["gpt-6-luna", { provider: "openai", id: "gpt-6-luna" }],
+    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
   ]);
   const attempted = [];
   let finishOldLuna;
@@ -1150,7 +1150,7 @@ test("a reset isolates unsupported-model state from an older in-flight call", as
   });
   const ctx = {
     modelRegistry: {
-      find(provider, id) { return provider === "openai" ? candidates.get(id) : undefined; },
+      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
       async getApiKeyAndHeaders() { return { ok: true, apiKey: "test-key" }; },
     },
   };
@@ -1169,13 +1169,13 @@ test("a reset isolates unsupported-model state from an older in-flight call", as
 
 test("metadata model resolution distinguishes missing authentication", async () => {
   const candidates = new Map([
-    ["gpt-5.3-codex-spark", { provider: "openai", id: "gpt-5.3-codex-spark" }],
-    ["gpt-6-luna", { provider: "openai", id: "gpt-6-luna" }],
+    ["gpt-5.6-luna", { provider: "openai-codex", id: "gpt-5.6-luna" }],
+    ["gpt-6-luna", { provider: "openai-codex", id: "gpt-6-luna" }],
   ]);
   const call = createSessionModelCall({ complete: async () => assert.fail("completion must not run") });
   const result = await call({
     modelRegistry: {
-      find(provider, id) { return provider === "openai" ? candidates.get(id) : undefined; },
+      find(provider, id) { return provider === "openai-codex" ? candidates.get(id) : undefined; },
       async getApiKeyAndHeaders() { return { ok: false }; },
     },
   }, "prompt", "input", 64);
@@ -1236,7 +1236,7 @@ test("metadata status badge and command report timeout without login advice", as
       model: "gpt-6-luna",
       latencyMs: 5_000,
       attempts: [{ model: "gpt-6-luna", latencyMs: 5_000, outcome: "failure", failure: { kind: "timeout", message: "Request timed out after 5000ms" } }],
-      skippedModels: ["gpt-5.3-codex-spark"],
+      skippedModels: ["gpt-5.6-luna"],
     }));
     await runtime.emit("session_start", { reason: "new" });
     assert.equal(runtime.status("session-metadata"), undefined);
@@ -1255,7 +1255,7 @@ test("metadata status badge and command report timeout without login advice", as
     assert.match(report, /gpt-6-luna/);
     assert.match(report, /5000 ms/);
     assert.match(report, /timeout/i);
-    assert.match(report, /gpt-5\.3-codex-spark/);
+    assert.match(report, /gpt-5\.6-luna/);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -1273,7 +1273,7 @@ test("authentication failures use the auth badge and login advice", async () => 
     await settle();
     assert.match(runtime.renderWorkflow(80), /◇× meta/);
     const warning = runtime.operations.find((item) => item.kind === "notify" && item.level === "warning");
-    assert.match(warning.message, /\/login openai\./);
+    assert.match(warning.message, /\/login openai-codex\./);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
