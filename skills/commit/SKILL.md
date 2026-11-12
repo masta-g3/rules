@@ -15,6 +15,7 @@ When the tools are available:
 - Before starting, call `set_workflow_step` with `stepId: "commit"`. Changing the indicator does not authorize additional work.
 - The initial activity is `archiving-plan`; do not duplicate that signal.
 - Call `set_workflow_activity` with `committing-changes` before staging and committing.
+- When instructed to push, call `set_workflow_activity` with `pushing-changes` before `git push`.
 - After meeting the completion requirements below, call `complete_workflow` once as the final action before the output. If a commit fails or closeout is blocked, leave Commit active.
 
 #### Worktree tooling

@@ -46,6 +46,15 @@ export type WorkflowPlanDisplay = {
 	phases?: Array<{ completed: number; total: number; title?: string }>;
 	nextStep?: string;
 	current?: { tasks: Array<{ done: boolean; text: string }>; before: number; after: number };
+	criteria?: number;
+};
+
+export type WorkflowCommitFact = { repo: string; hash: string; subject: string };
+export type WorkflowStepFacts = {
+	questions?: { answered: number; waiting?: { count: number; text: string; requestId: string } };
+	commits?: WorkflowCommitFact[];
+	closeout?: { archived?: true; ticketDone?: true };
+	pushed?: true;
 };
 
 export const WORKFLOW_ACTIVITIES = {
@@ -71,6 +80,7 @@ export const WORKFLOW_ACTIVITIES = {
 	commit: [
 		{ id: "archiving-plan", label: "Archiving plan", stage: "archive" },
 		{ id: "committing-changes", label: "Committing changes", stage: "commit" },
+		{ id: "pushing-changes", label: "Pushing changes", stage: "push" },
 	],
 } as const;
 
@@ -89,6 +99,44 @@ export type WorkflowLens = {
 };
 
 const LENS_STAGES = 12;
+const LENS_ITEMS = 12;
+
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+const boundedText = (value: string, max = 120) => [...value].slice(0, max).join("");
+type LensList = NonNullable<WorkflowLens["list"]>;
+type LensItem = LensList["items"][number];
+
+function planList(state: WorkflowState): LensList | undefined {
+	const plan = state.plan;
+	const questions = state.stepFacts?.questions;
+	const passes = state.activityPasses?.["reviewing-plan"] ?? 0;
+	const items: LensItem[] = [];
+	if (questions?.answered) items.push({ state: "done", text: `${questions.answered} answered` });
+	if (questions?.waiting) items.push({ state: "attention", text: boundedText(`${questions.waiting.count} waiting: ${questions.waiting.text}`) });
+	if (passes) items.push({ state: state.activity?.id === "reviewing-plan" ? "active" : "done", text: `critic pass ${passes}` });
+	// The list needs an item, so a written plan with nothing else to list shows its first critic pass as pending.
+	else if (plan && !items.length) items.push({ state: "pending", text: "critic pass 1" });
+	if (!items.length) return undefined;
+	const head = plan
+		? [plan.phase ? plural(plan.phase.count, "phase") : "", plural(plan.tasks.total, "task"), plan.criteria ? `${plan.criteria} ${plan.criteria === 1 ? "criterion" : "criteria"}` : ""].filter(Boolean).join(" · ")
+		: undefined;
+	return { label: "PLAN", ...(head ? { head } : {}), items, before: 0, after: 0 };
+}
+
+function commitList(state: WorkflowState): LensList | undefined {
+	const facts = state.stepFacts;
+	const commits = facts?.commits ?? [];
+	const items: LensItem[] = [
+		...(facts?.closeout?.archived ? [{ state: "done" as const, text: "Plan archived" }] : []),
+		...(facts?.closeout?.ticketDone ? [{ state: "done" as const, text: state.ticketId ? `Ticket ${state.ticketId} done` : "Ticket done" }] : []),
+		...commits.map((commit) => ({ state: "done" as const, text: boundedText(`${commit.repo} ${commit.hash} ${commit.subject}`) })),
+		...(facts?.pushed ? [{ state: state.currentStepComplete ? "done" as const : "active" as const, text: "push" }] : []),
+	];
+	if (!items.length) return undefined;
+	// Keep the latest closeout items; earlier ones are counted.
+	const shown = items.slice(-LENS_ITEMS);
+	return { label: "CLOSE", ...(commits.length ? { head: plural(commits.length, "commit") } : {}), items: shown, before: items.length - shown.length, after: 0 };
+}
 
 const stageState = (index: number, active: number): LensStage["state"] => index < active ? "done" : index === active ? "active" : "pending";
 
@@ -123,19 +171,24 @@ function executeLens(plan: WorkflowPlanDisplay): WorkflowLens {
 function activityLens(state: WorkflowState, step: StepName): WorkflowLens | undefined {
 	if (!state.activity) return undefined;
 	const definitions = activitiesOf(step);
-	const stages = [...new Set(definitions.map((item) => item.stage))];
+	// Push is a Commit stage only once the run reaches it.
+	const stages = [...new Set(definitions.map((item) => item.stage))].filter((stage) => stage !== "push" || state.stepFacts?.pushed);
 	const current = definitions.find((item) => item.id === state.activity!.id)?.stage;
-	const active = current ? stages.indexOf(current) : -1;
+	const active = state.currentStepComplete ? stages.length : current ? stages.indexOf(current) : -1;
+	const list = step === "plan-md" ? planList(state) : step === "commit" ? commitList(state) : undefined;
 	const pass = Math.max(0, ...definitions.filter((item) => item.review).map((item) => state.activityPasses?.[item.id] ?? 0));
 	return {
 		doing: state.activity.label,
 		...(stages.length ? { stages: stages.map((label, index) => ({ label, state: stageState(index, active) })) } : {}),
 		...(pass > 1 ? { pass } : {}),
+		...(list ? { list } : {}),
 	};
 }
 
 export function workflowLens(state: WorkflowState): WorkflowLens | undefined {
-	if (!state.activeStep || state.currentStepComplete) return undefined;
+	if (!state.activeStep) return undefined;
+	// A completed Commit keeps its closeout as the card's final state.
+	if (state.currentStepComplete && state.activeStep !== "commit") return undefined;
 	if (state.activeStep === "execute") return state.plan ? executeLens(state.plan) : undefined;
 	return activityLens(state, state.activeStep);
 }
@@ -148,13 +201,14 @@ export type WorkflowState = {
 	activity?: WorkflowActivityDisplay;
 	activityPasses?: Record<string, number>;
 	plan?: WorkflowPlanDisplay;
+	stepFacts?: WorkflowStepFacts;
 	currentStepComplete?: boolean;
 	source?: WorkflowSource;
 	updatedAt?: number;
 };
 
 export function setWorkflowTicketState(state: WorkflowState, ticketId: string | undefined, source?: WorkflowSource): WorkflowState {
-	const { plan: _plan, activity: _activity, activityPasses: _passes, currentStepComplete: _complete, worktreeRecord: _binding, ...withoutStepRun } = state;
+	const { plan: _plan, activity: _activity, activityPasses: _passes, stepFacts: _facts, currentStepComplete: _complete, worktreeRecord: _binding, ...withoutStepRun } = state;
 	return {
 		...(state.ticketId === ticketId ? state : withoutStepRun),
 		ticketId,
@@ -163,7 +217,7 @@ export function setWorkflowTicketState(state: WorkflowState, ticketId: string | 
 }
 
 export function unlinkWorkflowTicketState(state: WorkflowState, source?: WorkflowSource): WorkflowState {
-	const { ticketId: _ticketId, plan: _plan, execution: _execution, ...unlinked } = state;
+	const { ticketId: _ticketId, plan: _plan, execution: _execution, stepFacts: _facts, ...unlinked } = state;
 	return { ...unlinked, ...(source ? { source } : {}) };
 }
 
@@ -175,6 +229,7 @@ export function startWorkflowStep(state: WorkflowState, step: StepName, source?:
 		execution: undefined,
 		activity: first ? { id: first.id, label: first.label } : undefined,
 		activityPasses: {},
+		stepFacts: undefined,
 		currentStepComplete: undefined,
 		...(source ? { source } : {}),
 	};
@@ -193,6 +248,7 @@ export function setWorkflowActivity(state: WorkflowState, activityId: string): W
 	const pass = definition.review ? (passes[activityId] ?? 1) : undefined;
 	return {
 		...state,
+		...(activityId === "pushing-changes" ? { stepFacts: { ...state.stepFacts, pushed: true as const } } : {}),
 		activityPasses: passes,
 		activity: { id: definition.id, label: definition.label, ...(pass && pass > 1 ? { pass } : {}) },
 		currentStepComplete: definition.terminal ? true : undefined,
@@ -206,7 +262,7 @@ export function restoreReachedDone(state: WorkflowState): WorkflowState {
 }
 
 export type WorkflowRuntimeEntryData = Omit<WorkflowState, "plan"> & {
-	plan?: Omit<WorkflowPlanDisplay, "current">;
+	plan?: Omit<WorkflowPlanDisplay, "current" | "criteria">;
 	steps: WorkflowStepDefinition[];
 	activeMode?: WorkflowModeDisplay;
 	lens?: WorkflowLens;
@@ -221,11 +277,11 @@ export function withWorkflowDefinition(state: WorkflowState): WorkflowRuntimeEnt
 		? { ...FOCUS_MODE_DISPLAY, detail: `turn ${state.execution.turnsCompleted}` }
 		: undefined;
 	const lens = workflowLens(state);
-	// The task window feeds only the lens; the published plan keeps counts and phases.
-	const { current: _current, ...plan } = state.plan ?? {};
+	// The task window and criteria count feed only the lens; the published plan keeps counts and phases.
+	const { current: _current, criteria: _criteria, ...plan } = state.plan ?? {};
 	return {
 		...state,
-		...(state.plan ? { plan: plan as Omit<WorkflowPlanDisplay, "current"> } : {}),
+		...(state.plan ? { plan: plan as Omit<WorkflowPlanDisplay, "current" | "criteria"> } : {}),
 		steps: WORKFLOW_DEFINITION.map((step) => ({ ...step })),
 		...(activeMode ? { activeMode } : {}),
 		...(lens ? { lens } : {}),

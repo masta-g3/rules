@@ -2,6 +2,7 @@ import { keyHint, type ExtensionAPI, type ExtensionContext } from "@earendil-wor
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Box, Spacer, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { basename } from "node:path";
 import { Type } from "typebox";
 import {
 	completeWorkflow,
@@ -55,6 +56,7 @@ import {
 	type SessionModelCall,
 } from "./session-model.ts";
 import { applyPlanWidget } from "./plan-widget.ts";
+import { baselines, closeoutKinds, mergeCommits, newCommits, runsGitCommit, workspaceRepos, type RepoBaseline, type WorkspaceRepo } from "./commit-facts.ts";
 import { readWorkflowPlan } from "./workflow-plan.ts";
 import { brokenWorktreeSnapshot, clearedWorktreeSnapshot, projectWorktreeSnapshot, readWorktreeBinding, type WorktreeLifecycleSnapshot } from "./worktree-context.ts";
 import { TodoPanel, TODO_PANEL_OVERLAY_OPTIONS, TODO_PANEL_SHORTCUT } from "./todo-panel.ts";
@@ -432,6 +434,10 @@ export default function workflowRuntime(
 	let progressTicketId: string | undefined;
 	let progressPending = false;
 	let deferredWorkflowInputs: Array<{ name: string; ticketId?: string; text: string }> = [];
+	// Commit-step bash calls in flight: their step run, closeout kinds and each workspace repo's HEAD reflog length at start.
+	const pendingCommitCalls = new Map<string, { run: number; closeout: Array<"archived" | "ticketDone">; repos?: RepoBaseline[] }>();
+	// Changes whenever step facts reset, so late tool completions cannot write into a later step run.
+	let factsRun = 0;
 	let metadataEnabled = true;
 	let metadataStatus: MetadataStatus = { state: "ready" };
 	let settledMetadataStatus = metadataStatus;
@@ -447,6 +453,11 @@ export default function workflowRuntime(
 	};
 
 	const setState = (pi: ExtensionAPI, ctx: ExtensionContext, nextState: WorkflowState): WorkflowState => {
+		// A new step run or ticket, or facts that were just cleared, start a new facts run.
+		if (nextState.activeStep !== state.activeStep || nextState.ticketId !== state.ticketId || (state.stepFacts && !nextState.stepFacts)) {
+			factsRun += 1;
+			pendingCommitCalls.clear();
+		}
 		const updated = { ...nextState, updatedAt: Date.now() };
 		persistState(pi, updated);
 		applyWidget(ctx, updated, metadataStatus);
@@ -455,6 +466,13 @@ export default function workflowRuntime(
 	};
 
 	const clearWorkflowRail = (pi: ExtensionAPI, ctx: ExtensionContext): WorkflowState => setState(pi, ctx, {});
+
+	// Every step start, even of the same step, begins a new facts run that drops calls still in flight.
+	const startStep = (base: WorkflowState, step: StepName, source: Parameters<typeof startWorkflowStep>[2]): WorkflowState => {
+		factsRun += 1;
+		pendingCommitCalls.clear();
+		return startWorkflowStep(base, step, source);
+	};
 
 	const clearTaskState = (
 		ctx: ExtensionContext,
@@ -863,7 +881,7 @@ export default function workflowRuntime(
 				const interrupted = state.execution
 					? transition(state, { type: "end-focus" })
 					: { state, effects: [] as RuntimeEffect[] };
-				state = setState(pi, ctx, startWorkflowStep(interrupted.state, params.stepId, "tool"));
+				state = setState(pi, ctx, startStep(interrupted.state, params.stepId, "tool"));
 				await refreshPlan(ctx);
 				applyEffects(pi, ctx, () => state, interrupted.effects, continuationQueue);
 			}
@@ -1078,7 +1096,7 @@ export default function workflowRuntime(
 			}
 
 			generation += 1;
-			state = setState(pi, ctx, startWorkflowStep(state, nextStep, "shortcut"));
+			state = setState(pi, ctx, startStep(state, nextStep, "shortcut"));
 			pi.sendUserMessage(command);
 		},
 	});
@@ -1118,7 +1136,7 @@ export default function workflowRuntime(
 				? transition(state, { type: "end-focus" })
 				: { state, effects: [] as RuntimeEffect[] };
 			const selectedTicket = extractSkillTicket(text) ?? state.ticketId;
-			state = setState(pi, ctx, startWorkflowStep(setWorkflowTicketState(interrupted.state, selectedTicket, "input"), stepName, "input"));
+			state = setState(pi, ctx, startStep(setWorkflowTicketState(interrupted.state, selectedTicket, "input"), stepName, "input"));
 			if (selectedTicket && selectedTicket !== ticketContext?.id) await selectTicket(ctx, selectedTicket);
 			else if (!selectedTicket && !pi.getSessionName()) void generateName(ctx, normalizeText(text, 1_500) ?? "", false);
 			await refreshPlan(ctx);
@@ -1180,6 +1198,14 @@ export default function workflowRuntime(
 		deferredWorkflowInputs = [];
 	});
 
+	const workspaceRepoPaths = async (ctx: ExtensionContext): Promise<WorkspaceRepo[]> => {
+		if (state.worktreeRecord && state.ticketId) {
+			const binding = await readBinding(state.worktreeRecord, state.ticketId);
+			if (binding) return binding.snapshot.repositories?.map((repo) => ({ path: repo.worktreePath, label: basename(repo.worktreePath) })) ?? [];
+		}
+		return workspaceRepos(ctx.cwd);
+	};
+
 	pi.on("tool_execution_start", async (event, ctx) => {
 		if (event.toolName === "ask_user_question") {
 			const attention = questionAttention(event.toolCallId, event.args);
@@ -1187,7 +1213,27 @@ export default function workflowRuntime(
 				currentAttention = attention;
 				publishContext(attention);
 			}
-			if (state.activeStep === "plan-md") state = setState(pi, ctx, setWorkflowActivity(state, "clarifying-requirements"));
+			if (state.activeStep === "plan-md") {
+				const questions = (event.args as { questions?: Array<{ question?: unknown }> } | undefined)?.questions;
+				const text = Array.isArray(questions) ? normalizeText(questions[0]?.question, 100) : undefined;
+				const requestId = stableRequestId(event.toolCallId);
+				const answered = state.stepFacts?.questions?.answered ?? 0;
+				const waiting = text && requestId ? { count: questions!.length, text, requestId } : undefined;
+				// A question during critic review keeps the critic stage; earlier questions publish clarification.
+				const critic = WORKFLOW_ACTIVITIES["plan-md"].some((item) => item.stage === "critic" && item.id === state.activity?.id);
+				const base = critic ? state : setWorkflowActivity(state, "clarifying-requirements");
+				state = setState(pi, ctx, { ...base, stepFacts: { ...state.stepFacts, questions: { answered, ...(waiting ? { waiting } : {}) } } });
+			}
+			return;
+		}
+		if (event.toolName === "bash" && state.activeStep === "commit" && !state.currentStepComplete) {
+			const command = (event.args as { command?: unknown } | undefined)?.command;
+			if (typeof command !== "string") return;
+			const run = factsRun;
+			const closeout = closeoutKinds(command);
+			// Recorded before the command runs: Pi awaits start handlers before executing the tool.
+			const repos = runsGitCommit(command) ? await baselines(await workspaceRepoPaths(ctx)) : undefined;
+			if (run === factsRun && (closeout.length || repos)) pendingCommitCalls.set(event.toolCallId, { run, closeout, ...(repos ? { repos } : {}) });
 			return;
 		}
 		if (event.toolName !== "tmux_subagent") return;
@@ -1206,6 +1252,26 @@ export default function workflowRuntime(
 			if (requestId && currentAttention?.kind === "question" && currentAttention.requestId === requestId) {
 				currentAttention = undefined;
 				publishContext();
+			}
+			// Only the open call of this Plan run counts; a step change already reset the facts.
+			const questions = state.stepFacts?.questions;
+			if (requestId && questions?.waiting?.requestId === requestId) {
+				const answered = questions.answered + (event.isError ? 0 : questions.waiting.count);
+				state = setState(pi, ctx, { ...state, stepFacts: { ...state.stepFacts, questions: { answered } } });
+			}
+		}
+		const pending = pendingCommitCalls.get(event.toolCallId);
+		if (pending) {
+			pendingCommitCalls.delete(event.toolCallId);
+			// Commits are read from each repo's reflog, so one repo's success counts even when the call failed overall.
+			const found = pending.repos ? await newCommits(pending.repos) : [];
+			// Merge into the state as it is now: parallel calls and step changes may have landed during the read.
+			if (pending.run === factsRun) {
+				const commits = mergeCommits(state.stepFacts?.commits ?? [], found);
+				const closed = event.isError ? [] : pending.closeout;
+				const closeout = closed.length ? { ...state.stepFacts?.closeout, ...Object.fromEntries(closed.map((kind) => [kind, true as const])) } : state.stepFacts?.closeout;
+				const stepFacts = { ...state.stepFacts, ...(commits.length ? { commits } : {}), ...(closeout ? { closeout } : {}) };
+				if (JSON.stringify(stepFacts) !== JSON.stringify(state.stepFacts ?? {})) state = setState(pi, ctx, { ...state, stepFacts });
 			}
 		}
 		if (state.activeStep && (state.worktreeRecord || ticketContext?.planFile)) await refreshPlan(ctx);
@@ -1280,6 +1346,8 @@ export default function workflowRuntime(
 		applyMetadataStatus(ctx);
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
+		pendingCommitCalls.clear();
+		factsRun += 1;
 		const branch = ctx.sessionManager.getBranch();
 		const startsEmpty = compactForkStartup || event.reason === "new" || event.reason === "fork";
 		const branchContext = findLatestContext(branch);
@@ -1294,7 +1362,12 @@ export default function workflowRuntime(
 			ticketContext = restoredContext?.ticket;
 			publishContext();
 		}
-		const restored = event.reason === "new" ? { state: {} } : findLatestState(branch);
+		const latest = event.reason === "new" ? { state: {} as WorkflowState } : findLatestState(branch);
+		// Like request-backed question attention, an open question cannot survive the process boundary.
+		const staleWaiting = latest.state.stepFacts?.questions?.waiting !== undefined;
+		const restored = staleWaiting
+			? { ...latest, state: { ...latest.state, stepFacts: { ...latest.state.stepFacts, questions: { answered: latest.state.stepFacts!.questions!.answered } } } }
+			: latest;
 		const boundaryReason = compactForkStartup ? "fork" : event.reason;
 		const result = transition(restored.state, { type: "session-boundary", reason: boundaryReason });
 		const normalizeDefinition = shouldNormalizeWorkflowDefinition(
@@ -1314,7 +1387,7 @@ export default function workflowRuntime(
 			ticketContext = undefined;
 			ticketName = undefined;
 		}
-		if (result.effects.length || normalizeDefinition) {
+		if (result.effects.length || normalizeDefinition || staleWaiting) {
 			state = setState(pi, ctx, result.state);
 			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
 		} else {
