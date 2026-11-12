@@ -36,6 +36,7 @@ import {
   sanitizeSessionName,
 } from "../extensions/workflow-runtime/session-context.ts";
 import { parseWorkflowPlan } from "../extensions/workflow-runtime/workflow-plan.ts";
+import { closeoutKinds, runsGitCommit } from "../extensions/workflow-runtime/commit-facts.ts";
 
 const expectedWorkflowDefinition = [
   { id: "plan-md", short: "PL", label: "Plan" },
@@ -110,7 +111,7 @@ test("activity labels use the approved concise display without changing ids", ()
     "reviewing-plan": "Reviewing plan", "updating-plan": "Updating plan", "plan-ready": "Plan ready",
     "reviewing-implementation": "Reviewing changes", "fixing-review-findings": "Fixing findings", "review-complete": "Review complete",
     "reviewing-guidance": "Reviewing guidance", "updating-guidance": "Updating guidance", "reflection-complete": "Reflection complete",
-    "archiving-plan": "Archiving plan", "committing-changes": "Committing changes",
+    "archiving-plan": "Archiving plan", "committing-changes": "Committing changes", "pushing-changes": "Pushing changes",
   });
 });
 
@@ -123,7 +124,7 @@ test("effective project cwd accepts only an absolute managed root", () => {
 });
 
 test("producer activities validate steps and count critic passes", () => {
-  assert.deepEqual(WORKFLOW_ACTIVITIES.commit.map(({ label }) => label), ["Archiving plan", "Committing changes"]);
+  assert.deepEqual(WORKFLOW_ACTIVITIES.commit.map(({ label }) => label), ["Archiving plan", "Committing changes", "Pushing changes"]);
   let state = startWorkflowStep({}, "plan-md", "input");
   assert.equal(state.activity.label, "Inspecting code");
   state = setWorkflowActivity(state, "reviewing-plan");
@@ -355,7 +356,7 @@ test("other steps publish a lens from activity stages and review passes", () => 
   const stageLabels = Object.fromEntries(Object.entries(WORKFLOW_ACTIVITIES).map(([step, items]) => [step, items.map((item) => item.stage)]));
   assert.deepEqual(stageLabels, {
     "plan-md": ["inspect", "scope", "write", "critic", "critic", "ready"], execute: [],
-    review: ["review", "fix", "done"], reflect: ["review", "update", "done"], commit: ["archive", "commit"],
+    review: ["review", "fix", "done"], reflect: ["review", "update", "done"], commit: ["archive", "commit", "push"],
   });
   const planStages = (states) => ["inspect", "scope", "write", "critic", "ready"].map((label, index) => ({ label, state: states[index] }));
   let plan = startWorkflowStep({}, "plan-md");
@@ -379,7 +380,70 @@ test("other steps publish a lens from activity stages and review passes", () => 
   });
 
   assert.equal(withWorkflowDefinition({}).lens, undefined);
-  assert.equal(withWorkflowDefinition(completeWorkflow(startWorkflowStep({}, "commit"))).lens, undefined);
+  assert.deepEqual(withWorkflowDefinition(completeWorkflow(startWorkflowStep({}, "commit"))).lens, {
+    doing: "Commit complete", stages: [{ label: "archive", state: "done" }, { label: "commit", state: "done" }],
+  });
+});
+
+test("parseWorkflowPlan counts acceptance criteria under their heading only", () => {
+  const text = "## Phase 1: Build\n- [ ] A\n## Acceptance Criteria\n- [ ] One\n- [x] Two\n### Notes\n- [ ] Three\n## Risks\n- [ ] Not a criterion\n```\n- [ ] fenced\n```";
+  assert.equal(parseWorkflowPlan(text).projection.criteria, 3);
+  assert.equal(parseWorkflowPlan("## Phase 1: Build\n- [ ] A").projection.criteria, undefined);
+  // The criteria count feeds the lens only.
+  assert.equal("criteria" in withWorkflowDefinition({ activeStep: "plan-md", plan: parseWorkflowPlan(text).projection }).plan, false);
+});
+
+test("plan-md lens lists plan facts, answered and waiting questions, and the critic pass", () => {
+  let plan = startWorkflowStep({}, "plan-md");
+  assert.equal(withWorkflowDefinition(plan).lens.list, undefined);
+  plan = { ...setWorkflowActivity(plan, "clarifying-requirements"), stepFacts: { questions: { answered: 4, waiting: { count: 1, text: "Keep the button?", requestId: "r" } } } };
+  assert.deepEqual(withWorkflowDefinition(plan).lens.list, {
+    label: "PLAN", items: [{ state: "done", text: "4 answered" }, { state: "attention", text: "1 waiting: Keep the button?" }], before: 0, after: 0,
+  });
+  const phases = "## Phase 1: A\n- [ ] a\n- [ ] b\n## Phase 2: B\n- [ ] c\n## Acceptance Criteria\n- [ ] x\n- [ ] y";
+  plan = { ...plan, plan: parseWorkflowPlan(phases).projection, stepFacts: { questions: { answered: 4 } } };
+  assert.deepEqual(withWorkflowDefinition(plan).lens.list, {
+    label: "PLAN", head: "2 phases · 3 tasks · 2 criteria", items: [{ state: "done", text: "4 answered" }], before: 0, after: 0,
+  });
+  assert.deepEqual(withWorkflowDefinition({ ...plan, stepFacts: undefined }).lens.list.items, [{ state: "pending", text: "critic pass 1" }]);
+  plan = setWorkflowActivity(plan, "reviewing-plan");
+  assert.deepEqual(withWorkflowDefinition(plan).lens.list.items.at(-1), { state: "active", text: "critic pass 1" });
+  plan = setWorkflowActivity(setWorkflowActivity(plan, "reviewing-plan"), "updating-plan");
+  assert.deepEqual(withWorkflowDefinition(plan).lens.list.items.at(-1), { state: "done", text: "critic pass 2" });
+
+  assert.equal(startWorkflowStep(plan, "execute").stepFacts, undefined);
+  assert.equal(unlinkWorkflowTicketState({ ...plan, ticketId: "x-001" }).stepFacts, undefined);
+  assert.equal(setWorkflowTicketState({ ...plan, ticketId: "x-001" }, "y-001").stepFacts, undefined);
+});
+
+test("commit lens lists closeout and commits, shows push once reached, and stays after completion", () => {
+  let commit = startWorkflowStep({ ticketId: "x-001" }, "commit");
+  commit = { ...setWorkflowActivity(commit, "committing-changes"), stepFacts: {
+    closeout: { archived: true, ticketDone: true },
+    commits: [{ repo: "pi-agent-hub", hash: "3f9c2e1", subject: "Add step lens contract" }, { repo: "rules", hash: "a1b2c3d", subject: "Publish the workflow lens" }],
+  } };
+  assert.deepEqual(withWorkflowDefinition(commit).lens, {
+    doing: "Committing changes",
+    stages: [{ label: "archive", state: "done" }, { label: "commit", state: "active" }],
+    list: { label: "CLOSE", head: "2 commits", items: [
+      { state: "done", text: "Plan archived" }, { state: "done", text: "Ticket x-001 done" },
+      { state: "done", text: "pi-agent-hub 3f9c2e1 Add step lens contract" }, { state: "done", text: "rules a1b2c3d Publish the workflow lens" },
+    ], before: 0, after: 0 },
+  });
+  const done = withWorkflowDefinition(completeWorkflow(commit)).lens;
+  assert.deepEqual(done.stages, [{ label: "archive", state: "done" }, { label: "commit", state: "done" }]);
+  assert.equal(done.list.items.length, 4);
+
+  const pushed = setWorkflowActivity(commit, "pushing-changes");
+  assert.equal(pushed.stepFacts.pushed, true);
+  assert.deepEqual(withWorkflowDefinition(pushed).lens.stages.map((stage) => stage.state), ["done", "done", "active"]);
+  const finished = withWorkflowDefinition(completeWorkflow(pushed)).lens;
+  assert.deepEqual(finished.stages, [{ label: "archive", state: "done" }, { label: "commit", state: "done" }, { label: "push", state: "done" }]);
+  assert.deepEqual(finished.list.items.at(-1), { state: "done", text: "push" });
+
+  const many = { ...commit, stepFacts: { closeout: { archived: true }, commits: Array.from({ length: 14 }, (_, index) => ({ repo: `r${index}`, hash: "abc1234", subject: `S${index}` })) } };
+  const list = withWorkflowDefinition(many).lens.list;
+  assert.deepEqual([list.head, list.items.length, list.before, list.after, list.items.at(-1).text], ["14 commits", 12, 3, 0, "r13 abc1234 S13"]);
 });
 
 test("focus entries publish one producer-owned active mode display", () => {
@@ -656,4 +720,23 @@ test("continuation queue deduplicates and rejects stale runs", () => {
   activeRunId = "run-2";
   scheduled.shift()();
   assert.deepEqual(delivered, ["run-1"]);
+});
+
+test("commit and closeout detection reads executables and subcommands, not text", () => {
+  for (const command of [
+    "git commit -m x", `git -C "/tmp/my repo" commit -m 'a; b'`, "cd app && /usr/bin/git -c user.name=x commit -am y",
+    "GIT_AUTHOR_NAME=x git commit -m z", "git add -A; git commit --amend --no-edit", "(cd lib && git commit -m w)",
+    "git -C app \\\n  commit -m x", `git -C "app" com\\\nmit -m "multi \\\nline"`,
+  ]) assert.equal(runsGitCommit(command), true, command);
+  for (const command of [
+    "git log --grep=commit", "echo git commit", `git log -m "git commit"`, "git -C commit status", "gh pr commit", "git show HEAD:commit",
+  ]) assert.equal(runsGitCommit(command), false, command);
+
+  assert.deepEqual(closeoutKinds(`"$SKILLS_ROOT/commit/scripts/archive_plan.sh" plan.md x && "$SKILLS_ROOT/_lib/features_yaml.sh" complete t-001 --plan-file h.md`), ["archived", "ticketDone"]);
+  assert.deepEqual(closeoutKinds("bash archive_plan.sh plan.md x"), ["archived"]);
+  assert.deepEqual(closeoutKinds("features_yaml.sh \\\n  complete t-001"), ["ticketDone"]);
+  assert.deepEqual(closeoutKinds("features_yaml.sh --output json complete t-001"), ["ticketDone"]);
+  for (const command of ["echo archive_plan.sh plan.md", "cat features_yaml.sh complete", "features_yaml.sh update t-001 --json {}", "grep complete features_yaml.sh"]) {
+    assert.deepEqual(closeoutKinds(command), [], command);
+  }
 });
