@@ -11,7 +11,13 @@ import {
 	finalAssistantStopReason,
 	FOCUS_MODE_DISPLAY,
 	focusScope,
+	MAX_ORCHESTRATION_GATES,
+	MAX_ORCHESTRATION_NOTE,
+	MAX_ORCHESTRATION_TICKETS,
+	ORCHESTRATION_STATES,
+	parkedAttention,
 	positionalMarker,
+	setOrchestration,
 	recoverFocus,
 	setWorkflowActivity,
 	restoreReachedDone,
@@ -96,7 +102,7 @@ const STOP_NOTICES: Record<Exclude<RuntimeEffect, { kind: "continue" }>["reason"
 type CustomEntry = {
 	type: string;
 	customType?: string;
-	data?: WorkflowState & { steps?: unknown; activeMode?: unknown; lens?: unknown };
+	data?: WorkflowState & { steps?: unknown; activeMode?: unknown; lens?: unknown; heldStep?: StepName };
 };
 
 type RestoredState = {
@@ -214,8 +220,8 @@ function findLatestState(entries: unknown[]): RestoredState {
 		const entry = entries[i] as CustomEntry;
 		if (entry?.type === "custom" && entry.customType === ENTRY_TYPE && entry.data) {
 			// Derived display fields are recomputed at publish, never restored.
-			const { steps, activeMode: _activeMode, lens: _lens, ...state } = entry.data;
-			return { state, steps };
+			const { steps, activeMode: _activeMode, lens: _lens, heldStep, ...state } = entry.data;
+			return { state: heldStep ? { ...state, activeStep: heldStep } : state, steps };
 		}
 	}
 	return { state: {} };
@@ -468,7 +474,8 @@ export default function workflowRuntime(
 		return updated;
 	};
 
-	const clearWorkflowRail = (pi: ExtensionAPI, ctx: ExtensionContext): WorkflowState => setState(pi, ctx, {});
+	// Dismissing the rail keeps the orchestration snapshot; only /wf-clear or an empty set_orchestration clears it.
+	const clearWorkflowRail = (pi: ExtensionAPI, ctx: ExtensionContext): WorkflowState => setState(pi, ctx, state.orchestration ? { orchestration: state.orchestration } : {});
 
 	// Every step start, even of the same step, begins a new facts run that drops calls still in flight.
 	const startStep = (base: WorkflowState, step: StepName, source: Parameters<typeof startWorkflowStep>[2]): WorkflowState => {
@@ -491,7 +498,6 @@ export default function workflowRuntime(
 		lastMetadataWarning = undefined;
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
-		currentAttention = undefined;
 		currentProgress = undefined;
 		automaticNamingStarted = false;
 		lastAdvanceShortcutAt = 0;
@@ -499,10 +505,11 @@ export default function workflowRuntime(
 		ticketName = undefined;
 		const stopped = baseState.execution ? transition(baseState, { type: "end-focus" }).state : baseState;
 		const nextState = mode === "ticket" ? unlinkWorkflowTicketState(stopped, "command") : {};
+		currentAttention = parkedAttention(nextState.orchestration);
 		if (mode === "full" && worktreeLifecycle && !worktreeLifecycle.cleared) {
 			worktreeLifecycle = clearedWorktreeSnapshot(worktreeLifecycle);
-			publishContext();
-		} else publishContext();
+			publishContext(currentAttention);
+		} else publishContext(currentAttention);
 		state = setState(pi, ctx, nextState);
 		return state;
 	};
@@ -658,8 +665,8 @@ export default function workflowRuntime(
 		if (progressTicketId !== ticketId) currentProgress = undefined;
 		ticketContext = selected;
 		ticketName = selected.title ?? previousTicketName ?? (!rename ? pi.getSessionName() : undefined);
-		currentAttention = attention;
-		publishContext(attention);
+		currentAttention = attention ?? parkedAttention(state.orchestration);
+		publishContext(currentAttention);
 		let nameApplied = false;
 		if (awaitGeneratedName && !selected.title) {
 			if (metadataEnabled) {
@@ -1068,6 +1075,42 @@ export default function workflowRuntime(
 		},
 	});
 
+	pi.registerTool({
+		name: "set_orchestration",
+		label: "Set Orchestration",
+		description: "Publish the orchestrator's run as the session card lens: what it is doing and each ticket's state, step, accepted gates, parked question and commit. Each call replaces the whole snapshot; an empty ticket list clears it.",
+		promptSnippet: "Publish the orchestrated tickets' states on the session card",
+		promptGuidelines: [
+			"Call set_orchestration only while orchestrating ticket subagents: at kickoff and after each gate, launch, park, and merge. Send every ticket each time.",
+			"Set gates to the number of phase gates you accepted for that ticket. A parked ticket's note is its question; it raises a blocked request until the ticket leaves parked.",
+		],
+		parameters: Type.Object({
+			doing: Type.Optional(Type.String({ minLength: 1, maxLength: 120, description: "What the orchestrator is doing now" })),
+			tickets: Type.Array(Type.Object({
+				id: Type.String({ description: "Ticket id like engine-003" }),
+				state: StringEnum(ORCHESTRATION_STATES),
+				step: Type.Optional(StringEnum(WORKFLOW_DEFINITION.map((step) => step.id))),
+				note: Type.Optional(Type.String({ minLength: 1, maxLength: MAX_ORCHESTRATION_NOTE, description: "Parked question or latest gate result" })),
+				commit: Type.Optional(Type.String({ description: "Short commit hash once committed" })),
+				gates: Type.Optional(Type.Integer({ minimum: 0, maximum: MAX_ORCHESTRATION_GATES, description: "Phase gates you accepted for this ticket" })),
+			}), { maxItems: MAX_ORCHESTRATION_TICKETS }),
+			pr: Type.Optional(Type.String({ minLength: 1, maxLength: 120, description: "Pull request URL or state" })),
+		}),
+		async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+			const before = parkedAttention(state.orchestration);
+			const orchestration = setOrchestration(state.orchestration, params, toolCallId);
+			const { orchestration: _previous, ...rest } = state;
+			state = setState(pi, ctx, orchestration ? { ...rest, orchestration } : rest);
+			// A newer question or handoff keeps priority; the parked request returns once it clears.
+			if (!currentAttention || (before && currentAttention.requestId === before.requestId)) {
+				currentAttention = parkedAttention(orchestration);
+				publishContext(currentAttention);
+			}
+			const count = orchestration?.tickets.length ?? 0;
+			return { content: [{ type: "text", text: count ? `Orchestration published: ${count} ticket${count === 1 ? "" : "s"}.` : "Orchestration cleared." }], details: { orchestration } };
+		},
+	});
+
 	pi.registerShortcut(ADVANCE_SHORTCUT, {
 		description: "Run the next workflow skill, or dismiss completed Commit, on double press",
 		handler: async (ctx) => {
@@ -1259,8 +1302,8 @@ export default function workflowRuntime(
 		if (event.toolName === "ask_user_question") {
 			const requestId = stableRequestId(event.toolCallId);
 			if (requestId && currentAttention?.kind === "question" && currentAttention.requestId === requestId) {
-				currentAttention = undefined;
-				publishContext();
+				currentAttention = parkedAttention(state.orchestration);
+				publishContext(currentAttention);
 			}
 			// Only the open call of this Plan run counts; a step change already reset the facts.
 			const questions = state.stepFacts?.questions;
@@ -1302,7 +1345,9 @@ export default function workflowRuntime(
 	});
 
 	pi.on("before_agent_start", async (event) => {
-		if (currentAttention) { currentAttention = undefined; publishContext(); }
+		// Ordinary attention ends with the turn; a parked ticket's request stays until the ticket leaves parked.
+		const parked = parkedAttention(state.orchestration);
+		if (currentAttention !== parked && JSON.stringify(currentAttention) !== JSON.stringify(parked)) { currentAttention = parked; publishContext(currentAttention); }
 		if (state.execution) {
 			const recovery = recoverFocus(recoveryPending, { type: "before-agent-start" });
 			recoveryPending = recovery.pending;
@@ -1405,6 +1450,7 @@ export default function workflowRuntime(
 			applyPlanWidget(ctx, state.plan);
 		}
 		if (event.reason !== "new" && event.reason !== "fork") {
+			currentAttention ??= parkedAttention(state.orchestration);
 			const ticketId = state.ticketId ?? restoredContext?.ticket?.id;
 			if (ticketId) await selectTicket(ctx, ticketId, false, currentAttention);
 			else if (currentAttention) publishContext(currentAttention);

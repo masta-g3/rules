@@ -20,6 +20,16 @@ After each turn, the parent checks the gate before sending the next phase. Child
 
 Launch each child with `allowNestedSubagents: true` and `nestedAgentAllowlist: ["code-critic", "docs-critic"]`; the allowlist is fixed at launch.
 
+## Card
+
+Keep the session card current with `set_orchestration`. Call it at kickoff and after each gate, launch, park, and merge. Send every ticket each time; a call replaces the whole snapshot.
+
+- `doing`: what the parent does now, such as `Running 2 tickets; next gate web-013 review`.
+- Per ticket: `id`, `state` (`queued`, `running`, `gated` while you check its gate, `parked`, `committed`), `step` (the child's current phase), `gates` (phase gates you accepted for it), `commit` (short hash once merged), and `note` (for a parked ticket, its question).
+- `pr`: the draft PR URL or state, once it exists.
+
+A parked ticket with a `note` raises a blocked request on this session until it leaves `parked`. Send `tickets: []` when the run ends.
+
 ## Kickoff (user present)
 
 1. Select the tickets: the ones the user named, an epic, or `$SKILLS_ROOT/_lib/features_yaml.sh next --output json`. Read `depends_on` to know the order. For an epic, read its `{epic}-000.md` doc. With multiple tickets, pass its absolute path in the integration worktree in every phase prompt.
@@ -37,7 +47,7 @@ Handle each child question or reported deviation this way:
 | --- | --- |
 | The plan or AFK limits settle it | Answer with a pointer to the plan and continue. |
 | Reversible judgment call | Take the child's recommendation, log it as decided for the user with the alternative, and continue. |
-| Changes acceptance criteria or scope, or is not reversible | Park that ticket, queue the question, and continue the others. |
+| Changes acceptance criteria or scope, or is not reversible | Park that ticket, queue the question, publish it with `set_orchestration`, and continue the others. |
 
 Read each plan's `Discovered Work` at every gate and log new items. Keep the decision log, discovered work, and parked questions in the draft PR body, or in the final report if no PR exists.
 
