@@ -2197,6 +2197,28 @@ test("set_orchestration publishes a lens-only entry once the parent's step compl
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
+test("orchestrator questions and critic launches keep the orchestration card after plan-ready", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    const orchestrate = (id) => runtime.tools.get("set_orchestration").execute(id, { tickets: [{ id: "meta-001", state: "running", step: "execute" }, { id: "other-001", state: "queued" }] }, undefined, undefined, runtime.ctx);
+    const current = () => runtime.latest("workflow-runtime");
+    await runtime.emit("input", { source: "interactive", text: "/skill:plan-md meta-001" });
+    await runtime.tools.get("set_workflow_activity").execute("a", { activityId: "plan-ready" }, undefined, undefined, runtime.ctx);
+    await orchestrate("o1");
+    assert.equal(current().lens.list.label, "TIX");
+    await runtime.emit("tool_execution_start", { toolName: "ask_user_question", toolCallId: "q1", args: { questions: [{ question: "Merge now?" }] } });
+    assert.equal(runtime.latest("pi-agent-hub-context").attention.kind, "question");
+    await runtime.emit("tool_execution_start", { toolName: "tmux_subagent", toolCallId: "t1", args: { agent: "plan-critic" } });
+    await runtime.emit("tool_execution_end", { toolName: "ask_user_question", toolCallId: "q1" });
+    assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
+    await orchestrate("o2");
+    assert.equal(current().activeStep, undefined);
+    assert.equal(current().heldStep, "plan-md");
+    assert.equal(current().lens.list.label, "TIX");
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
 test("a parked ticket raises one blocked request that persists until it leaves parked", async () => {
   const cwd = await project();
   try {

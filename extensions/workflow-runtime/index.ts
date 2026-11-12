@@ -15,6 +15,7 @@ import {
 	MAX_ORCHESTRATION_NOTE,
 	MAX_ORCHESTRATION_TICKETS,
 	ORCHESTRATION_STATES,
+	orchestrationLens,
 	parkedAttention,
 	positionalMarker,
 	setOrchestration,
@@ -1265,7 +1266,8 @@ export default function workflowRuntime(
 				currentAttention = attention;
 				publishContext(attention);
 			}
-			if (state.activeStep === "plan-md") {
+			// Once orchestration owns the card, the orchestrator's questions must not reopen the held step.
+			if (state.activeStep === "plan-md" && !orchestrationLens(state)) {
 				const questions = (event.args as { questions?: Array<{ question?: unknown }> } | undefined)?.questions;
 				const text = Array.isArray(questions) ? normalizeText(questions[0]?.question, 100) : undefined;
 				const requestId = stableRequestId(event.toolCallId);
@@ -1290,7 +1292,7 @@ export default function workflowRuntime(
 		}
 		if (event.toolName !== "tmux_subagent") return;
 		const args = event.args as { action?: unknown; agent?: unknown } | undefined;
-		if (!args || args.action !== undefined) return;
+		if (!args || args.action !== undefined || orchestrationLens(state)) return;
 		const activity = state.activeStep === "plan-md" && args.agent === "plan-critic" ? "reviewing-plan"
 			: state.activeStep === "review" && args.agent === "code-critic" ? "reviewing-implementation"
 			: state.activeStep === "reflect" && args.agent === "docs-critic" ? "reviewing-guidance"
