@@ -1251,12 +1251,12 @@ export default function workflowRuntime(
 		deferredWorkflowInputs = [];
 	});
 
+	// A bound record is authoritative: a broken one records no commits rather than scanning unbound repositories.
 	const workspaceRepoPaths = async (ctx: ExtensionContext): Promise<WorkspaceRepo[]> => {
-		if (state.worktreeRecord && state.ticketId) {
-			const binding = await readBinding(state.worktreeRecord, state.ticketId);
-			if (binding) return binding.snapshot.repositories?.map((repo) => ({ path: repo.worktreePath, label: basename(repo.worktreePath) })) ?? [];
-		}
-		return workspaceRepos(ctx.cwd);
+		if (!state.worktreeRecord) return workspaceRepos(ctx.cwd);
+		if (!state.ticketId) return [];
+		const binding = await readAuthoritativeBinding(ctx, state.ticketId);
+		return binding.snapshot?.repositories?.map((repo) => ({ path: repo.worktreePath, label: basename(repo.worktreePath) })) ?? [];
 	};
 
 	pi.on("tool_execution_start", async (event, ctx) => {

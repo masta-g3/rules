@@ -2156,6 +2156,12 @@ test("Commit lens reads repositories from a bound worktree record", async () => 
     for (const [repo, file] of [[primary, "p"], [extra, "e"], [stray, "s"]]) execFileSync("sh", ["-c", `echo 1 > ${file} && git add ${file} && git commit -qm 'Commit ${file}'`], { cwd: repo });
     await runtime.emit("tool_execution_end", { toolCallId: "c", toolName: "bash", isError: false });
     assert.deepEqual(runtime.latest("workflow-runtime").stepFacts.commits.map((item) => item.subject), ["Commit p", "Commit e"]);
+    // A broken bound record records nothing rather than scanning the cwd's unbound repositories.
+    await rm(recordPath);
+    await runtime.emit("tool_execution_start", { toolCallId: "c2", toolName: "bash", args: { command: "git commit -am again" } });
+    for (const [repo, file] of [[primary, "p2"], [stray, "s2"]]) execFileSync("sh", ["-c", `echo 1 > ${file} && git add ${file} && git commit -qm 'Commit ${file}'`], { cwd: repo });
+    await runtime.emit("tool_execution_end", { toolCallId: "c2", toolName: "bash", isError: false });
+    assert.deepEqual(runtime.latest("workflow-runtime").stepFacts.commits.map((item) => item.subject), ["Commit p", "Commit e"]);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
