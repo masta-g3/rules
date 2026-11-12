@@ -10,6 +10,7 @@ export type PlanProjection = {
 	phases?: Array<{ completed: number; total: number; title?: string }>;
 	nextStep?: string;
 	current?: { tasks: PlanTask[]; before: number; after: number };
+	criteria?: number;
 };
 
 const CURRENT_TASKS = 12;
@@ -35,6 +36,9 @@ export function parseWorkflowPlan(text: string): { plan?: WorkflowPlan; projecti
 	const all: PlanTask[] = [];
 	const sections: Array<PlanSection & { title?: string; headingLevel: number }> = [];
 	let active: (typeof sections)[number] | undefined;
+	// Acceptance criteria are the checkboxes under an "Acceptance Criteria" heading, up to the next same-level heading.
+	let criteriaLevel: number | undefined;
+	let criteria = 0;
 	let fence: { marker: string; length: number } | undefined;
 	for (const line of text.split(/\r?\n/)) {
 		const delimiter = /^\s*(`{3,}|~{3,})(.*)$/.exec(line);
@@ -46,6 +50,8 @@ export function parseWorkflowPlan(text: string): { plan?: WorkflowPlan; projecti
 		const heading = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
 		if (heading) {
 			const headingLevel = heading[1]!.length;
+			if (criteriaLevel !== undefined && headingLevel <= criteriaLevel) criteriaLevel = undefined;
+			if (/^acceptance criteria$/i.test(clean(heading[2] ?? ""))) criteriaLevel = headingLevel;
 			const match = /^(phase|stage)\s+(\d+)\s*(?::|[-–—])\s*(.+)$/i.exec(heading[2] ?? "");
 			if (match) {
 				const title = clean(match[3] ?? "");
@@ -59,6 +65,7 @@ export function parseWorkflowPlan(text: string): { plan?: WorkflowPlan; projecti
 		const checkbox = /^\s*-\s+\[([ xX])]\s+(.+?)\s*$/.exec(line);
 		if (!checkbox) continue;
 		const task = { done: checkbox[1]!.toLowerCase() === "x", text: clean(checkbox[2] ?? "") };
+		if (criteriaLevel !== undefined) criteria += 1;
 		all.push(task); active?.tasks.push(task);
 	}
 	const populated = sections.filter((section) => section.tasks.length);
@@ -75,6 +82,7 @@ export function parseWorkflowPlan(text: string): { plan?: WorkflowPlan; projecti
 		...(populated.length ? { phases: populated.slice(0, 100).map((item) => ({ completed: item.tasks.filter((task) => task.done).length, total: item.tasks.length, title: bounded(item.title!, 80) })) } : {}),
 		...(tasks.find((task) => !task.done) ? { nextStep: bounded(tasks.find((task) => !task.done)!.text, 120) } : {}),
 		current: currentWindow(planSections[selected]!.tasks),
+		...(criteria ? { criteria } : {}),
 	};
 	return { plan, projection };
 }

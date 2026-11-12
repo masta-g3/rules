@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -430,7 +431,7 @@ test("runtime registers commands, shortcuts, and guarded producer tools", async 
     assert.deepEqual([...runtime.commands.keys()].sort(), ["session-metadata-disable", "session-metadata-enable", "session-metadata-status", "session-name-refresh", "wf-clear", "wf-ticket", "wf-todos"]);
     assert.ok(runtime.shortcuts.has("ctrl+shift+right"));
     assert.equal(runtime.shortcuts.size, 2);
-    for (const tool of ["set_session_name", "set_workflow_activity", "set_workflow_ticket", "complete_workflow"]) assert.ok(runtime.tools.has(tool));
+    for (const tool of ["set_session_name", "set_workflow_activity", "set_workflow_ticket", "complete_workflow", "set_orchestration"]) assert.ok(runtime.tools.has(tool));
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -495,6 +496,30 @@ test("workflow clear commands durably unlink the right projection and release na
     await resumed.tools.get("set_session_name").execute("name", { name: "Full reset rename" });
     assert.deepEqual(await readFile(join(cwd, "agent-work/features.yaml")), ticketBytes);
     assert.deepEqual(await readFile(join(cwd, "agent-work/plans/meta-001.md")), planBytes);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("set_workflow_activity publishes review items as the lens list until unlink", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd);
+    const activity = runtime.tools.get("set_workflow_activity");
+    await runtime.emit("input", { source: "interactive", text: "/skill:review meta-001" });
+    await activity.execute("activity", { activityId: "fixing-review-findings", items: [{ text: "Stale cursor", state: "active" }, { text: "Dropped history", state: "open" }] }, undefined, undefined, runtime.ctx);
+    assert.deepEqual(runtime.latest("workflow-runtime").lens.list, {
+      label: "FOUND", head: "2 open", items: [{ state: "active", text: "Stale cursor" }, { state: "pending", text: "Dropped history" }], before: 0, after: 0,
+    });
+    assert.equal(runtime.latest("workflow-runtime").lens.doing, "Stale cursor");
+    await activity.execute("activity", { activityId: "review-complete", items: [{ text: "Stale cursor", state: "done" }, { text: "Dropped history", state: "deferred" }] }, undefined, undefined, runtime.ctx);
+    assert.equal(runtime.latest("workflow-runtime").lens.list.head, "1 fixed · 1 deferred");
+    const resumed = harness(cwd, runtime.branch, runtime.name);
+    await resumed.emit("session_start", { reason: "resume" });
+    assert.deepEqual(resumed.latest("workflow-runtime").stepItems, [{ text: "Stale cursor", state: "done" }, { text: "Dropped history", state: "deferred" }]);
+    await resumed.commands.get("wf-ticket").handler("clear", resumed.ctx);
+    assert.equal(resumed.latest("workflow-runtime").stepItems, undefined);
+    assert.equal(resumed.latest("workflow-runtime").lens, undefined);
+    await resumed.emit("input", { source: "interactive", text: "/skill:plan-md meta-001" });
+    await assert.rejects(resumed.tools.get("set_workflow_activity").execute("activity", { activityId: "writing-plan", items: [{ text: "x", state: "open" }] }, undefined, undefined, resumed.ctx), /review and reflect/);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -707,6 +732,40 @@ test("ticket context precedes native name, ordinary turns stay stable, and plan 
     await runtime.emit("tool_execution_end", { toolName: "edit" });
     assert.deepEqual(runtime.latest("workflow-runtime").plan.tasks, { completed: 1, total: 2 });
     assert.equal(runtime.latest("workflow-runtime").plan.nextStep, "Add tests");
+    assert.equal(runtime.latest("workflow-runtime").plan.current, undefined);
+    assert.deepEqual(runtime.latest("workflow-runtime").lens, {
+      doing: "Add tests",
+      stages: [{ label: "1", state: "active" }],
+      progress: { completed: 1, total: 2, unit: "tasks" },
+      list: { label: "PLAN", head: "Foundation", items: [{ state: "done", text: "Add contract" }, { state: "active", text: "Add tests" }], before: 0, after: 0 },
+    });
+    assert.ok(runtime.ctx.ui && runtime.renderWorkflow(80));
+    await runtime.commands.get("wf-todos").handler("", runtime.ctx);
+    assert.equal(runtime.operations.at(-1).kind, "custom");
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("a reload never republishes a stored lens after completion or unlinking", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    await runtime.emit("input", { source: "interactive", text: "/skill:commit meta-001" });
+    assert.equal(runtime.latest("workflow-runtime").lens.doing, "Archiving plan");
+    await runtime.tools.get("complete_workflow").execute("done", {}, undefined, undefined, runtime.ctx);
+    assert.equal(runtime.latest("workflow-runtime").lens.doing, "Commit complete");
+
+    const stale = { doing: "Stale work", progress: { completed: 1, total: 2 } };
+    for (const data of [
+      { activeStep: "commit", currentStepComplete: true, activity: { id: "commit-complete", label: "Commit complete" }, lens: stale },
+      { activeStep: "execute", lens: stale },
+    ]) {
+      // No steps forces a normalizing publish of the restored state on reload.
+      const reloaded = harness(cwd, [{ type: "custom", customType: "workflow-runtime", data }]);
+      await reloaded.emit("session_start", { reason: "reload" });
+      assert.equal(reloaded.branch.filter((entry) => entry.customType === "workflow-runtime").length, 2);
+      // A completed Commit recomputes its closeout lens from state; the stored lens never returns.
+      assert.equal(reloaded.latest("workflow-runtime").lens?.doing, data.activeStep === "commit" ? "Commit complete" : undefined);
+    }
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -1905,4 +1964,310 @@ test("switching tickets drops the previous ticket's progress note", async () => 
     else process.env.PI_TMUX_SUBAGENTS_JOB_ID = previousJob;
     await rm(cwd, { recursive: true, force: true });
   }
+});
+
+test("Plan lens counts answered and waiting questions per step run", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    const ask = (id, questions) => runtime.emit("tool_execution_start", { toolCallId: id, toolName: "ask_user_question", args: { questions: questions.map((question) => ({ question })) } });
+    const answer = (id, isError = false) => runtime.emit("tool_execution_end", { toolCallId: id, toolName: "ask_user_question", isError });
+    const list = () => runtime.latest("workflow-runtime").lens.list;
+    await runtime.emit("input", { source: "interactive", text: "/skill:plan-md meta-001" });
+    await ask("q1", ["Scope?", "Timing?"]);
+    assert.deepEqual(list().items[0], { state: "attention", text: "2 waiting: Scope?" });
+    await answer("q1");
+    await ask("q2", ["Keep the reply button?"]);
+    assert.deepEqual(list().items.slice(0, 2), [{ state: "done", text: "2 answered" }, { state: "attention", text: "1 waiting: Keep the reply button?" }]);
+    await answer("q2", true);
+    assert.deepEqual(list().items[0], { state: "done", text: "2 answered" });
+    assert.equal(list().head, "1 phase · 1 task");
+    assert.equal(runtime.latest("workflow-runtime").stepFacts.questions.waiting, undefined);
+
+    // Reload keeps the answered count but clears an open question.
+    await ask("q3", ["Ship it?"]);
+    const reloaded = harness(cwd, runtime.branch, runtime.name);
+    await reloaded.emit("session_start", { reason: "resume" });
+    assert.deepEqual(reloaded.latest("workflow-runtime").stepFacts.questions, { answered: 2 });
+    await reloaded.emit("tool_execution_end", { toolCallId: "q3", toolName: "ask_user_question", isError: false });
+    assert.deepEqual(reloaded.latest("workflow-runtime").stepFacts.questions, { answered: 2 });
+
+    // A completion after a step change does not count, and the step change resets the counts.
+    await ask("q4", ["Late?"]);
+    await runtime.tools.get("set_workflow_step").execute("step", { stepId: "execute" }, undefined, undefined, runtime.ctx);
+    await answer("q4");
+    assert.equal(runtime.latest("workflow-runtime").stepFacts, undefined);
+    await runtime.tools.get("set_workflow_step").execute("step", { stepId: "plan-md" }, undefined, undefined, runtime.ctx);
+    await answer("q4");
+    assert.equal(runtime.latest("workflow-runtime").stepFacts, undefined);
+
+    await ask("q5", ["Again?"]);
+    await answer("q5");
+    // A question during critic review keeps the critic stage and its active pass.
+    await runtime.tools.get("set_workflow_activity").execute("a", { activityId: "reviewing-plan" }, undefined, undefined, runtime.ctx);
+    await ask("q6", ["Keep it?"]);
+    assert.equal(runtime.latest("workflow-runtime").activity.id, "reviewing-plan");
+    assert.deepEqual(list().items, [{ state: "done", text: "1 answered" }, { state: "attention", text: "1 waiting: Keep it?" }, { state: "active", text: "critic pass 1" }]);
+    await answer("q6");
+    await runtime.commands.get("wf-ticket").handler("clear", runtime.ctx);
+    assert.equal(runtime.latest("workflow-runtime").stepFacts, undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+function gitRepo(path, ...files) {
+  execFileSync("git", ["init", "-q", "-b", "main", path]);
+  execFileSync("git", ["-C", path, "config", "user.email", "t@example.com"]);
+  execFileSync("git", ["-C", path, "config", "user.name", "T"]);
+  for (const file of files) execFileSync("sh", ["-c", `echo ${file} > ${file} && git add ${file} && git commit -qm "Add ${file}"`], { cwd: path });
+}
+
+function shortHead(path) {
+  return execFileSync("git", ["-C", path, "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim();
+}
+
+test("Commit lens records commits per repo from reflogs, plus closeout and push", async () => {
+  const root = await mkdtemp(join(tmpdir(), "rules-commit-"));
+  try {
+    const workspace = join(root, "workspace");
+    const app = join(root, "app");
+    const lib = join(root, "lib");
+    const empty = join(root, "empty");
+    gitRepo(app, "a.txt");
+    gitRepo(lib, "b.txt");
+    gitRepo(empty);
+    await mkdir(join(workspace, "agent-work/plans"), { recursive: true });
+    await writeFile(join(workspace, "agent-work/features.yaml"), "- id: meta-001\n  status: pending\n  title: Meta\n  plan_file: agent-work/plans/meta-001.md\n");
+    await writeFile(join(workspace, "agent-work/plans/meta-001.md"), "### Phase 1: Foundation\n- [x] Add contract\n");
+    await symlink(app, join(workspace, "app"));
+    await symlink(lib, join(workspace, "lib"));
+    await symlink(empty, join(workspace, "empty"));
+    // An unrelated worktree of the same repo is not part of the workspace.
+    const other = join(root, "other");
+    execFileSync("git", ["-C", app, "worktree", "add", "-q", "-b", "other", other]);
+
+    const runtime = harness(workspace, [], "Meta");
+    let call = 0;
+    const bash = async (command, isError = false, effect = () => {}) => {
+      const toolCallId = `bash-${++call}`;
+      await runtime.emit("tool_execution_start", { toolCallId, toolName: "bash", args: { command } });
+      effect();
+      await runtime.emit("tool_execution_end", { toolCallId, toolName: "bash", isError });
+    };
+    const run = (cwd, script) => () => execFileSync("sh", ["-c", script], { cwd });
+    const commits = () => runtime.latest("workflow-runtime").stepFacts?.commits ?? [];
+    await runtime.emit("input", { source: "interactive", text: "/skill:commit meta-001" });
+
+    await bash("bash archive_plan.sh agent-work/plans/meta-001.md lens", true);
+    await bash("$SKILLS_ROOT/commit/scripts/archive_plan.sh agent-work/plans/meta-001.md lens");
+    await bash("$SKILLS_ROOT/_lib/features_yaml.sh complete meta-001 --plan-file x.md");
+    assert.deepEqual(runtime.latest("workflow-runtime").stepFacts.closeout, { archived: true, ticketDone: true });
+
+    await bash("git log --grep=commit", false, run(other, "echo o > o && git add o && git commit -qm 'Other worktree'"));
+    await bash("git -C app commit -m nothing", true);
+    assert.deepEqual(commits(), []);
+
+    // App commits, lib fails, in one call that exits with an error.
+    await bash("git -C app commit -am x && git -C lib commit -m y", true, run(app, "echo 2 > a.txt && git commit -qam 'Change app'"));
+    await bash("cd empty && git commit -m init", false, run(empty, "echo e > e && git add e && git commit -qm 'Initial empty'"));
+    await bash("git -C lib commit --amend", false, run(lib, "git commit -q --amend -m 'Add b.txt again'"));
+    await bash("git -C lib commit --amend", false, run(lib, "git commit -q --amend -m 'Add b.txt final'"));
+    assert.deepEqual(commits(), [
+      { repo: "app", hash: shortHead(app), subject: "Change app" },
+      { repo: "empty", hash: shortHead(empty), subject: "Initial empty" },
+      { repo: "lib", hash: shortHead(lib), subject: "Add b.txt final" },
+    ]);
+
+    // A checkout to an existing child commit in the same call as a failed commit is not recorded.
+    run(app, "echo 3 > a.txt && git commit -qam 'Child' && git checkout -q HEAD~1")();
+    await bash("git -C app commit -m z", true, run(app, "git checkout -q main"));
+    assert.equal(commits().length, 3);
+
+    // Overlapping calls finish together: each merges into the latest state, so neither drops the other's commit.
+    const start = (toolCallId) => runtime.emit("tool_execution_start", { toolCallId, toolName: "bash", args: { command: "git commit -m p" } });
+    await start("par-1");
+    run(app, "echo 4 > a.txt && git commit -qam 'Parallel app'")();
+    await start("par-2");
+    run(lib, "echo 4 > b.txt && git commit -qam 'Parallel lib'")();
+    await Promise.all(["par-1", "par-2"].map((toolCallId) => runtime.emit("tool_execution_end", { toolCallId, toolName: "bash", isError: false })));
+    assert.deepEqual(commits().slice(-2).map((item) => item.subject).sort(), ["Parallel app", "Parallel lib"]);
+
+    const lens = runtime.latest("workflow-runtime").lens;
+    assert.equal(lens.list.head, "5 commits");
+    assert.deepEqual(lens.list.items.slice(0, 2), [{ state: "done", text: "Plan archived" }, { state: "done", text: "Ticket meta-001 done" }]);
+    assert.deepEqual(lens.stages.map((stage) => stage.label), ["archive", "commit"]);
+
+    await runtime.tools.get("set_workflow_activity").execute("a", { activityId: "pushing-changes" }, undefined, undefined, runtime.ctx);
+    await runtime.tools.get("complete_workflow").execute("done", {}, undefined, undefined, runtime.ctx);
+    const done = runtime.latest("workflow-runtime").lens;
+    assert.deepEqual(done.stages, [{ label: "archive", state: "done" }, { label: "commit", state: "done" }, { label: "push", state: "done" }]);
+    assert.equal(done.list.items.length, 8);
+
+    const reloaded = harness(workspace, runtime.branch, runtime.name);
+    await reloaded.emit("session_start", { reason: "reload" });
+    await reloaded.emit("tool_execution_end", { toolName: "edit" });
+    assert.deepEqual(reloaded.latest("workflow-runtime").lens, done);
+
+    // A call still running when the step changes cannot write into the next Commit run.
+    await runtime.emit("input", { source: "interactive", text: "/skill:commit meta-001" });
+    await runtime.emit("tool_execution_start", { toolCallId: "late", toolName: "bash", args: { command: "archive_plan.sh p.md x && git -C app commit -m late" } });
+    await runtime.tools.get("set_workflow_step").execute("s", { stepId: "reflect" }, undefined, undefined, runtime.ctx);
+    await runtime.tools.get("set_workflow_step").execute("s", { stepId: "commit" }, undefined, undefined, runtime.ctx);
+    run(app, "echo 5 > a.txt && git commit -qam 'Late'")();
+    await runtime.emit("tool_execution_end", { toolCallId: "late", toolName: "bash", isError: false });
+    assert.equal(runtime.latest("workflow-runtime").stepFacts, undefined);
+    // Restarting the same step before any facts exist also drops calls in flight.
+    await runtime.emit("tool_execution_start", { toolCallId: "late-2", toolName: "bash", args: { command: "archive_plan.sh p.md x && git -C app commit -m late" } });
+    await runtime.emit("input", { source: "interactive", text: "/skill:commit meta-001" });
+    run(app, "echo 6 > a.txt && git commit -qam 'Late again'")();
+    await runtime.emit("tool_execution_end", { toolCallId: "late-2", toolName: "bash", isError: false });
+    assert.equal(runtime.latest("workflow-runtime").stepFacts, undefined);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("Commit lens reads repositories from a bound worktree record", async () => {
+  const root = await mkdtemp(join(tmpdir(), "rules-commit-bound-"));
+  try {
+    const source = join(root, "source");
+    const primary = join(root, "wt", "primary");
+    const extra = join(root, "wt", "extra");
+    const stray = join(root, "stray");
+    gitRepo(source, "s.txt");
+    await mkdir(join(root, "wt"));
+    execFileSync("git", ["-C", source, "worktree", "add", "-q", "-b", "task", primary]);
+    gitRepo(extra, "x.txt");
+    gitRepo(stray, "y.txt");
+    await mkdir(join(primary, "agent-work/plans"), { recursive: true });
+    await writeFile(join(primary, "agent-work/features.yaml"), "- id: meta-001\n  status: pending\n  title: Meta\n  plan_file: agent-work/plans/meta-001.md\n");
+    await writeFile(join(primary, "agent-work/plans/meta-001.md"), "### Phase 1: A\n- [x] a\n");
+    // A symlink in the session cwd is ignored when a record is bound.
+    await symlink(stray, join(primary, "stray"));
+    const recordPath = join(root, "worktree.json");
+    await writeFile(recordPath, JSON.stringify({
+      version: 1, id: "rec", revision: 1, owner: "rules", ticket: "meta-001", recordPath, primaryRepository: "primary",
+      authoredRoot: primary, state: "active", updatedAt: new Date().toISOString(), repositories: [
+        { label: "primary", source, worktree: primary, branch: "task", role: "primary", state: "active" },
+        { label: "extra", source: extra, worktree: extra, branch: "main", role: "additional", state: "active" },
+      ],
+    }));
+    const runtime = harness(primary, [], "Meta");
+    await runtime.tools.get("set_workflow_ticket").execute("t", { ticketId: "meta-001", worktreeRecord: recordPath }, undefined, undefined, runtime.ctx);
+    await runtime.emit("input", { source: "interactive", text: "/skill:commit meta-001" });
+    await runtime.emit("tool_execution_start", { toolCallId: "c", toolName: "bash", args: { command: "git commit -am all" } });
+    for (const [repo, file] of [[primary, "p"], [extra, "e"], [stray, "s"]]) execFileSync("sh", ["-c", `echo 1 > ${file} && git add ${file} && git commit -qm 'Commit ${file}'`], { cwd: repo });
+    await runtime.emit("tool_execution_end", { toolCallId: "c", toolName: "bash", isError: false });
+    assert.deepEqual(runtime.latest("workflow-runtime").stepFacts.commits.map((item) => item.subject), ["Commit p", "Commit e"]);
+    // A broken bound record records nothing rather than scanning the cwd's unbound repositories.
+    await rm(recordPath);
+    await runtime.emit("tool_execution_start", { toolCallId: "c2", toolName: "bash", args: { command: "git commit -am again" } });
+    for (const [repo, file] of [[primary, "p2"], [stray, "s2"]]) execFileSync("sh", ["-c", `echo 1 > ${file} && git add ${file} && git commit -qm 'Commit ${file}'`], { cwd: repo });
+    await runtime.emit("tool_execution_end", { toolCallId: "c2", toolName: "bash", isError: false });
+    assert.deepEqual(runtime.latest("workflow-runtime").stepFacts.commits.map((item) => item.subject), ["Commit p", "Commit e"]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("set_orchestration publishes a lens-only entry once the parent's step completes", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    const orchestrate = (id, params) => runtime.tools.get("set_orchestration").execute(id, params, undefined, undefined, runtime.ctx);
+    const activity = (id) => runtime.tools.get("set_workflow_activity").execute(id, { activityId: id }, undefined, undefined, runtime.ctx);
+    const current = () => runtime.latest("workflow-runtime");
+    await runtime.emit("input", { source: "interactive", text: "/skill:plan-md meta-001" });
+    await orchestrate("o1", { doing: "Running 1 ticket", tickets: [{ id: "meta-001", state: "running", step: "execute", gates: 1 }, { id: "other-001", state: "queued" }] });
+    assert.equal(current().activeStep, "plan-md");
+    assert.equal(current().lens.doing, "Inspecting code");
+    await activity("plan-ready");
+    assert.equal(current().activeStep, undefined);
+    assert.equal(current().heldStep, "plan-md");
+    assert.equal(current().lens.doing, "Running 1 ticket");
+    assert.equal(current().lens.summary, "1 running · 1 queued");
+
+    const reloaded = harness(cwd, runtime.branch, runtime.name);
+    await reloaded.emit("session_start", { reason: "reload" });
+    await reloaded.tools.get("set_workflow_activity").execute("a", { activityId: "plan-ready" }, undefined, undefined, reloaded.ctx);
+    assert.equal(reloaded.latest("workflow-runtime").heldStep, "plan-md");
+    assert.equal(reloaded.latest("workflow-runtime").lens.doing, "Running 1 ticket");
+    // A new planning step wins again without clearing the snapshot.
+    await reloaded.emit("input", { source: "interactive", text: "/skill:plan-md other-001" });
+    assert.equal(reloaded.latest("workflow-runtime").activeStep, "plan-md");
+    assert.equal(reloaded.latest("workflow-runtime").lens.doing, "Inspecting code");
+    assert.equal(reloaded.latest("workflow-runtime").orchestration.tickets.length, 2);
+    await reloaded.tools.get("set_workflow_activity").execute("a", { activityId: "plan-ready" }, undefined, undefined, reloaded.ctx);
+    assert.equal(reloaded.latest("workflow-runtime").lens.list.label, "TIX");
+
+    await reloaded.tools.get("set_orchestration").execute("o2", { tickets: [] }, undefined, undefined, reloaded.ctx);
+    assert.equal(reloaded.latest("workflow-runtime").orchestration, undefined);
+    assert.equal(reloaded.latest("workflow-runtime").activeStep, "plan-md");
+    assert.equal(reloaded.latest("workflow-runtime").lens, undefined);
+    await assert.rejects(reloaded.tools.get("set_orchestration").execute("o3", { tickets: [{ id: "x", state: "queued" }] }, undefined, undefined, reloaded.ctx), /id like/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("orchestrator questions and critic launches keep the orchestration card after plan-ready", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    const orchestrate = (id) => runtime.tools.get("set_orchestration").execute(id, { tickets: [{ id: "meta-001", state: "running", step: "execute" }, { id: "other-001", state: "queued" }] }, undefined, undefined, runtime.ctx);
+    const current = () => runtime.latest("workflow-runtime");
+    await runtime.emit("input", { source: "interactive", text: "/skill:plan-md meta-001" });
+    await runtime.tools.get("set_workflow_activity").execute("a", { activityId: "plan-ready" }, undefined, undefined, runtime.ctx);
+    await orchestrate("o1");
+    assert.equal(current().lens.list.label, "TIX");
+    await runtime.emit("tool_execution_start", { toolName: "ask_user_question", toolCallId: "q1", args: { questions: [{ question: "Merge now?" }] } });
+    assert.equal(runtime.latest("pi-agent-hub-context").attention.kind, "question");
+    await runtime.emit("tool_execution_start", { toolName: "tmux_subagent", toolCallId: "t1", args: { agent: "plan-critic" } });
+    await runtime.emit("tool_execution_end", { toolName: "ask_user_question", toolCallId: "q1" });
+    assert.equal(runtime.latest("pi-agent-hub-context").attention, undefined);
+    await orchestrate("o2");
+    assert.equal(current().activeStep, undefined);
+    assert.equal(current().heldStep, "plan-md");
+    assert.equal(current().lens.list.label, "TIX");
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("a parked ticket raises one blocked request that persists until it leaves parked", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Existing");
+    const orchestrate = (id, tickets) => runtime.tools.get("set_orchestration").execute(id, { tickets }, undefined, undefined, runtime.ctx);
+    const attention = () => runtime.latest("pi-agent-hub-context")?.attention;
+    const parked = [{ id: "s-014", state: "parked", note: "Which tile CDN?" }, { id: "s-015", state: "queued" }];
+    await orchestrate("park-1", parked);
+    const first = attention();
+    assert.deepEqual(first, { requestId: first.requestId, kind: "blocked", text: "s-014 parked · Which tile CDN?" });
+    // Republishing the same parked episode keeps its request ID.
+    await orchestrate("park-1b", [{ ...parked[0], note: "Which tile CDN?" }, { id: "s-015", state: "running", step: "execute" }]);
+    assert.equal(attention().requestId, first.requestId);
+    await runtime.emit("before_agent_start", { systemPrompt: "base" });
+    assert.deepEqual(attention(), first);
+
+    // A newer question keeps priority while open; the parked request returns after it clears.
+    await runtime.emit("tool_execution_start", { toolName: "ask_user_question", toolCallId: "q1", args: { questions: [{ question: "Proceed?" }] } });
+    assert.equal(attention().kind, "question");
+    await orchestrate("park-1c", parked);
+    assert.equal(attention().kind, "question");
+    await runtime.emit("tool_execution_end", { toolName: "ask_user_question", toolCallId: "q1" });
+    assert.deepEqual(attention(), first);
+    await runtime.tools.get("hand_off").execute("h1", { kind: "ready", text: "Done" }, undefined, undefined, runtime.ctx);
+    assert.equal(attention().kind, "ready");
+    await runtime.emit("before_agent_start", { systemPrompt: "base" });
+    assert.deepEqual(attention(), first);
+
+    const reloaded = harness(cwd, runtime.branch, "Existing");
+    await reloaded.emit("session_start", { reason: "reload" });
+    await reloaded.emit("before_agent_start", { systemPrompt: "base" });
+    assert.deepEqual(reloaded.latest("pi-agent-hub-context").attention, first);
+
+    await reloaded.tools.get("set_orchestration").execute("unpark", { tickets: [{ id: "s-014", state: "running", step: "execute" }] }, undefined, undefined, reloaded.ctx);
+    assert.equal(reloaded.latest("pi-agent-hub-context").attention, undefined);
+    // Parking again after the earlier request was dismissed issues a new request ID.
+    await reloaded.tools.get("set_orchestration").execute("park-2", { tickets: [{ id: "s-014", state: "parked", note: "Which tile CDN?" }] }, undefined, undefined, reloaded.ctx);
+    const second = reloaded.latest("pi-agent-hub-context").attention;
+    assert.equal(second.text, first.text);
+    assert.notEqual(second.requestId, first.requestId);
+
+    await reloaded.commands.get("wf-clear").handler("", reloaded.ctx);
+    assert.equal(reloaded.latest("workflow-runtime").orchestration, undefined);
+    assert.equal(reloaded.latest("pi-agent-hub-context").attention, undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
 });

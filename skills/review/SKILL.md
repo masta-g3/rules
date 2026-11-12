@@ -15,6 +15,7 @@ When the tools are available:
 - Before starting, call `set_workflow_step` with `stepId: "review"`. Changing the indicator does not authorize additional work.
 - The initial activity is `reviewing-implementation`. Launch `code-critic` through `tmux_subagent`; Pi republishes that activity and increments the pass count. Only for a non-tmux launch, publish `reviewing-implementation` manually before each pass. Never do both.
 - Call `set_workflow_activity` with `fixing-review-findings` before fixes and `review-complete` before the successful report.
+- On both calls, pass `items`: one short title per actionable finding (up to 12, each at most 120 characters) with `state` `done` (fixed), `active` (being fixed now), `open`, `deferred` (out of scope or ignored), or `attention` (needs the user). Each call replaces the list. Repeat `fixing-review-findings` with updated `items` only when a finding changes state.
 
 ### Review Process
 

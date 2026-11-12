@@ -2,6 +2,7 @@ import { keyHint, type ExtensionAPI, type ExtensionContext } from "@earendil-wor
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Box, Spacer, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { basename } from "node:path";
 import { Type } from "typebox";
 import {
 	completeWorkflow,
@@ -10,10 +11,20 @@ import {
 	finalAssistantStopReason,
 	FOCUS_MODE_DISPLAY,
 	focusScope,
+	MAX_ORCHESTRATION_GATES,
+	MAX_ORCHESTRATION_NOTE,
+	MAX_ORCHESTRATION_TICKETS,
+	ORCHESTRATION_STATES,
+	orchestrationLens,
+	parkedAttention,
 	positionalMarker,
+	setOrchestration,
 	recoverFocus,
 	setWorkflowActivity,
 	restoreReachedDone,
+	MAX_STEP_ITEM_TEXT,
+	MAX_STEP_ITEMS,
+	STEP_ITEM_STATES,
 	setWorkflowTicketState,
 	shouldNormalizeWorkflowDefinition,
 	startWorkflowStep,
@@ -55,6 +66,7 @@ import {
 	type SessionModelCall,
 } from "./session-model.ts";
 import { applyPlanWidget } from "./plan-widget.ts";
+import { baselines, closeoutKinds, mergeCommits, newCommits, runsGitCommit, workspaceRepos, type RepoBaseline, type WorkspaceRepo } from "./commit-facts.ts";
 import { readWorkflowPlan } from "./workflow-plan.ts";
 import { brokenWorktreeSnapshot, clearedWorktreeSnapshot, projectWorktreeSnapshot, readWorktreeBinding, type WorktreeLifecycleSnapshot } from "./worktree-context.ts";
 import { TodoPanel, TODO_PANEL_OVERLAY_OPTIONS, TODO_PANEL_SHORTCUT } from "./todo-panel.ts";
@@ -91,7 +103,7 @@ const STOP_NOTICES: Record<Exclude<RuntimeEffect, { kind: "continue" }>["reason"
 type CustomEntry = {
 	type: string;
 	customType?: string;
-	data?: WorkflowState & { steps?: unknown; activeMode?: unknown };
+	data?: WorkflowState & { steps?: unknown; activeMode?: unknown; lens?: unknown; heldStep?: StepName };
 };
 
 type RestoredState = {
@@ -208,8 +220,9 @@ function findLatestState(entries: unknown[]): RestoredState {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i] as CustomEntry;
 		if (entry?.type === "custom" && entry.customType === ENTRY_TYPE && entry.data) {
-			const { steps, activeMode: _activeMode, ...state } = entry.data;
-			return { state, steps };
+			// Derived display fields are recomputed at publish, never restored.
+			const { steps, activeMode: _activeMode, lens: _lens, heldStep, ...state } = entry.data;
+			return { state: heldStep ? { ...state, activeStep: heldStep } : state, steps };
 		}
 	}
 	return { state: {} };
@@ -431,6 +444,10 @@ export default function workflowRuntime(
 	let progressTicketId: string | undefined;
 	let progressPending = false;
 	let deferredWorkflowInputs: Array<{ name: string; ticketId?: string; text: string }> = [];
+	// Commit-step bash calls in flight: their step run, closeout kinds and each workspace repo's HEAD reflog length at start.
+	const pendingCommitCalls = new Map<string, { run: number; closeout: Array<"archived" | "ticketDone">; repos?: RepoBaseline[] }>();
+	// Changes whenever step facts reset, so late tool completions cannot write into a later step run.
+	let factsRun = 0;
 	let metadataEnabled = true;
 	let metadataStatus: MetadataStatus = { state: "ready" };
 	let settledMetadataStatus = metadataStatus;
@@ -446,6 +463,11 @@ export default function workflowRuntime(
 	};
 
 	const setState = (pi: ExtensionAPI, ctx: ExtensionContext, nextState: WorkflowState): WorkflowState => {
+		// A new step run or ticket, or facts that were just cleared, start a new facts run.
+		if (nextState.activeStep !== state.activeStep || nextState.ticketId !== state.ticketId || (state.stepFacts && !nextState.stepFacts)) {
+			factsRun += 1;
+			pendingCommitCalls.clear();
+		}
 		const updated = { ...nextState, updatedAt: Date.now() };
 		persistState(pi, updated);
 		applyWidget(ctx, updated, metadataStatus);
@@ -453,7 +475,15 @@ export default function workflowRuntime(
 		return updated;
 	};
 
-	const clearWorkflowRail = (pi: ExtensionAPI, ctx: ExtensionContext): WorkflowState => setState(pi, ctx, {});
+	// Dismissing the rail keeps the orchestration snapshot; only /wf-clear or an empty set_orchestration clears it.
+	const clearWorkflowRail = (pi: ExtensionAPI, ctx: ExtensionContext): WorkflowState => setState(pi, ctx, state.orchestration ? { orchestration: state.orchestration } : {});
+
+	// Every step start, even of the same step, begins a new facts run that drops calls still in flight.
+	const startStep = (base: WorkflowState, step: StepName, source: Parameters<typeof startWorkflowStep>[2]): WorkflowState => {
+		factsRun += 1;
+		pendingCommitCalls.clear();
+		return startWorkflowStep(base, step, source);
+	};
 
 	const clearTaskState = (
 		ctx: ExtensionContext,
@@ -469,7 +499,6 @@ export default function workflowRuntime(
 		lastMetadataWarning = undefined;
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
-		currentAttention = undefined;
 		currentProgress = undefined;
 		automaticNamingStarted = false;
 		lastAdvanceShortcutAt = 0;
@@ -477,10 +506,11 @@ export default function workflowRuntime(
 		ticketName = undefined;
 		const stopped = baseState.execution ? transition(baseState, { type: "end-focus" }).state : baseState;
 		const nextState = mode === "ticket" ? unlinkWorkflowTicketState(stopped, "command") : {};
+		currentAttention = parkedAttention(nextState.orchestration);
 		if (mode === "full" && worktreeLifecycle && !worktreeLifecycle.cleared) {
 			worktreeLifecycle = clearedWorktreeSnapshot(worktreeLifecycle);
-			publishContext();
-		} else publishContext();
+			publishContext(currentAttention);
+		} else publishContext(currentAttention);
 		state = setState(pi, ctx, nextState);
 		return state;
 	};
@@ -636,8 +666,8 @@ export default function workflowRuntime(
 		if (progressTicketId !== ticketId) currentProgress = undefined;
 		ticketContext = selected;
 		ticketName = selected.title ?? previousTicketName ?? (!rename ? pi.getSessionName() : undefined);
-		currentAttention = attention;
-		publishContext(attention);
+		currentAttention = attention ?? parkedAttention(state.orchestration);
+		publishContext(currentAttention);
 		let nameApplied = false;
 		if (awaitGeneratedName && !selected.title) {
 			if (metadataEnabled) {
@@ -862,7 +892,7 @@ export default function workflowRuntime(
 				const interrupted = state.execution
 					? transition(state, { type: "end-focus" })
 					: { state, effects: [] as RuntimeEffect[] };
-				state = setState(pi, ctx, startWorkflowStep(interrupted.state, params.stepId, "tool"));
+				state = setState(pi, ctx, startStep(interrupted.state, params.stepId, "tool"));
 				await refreshPlan(ctx);
 				applyEffects(pi, ctx, () => state, interrupted.effects, continuationQueue);
 			}
@@ -874,9 +904,15 @@ export default function workflowRuntime(
 		name: "set_workflow_activity",
 		label: "Set Workflow Activity",
 		description: "Publish a fixed activity for the active workflow step.",
-		parameters: Type.Object({ activityId: StringEnum(ACTIVITY_IDS as [string, ...string[]]) }),
+		parameters: Type.Object({
+			activityId: StringEnum(ACTIVITY_IDS as [string, ...string[]]),
+			items: Type.Optional(Type.Array(Type.Object({
+				text: Type.String({ minLength: 1, maxLength: MAX_STEP_ITEM_TEXT, description: "Short title of one finding or candidate" }),
+				state: StringEnum(STEP_ITEM_STATES),
+			}), { maxItems: MAX_STEP_ITEMS, description: "Review findings or Reflect candidates with their state; replaces the step's list. Review and Reflect only." })),
+		}),
 		async execute(_id, params, _signal, _update, ctx) {
-			state = setState(pi, ctx, setWorkflowActivity(state, params.activityId));
+			state = setState(pi, ctx, setWorkflowActivity(state, params.activityId, params.items));
 			return { content: [{ type: "text", text: `Workflow activity: ${state.activity!.label}${state.activity!.pass ? ` (pass ${state.activity!.pass})` : ""}.` }], details: { activity: state.activity } };
 		},
 	});
@@ -1040,6 +1076,42 @@ export default function workflowRuntime(
 		},
 	});
 
+	pi.registerTool({
+		name: "set_orchestration",
+		label: "Set Orchestration",
+		description: "Publish the orchestrator's run as the session card lens: what it is doing and each ticket's state, step, accepted gates, parked question and commit. Each call replaces the whole snapshot; an empty ticket list clears it.",
+		promptSnippet: "Publish the orchestrated tickets' states on the session card",
+		promptGuidelines: [
+			"Call set_orchestration only while orchestrating ticket subagents: at kickoff and after each gate, launch, park, and merge. Send every ticket each time.",
+			"Set gates to the number of phase gates you accepted for that ticket. A parked ticket's note is its question; it raises a blocked request until the ticket leaves parked.",
+		],
+		parameters: Type.Object({
+			doing: Type.Optional(Type.String({ minLength: 1, maxLength: 120, description: "What the orchestrator is doing now" })),
+			tickets: Type.Array(Type.Object({
+				id: Type.String({ description: "Ticket id like engine-003" }),
+				state: StringEnum(ORCHESTRATION_STATES),
+				step: Type.Optional(StringEnum(WORKFLOW_DEFINITION.map((step) => step.id))),
+				note: Type.Optional(Type.String({ minLength: 1, maxLength: MAX_ORCHESTRATION_NOTE, description: "Parked question or latest gate result" })),
+				commit: Type.Optional(Type.String({ description: "Short commit hash once committed" })),
+				gates: Type.Optional(Type.Integer({ minimum: 0, maximum: MAX_ORCHESTRATION_GATES, description: "Phase gates you accepted for this ticket" })),
+			}), { maxItems: MAX_ORCHESTRATION_TICKETS }),
+			pr: Type.Optional(Type.String({ minLength: 1, maxLength: 120, description: "Pull request URL or state" })),
+		}),
+		async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+			const before = parkedAttention(state.orchestration);
+			const orchestration = setOrchestration(state.orchestration, params, toolCallId);
+			const { orchestration: _previous, ...rest } = state;
+			state = setState(pi, ctx, orchestration ? { ...rest, orchestration } : rest);
+			// A newer question or handoff keeps priority; the parked request returns once it clears.
+			if (!currentAttention || (before && currentAttention.requestId === before.requestId)) {
+				currentAttention = parkedAttention(orchestration);
+				publishContext(currentAttention);
+			}
+			const count = orchestration?.tickets.length ?? 0;
+			return { content: [{ type: "text", text: count ? `Orchestration published: ${count} ticket${count === 1 ? "" : "s"}.` : "Orchestration cleared." }], details: { orchestration } };
+		},
+	});
+
 	pi.registerShortcut(ADVANCE_SHORTCUT, {
 		description: "Run the next workflow skill, or dismiss completed Commit, on double press",
 		handler: async (ctx) => {
@@ -1077,7 +1149,7 @@ export default function workflowRuntime(
 			}
 
 			generation += 1;
-			state = setState(pi, ctx, startWorkflowStep(state, nextStep, "shortcut"));
+			state = setState(pi, ctx, startStep(state, nextStep, "shortcut"));
 			pi.sendUserMessage(command);
 		},
 	});
@@ -1117,7 +1189,7 @@ export default function workflowRuntime(
 				? transition(state, { type: "end-focus" })
 				: { state, effects: [] as RuntimeEffect[] };
 			const selectedTicket = extractSkillTicket(text) ?? state.ticketId;
-			state = setState(pi, ctx, startWorkflowStep(setWorkflowTicketState(interrupted.state, selectedTicket, "input"), stepName, "input"));
+			state = setState(pi, ctx, startStep(setWorkflowTicketState(interrupted.state, selectedTicket, "input"), stepName, "input"));
 			if (selectedTicket && selectedTicket !== ticketContext?.id) await selectTicket(ctx, selectedTicket);
 			else if (!selectedTicket && !pi.getSessionName()) void generateName(ctx, normalizeText(text, 1_500) ?? "", false);
 			await refreshPlan(ctx);
@@ -1179,6 +1251,14 @@ export default function workflowRuntime(
 		deferredWorkflowInputs = [];
 	});
 
+	// A bound record is authoritative: a broken one records no commits rather than scanning unbound repositories.
+	const workspaceRepoPaths = async (ctx: ExtensionContext): Promise<WorkspaceRepo[]> => {
+		if (!state.worktreeRecord) return workspaceRepos(ctx.cwd);
+		if (!state.ticketId) return [];
+		const binding = await readAuthoritativeBinding(ctx, state.ticketId);
+		return binding.snapshot?.repositories?.map((repo) => ({ path: repo.worktreePath, label: basename(repo.worktreePath) })) ?? [];
+	};
+
 	pi.on("tool_execution_start", async (event, ctx) => {
 		if (event.toolName === "ask_user_question") {
 			const attention = questionAttention(event.toolCallId, event.args);
@@ -1186,12 +1266,33 @@ export default function workflowRuntime(
 				currentAttention = attention;
 				publishContext(attention);
 			}
-			if (state.activeStep === "plan-md") state = setState(pi, ctx, setWorkflowActivity(state, "clarifying-requirements"));
+			// Once orchestration owns the card, the orchestrator's questions must not reopen the held step.
+			if (state.activeStep === "plan-md" && !orchestrationLens(state)) {
+				const questions = (event.args as { questions?: Array<{ question?: unknown }> } | undefined)?.questions;
+				const text = Array.isArray(questions) ? normalizeText(questions[0]?.question, 100) : undefined;
+				const requestId = stableRequestId(event.toolCallId);
+				const answered = state.stepFacts?.questions?.answered ?? 0;
+				const waiting = text && requestId ? { count: questions!.length, text, requestId } : undefined;
+				// A question during critic review keeps the critic stage; earlier questions publish clarification.
+				const critic = WORKFLOW_ACTIVITIES["plan-md"].some((item) => item.stage === "critic" && item.id === state.activity?.id);
+				const base = critic ? state : setWorkflowActivity(state, "clarifying-requirements");
+				state = setState(pi, ctx, { ...base, stepFacts: { ...state.stepFacts, questions: { answered, ...(waiting ? { waiting } : {}) } } });
+			}
+			return;
+		}
+		if (event.toolName === "bash" && state.activeStep === "commit" && !state.currentStepComplete) {
+			const command = (event.args as { command?: unknown } | undefined)?.command;
+			if (typeof command !== "string") return;
+			const run = factsRun;
+			const closeout = closeoutKinds(command);
+			// Recorded before the command runs: Pi awaits start handlers before executing the tool.
+			const repos = runsGitCommit(command) ? await baselines(await workspaceRepoPaths(ctx)) : undefined;
+			if (run === factsRun && (closeout.length || repos)) pendingCommitCalls.set(event.toolCallId, { run, closeout, ...(repos ? { repos } : {}) });
 			return;
 		}
 		if (event.toolName !== "tmux_subagent") return;
 		const args = event.args as { action?: unknown; agent?: unknown } | undefined;
-		if (!args || args.action !== undefined) return;
+		if (!args || args.action !== undefined || orchestrationLens(state)) return;
 		const activity = state.activeStep === "plan-md" && args.agent === "plan-critic" ? "reviewing-plan"
 			: state.activeStep === "review" && args.agent === "code-critic" ? "reviewing-implementation"
 			: state.activeStep === "reflect" && args.agent === "docs-critic" ? "reviewing-guidance"
@@ -1203,8 +1304,28 @@ export default function workflowRuntime(
 		if (event.toolName === "ask_user_question") {
 			const requestId = stableRequestId(event.toolCallId);
 			if (requestId && currentAttention?.kind === "question" && currentAttention.requestId === requestId) {
-				currentAttention = undefined;
-				publishContext();
+				currentAttention = parkedAttention(state.orchestration);
+				publishContext(currentAttention);
+			}
+			// Only the open call of this Plan run counts; a step change already reset the facts.
+			const questions = state.stepFacts?.questions;
+			if (requestId && questions?.waiting?.requestId === requestId) {
+				const answered = questions.answered + (event.isError ? 0 : questions.waiting.count);
+				state = setState(pi, ctx, { ...state, stepFacts: { ...state.stepFacts, questions: { answered } } });
+			}
+		}
+		const pending = pendingCommitCalls.get(event.toolCallId);
+		if (pending) {
+			pendingCommitCalls.delete(event.toolCallId);
+			// Commits are read from each repo's reflog, so one repo's success counts even when the call failed overall.
+			const found = pending.repos ? await newCommits(pending.repos) : [];
+			// Merge into the state as it is now: parallel calls and step changes may have landed during the read.
+			if (pending.run === factsRun) {
+				const commits = mergeCommits(state.stepFacts?.commits ?? [], found);
+				const closed = event.isError ? [] : pending.closeout;
+				const closeout = closed.length ? { ...state.stepFacts?.closeout, ...Object.fromEntries(closed.map((kind) => [kind, true as const])) } : state.stepFacts?.closeout;
+				const stepFacts = { ...state.stepFacts, ...(commits.length ? { commits } : {}), ...(closeout ? { closeout } : {}) };
+				if (JSON.stringify(stepFacts) !== JSON.stringify(state.stepFacts ?? {})) state = setState(pi, ctx, { ...state, stepFacts });
 			}
 		}
 		if (state.activeStep && (state.worktreeRecord || ticketContext?.planFile)) await refreshPlan(ctx);
@@ -1226,7 +1347,9 @@ export default function workflowRuntime(
 	});
 
 	pi.on("before_agent_start", async (event) => {
-		if (currentAttention) { currentAttention = undefined; publishContext(); }
+		// Ordinary attention ends with the turn; a parked ticket's request stays until the ticket leaves parked.
+		const parked = parkedAttention(state.orchestration);
+		if (currentAttention !== parked && JSON.stringify(currentAttention) !== JSON.stringify(parked)) { currentAttention = parked; publishContext(currentAttention); }
 		if (state.execution) {
 			const recovery = recoverFocus(recoveryPending, { type: "before-agent-start" });
 			recoveryPending = recovery.pending;
@@ -1279,6 +1402,8 @@ export default function workflowRuntime(
 		applyMetadataStatus(ctx);
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
+		pendingCommitCalls.clear();
+		factsRun += 1;
 		const branch = ctx.sessionManager.getBranch();
 		const startsEmpty = compactForkStartup || event.reason === "new" || event.reason === "fork";
 		const branchContext = findLatestContext(branch);
@@ -1293,7 +1418,12 @@ export default function workflowRuntime(
 			ticketContext = restoredContext?.ticket;
 			publishContext();
 		}
-		const restored = event.reason === "new" ? { state: {} } : findLatestState(branch);
+		const latest = event.reason === "new" ? { state: {} as WorkflowState } : findLatestState(branch);
+		// Like request-backed question attention, an open question cannot survive the process boundary.
+		const staleWaiting = latest.state.stepFacts?.questions?.waiting !== undefined;
+		const restored = staleWaiting
+			? { ...latest, state: { ...latest.state, stepFacts: { ...latest.state.stepFacts, questions: { answered: latest.state.stepFacts!.questions!.answered } } } }
+			: latest;
 		const boundaryReason = compactForkStartup ? "fork" : event.reason;
 		const result = transition(restored.state, { type: "session-boundary", reason: boundaryReason });
 		const normalizeDefinition = shouldNormalizeWorkflowDefinition(
@@ -1313,7 +1443,7 @@ export default function workflowRuntime(
 			ticketContext = undefined;
 			ticketName = undefined;
 		}
-		if (result.effects.length || normalizeDefinition) {
+		if (result.effects.length || normalizeDefinition || staleWaiting) {
 			state = setState(pi, ctx, result.state);
 			applyEffects(pi, ctx, () => state, result.effects, continuationQueue);
 		} else {
@@ -1322,6 +1452,7 @@ export default function workflowRuntime(
 			applyPlanWidget(ctx, state.plan);
 		}
 		if (event.reason !== "new" && event.reason !== "fork") {
+			currentAttention ??= parkedAttention(state.orchestration);
 			const ticketId = state.ticketId ?? restoredContext?.ticket?.id;
 			if (ticketId) await selectTicket(ctx, ticketId, false, currentAttention);
 			else if (currentAttention) publishContext(currentAttention);
