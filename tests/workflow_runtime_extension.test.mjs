@@ -431,7 +431,7 @@ test("runtime registers commands, shortcuts, and guarded producer tools", async 
     assert.deepEqual([...runtime.commands.keys()].sort(), ["session-metadata-disable", "session-metadata-enable", "session-metadata-status", "session-name-refresh", "wf-clear", "wf-ticket", "wf-todos"]);
     assert.ok(runtime.shortcuts.has("ctrl+shift+right"));
     assert.equal(runtime.shortcuts.size, 2);
-    for (const tool of ["set_session_name", "set_workflow_activity", "set_workflow_ticket", "complete_workflow"]) assert.ok(runtime.tools.has(tool));
+    for (const tool of ["set_session_name", "set_workflow_activity", "set_workflow_ticket", "complete_workflow", "set_orchestration"]) assert.ok(runtime.tools.has(tool));
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
@@ -2157,4 +2157,89 @@ test("Commit lens reads repositories from a bound worktree record", async () => 
     await runtime.emit("tool_execution_end", { toolCallId: "c", toolName: "bash", isError: false });
     assert.deepEqual(runtime.latest("workflow-runtime").stepFacts.commits.map((item) => item.subject), ["Commit p", "Commit e"]);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("set_orchestration publishes a lens-only entry once the parent's step completes", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Metadata redesign");
+    const orchestrate = (id, params) => runtime.tools.get("set_orchestration").execute(id, params, undefined, undefined, runtime.ctx);
+    const activity = (id) => runtime.tools.get("set_workflow_activity").execute(id, { activityId: id }, undefined, undefined, runtime.ctx);
+    const current = () => runtime.latest("workflow-runtime");
+    await runtime.emit("input", { source: "interactive", text: "/skill:plan-md meta-001" });
+    await orchestrate("o1", { doing: "Running 1 ticket", tickets: [{ id: "meta-001", state: "running", step: "execute", gates: 1 }, { id: "other-001", state: "queued" }] });
+    assert.equal(current().activeStep, "plan-md");
+    assert.equal(current().lens.doing, "Inspecting code");
+    await activity("plan-ready");
+    assert.equal(current().activeStep, undefined);
+    assert.equal(current().heldStep, "plan-md");
+    assert.equal(current().lens.doing, "Running 1 ticket");
+    assert.equal(current().lens.summary, "1 running · 1 queued");
+
+    const reloaded = harness(cwd, runtime.branch, runtime.name);
+    await reloaded.emit("session_start", { reason: "reload" });
+    await reloaded.tools.get("set_workflow_activity").execute("a", { activityId: "plan-ready" }, undefined, undefined, reloaded.ctx);
+    assert.equal(reloaded.latest("workflow-runtime").heldStep, "plan-md");
+    assert.equal(reloaded.latest("workflow-runtime").lens.doing, "Running 1 ticket");
+    // A new planning step wins again without clearing the snapshot.
+    await reloaded.emit("input", { source: "interactive", text: "/skill:plan-md other-001" });
+    assert.equal(reloaded.latest("workflow-runtime").activeStep, "plan-md");
+    assert.equal(reloaded.latest("workflow-runtime").lens.doing, "Inspecting code");
+    assert.equal(reloaded.latest("workflow-runtime").orchestration.tickets.length, 2);
+    await reloaded.tools.get("set_workflow_activity").execute("a", { activityId: "plan-ready" }, undefined, undefined, reloaded.ctx);
+    assert.equal(reloaded.latest("workflow-runtime").lens.list.label, "TIX");
+
+    await reloaded.tools.get("set_orchestration").execute("o2", { tickets: [] }, undefined, undefined, reloaded.ctx);
+    assert.equal(reloaded.latest("workflow-runtime").orchestration, undefined);
+    assert.equal(reloaded.latest("workflow-runtime").activeStep, "plan-md");
+    assert.equal(reloaded.latest("workflow-runtime").lens, undefined);
+    await assert.rejects(reloaded.tools.get("set_orchestration").execute("o3", { tickets: [{ id: "x", state: "queued" }] }, undefined, undefined, reloaded.ctx), /id like/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("a parked ticket raises one blocked request that persists until it leaves parked", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Existing");
+    const orchestrate = (id, tickets) => runtime.tools.get("set_orchestration").execute(id, { tickets }, undefined, undefined, runtime.ctx);
+    const attention = () => runtime.latest("pi-agent-hub-context")?.attention;
+    const parked = [{ id: "s-014", state: "parked", note: "Which tile CDN?" }, { id: "s-015", state: "queued" }];
+    await orchestrate("park-1", parked);
+    const first = attention();
+    assert.deepEqual(first, { requestId: first.requestId, kind: "blocked", text: "s-014 parked · Which tile CDN?" });
+    // Republishing the same parked episode keeps its request ID.
+    await orchestrate("park-1b", [{ ...parked[0], note: "Which tile CDN?" }, { id: "s-015", state: "running", step: "execute" }]);
+    assert.equal(attention().requestId, first.requestId);
+    await runtime.emit("before_agent_start", { systemPrompt: "base" });
+    assert.deepEqual(attention(), first);
+
+    // A newer question keeps priority while open; the parked request returns after it clears.
+    await runtime.emit("tool_execution_start", { toolName: "ask_user_question", toolCallId: "q1", args: { questions: [{ question: "Proceed?" }] } });
+    assert.equal(attention().kind, "question");
+    await orchestrate("park-1c", parked);
+    assert.equal(attention().kind, "question");
+    await runtime.emit("tool_execution_end", { toolName: "ask_user_question", toolCallId: "q1" });
+    assert.deepEqual(attention(), first);
+    await runtime.tools.get("hand_off").execute("h1", { kind: "ready", text: "Done" }, undefined, undefined, runtime.ctx);
+    assert.equal(attention().kind, "ready");
+    await runtime.emit("before_agent_start", { systemPrompt: "base" });
+    assert.deepEqual(attention(), first);
+
+    const reloaded = harness(cwd, runtime.branch, "Existing");
+    await reloaded.emit("session_start", { reason: "reload" });
+    await reloaded.emit("before_agent_start", { systemPrompt: "base" });
+    assert.deepEqual(reloaded.latest("pi-agent-hub-context").attention, first);
+
+    await reloaded.tools.get("set_orchestration").execute("unpark", { tickets: [{ id: "s-014", state: "running", step: "execute" }] }, undefined, undefined, reloaded.ctx);
+    assert.equal(reloaded.latest("pi-agent-hub-context").attention, undefined);
+    // Parking again after the earlier request was dismissed issues a new request ID.
+    await reloaded.tools.get("set_orchestration").execute("park-2", { tickets: [{ id: "s-014", state: "parked", note: "Which tile CDN?" }] }, undefined, undefined, reloaded.ctx);
+    const second = reloaded.latest("pi-agent-hub-context").attention;
+    assert.equal(second.text, first.text);
+    assert.notEqual(second.requestId, first.requestId);
+
+    await reloaded.commands.get("wf-clear").handler("", reloaded.ctx);
+    assert.equal(reloaded.latest("workflow-runtime").orchestration, undefined);
+    assert.equal(reloaded.latest("pi-agent-hub-context").attention, undefined);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
 });

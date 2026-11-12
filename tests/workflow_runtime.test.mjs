@@ -19,6 +19,8 @@ import {
   startWorkflowStep,
   transition,
   unlinkWorkflowTicketState,
+  setOrchestration,
+  parkedAttention,
   withWorkflowDefinition,
   WORKFLOW_ACTIVITIES,
   WORKFLOW_DEFINITION,
@@ -808,4 +810,92 @@ test("commit and closeout detection reads executables and subcommands, not text"
   for (const command of ["echo archive_plan.sh plan.md", "cat features_yaml.sh complete", "features_yaml.sh update t-001 --json {}", "grep complete features_yaml.sh"]) {
     assert.deepEqual(closeoutKinds(command), [], command);
   }
+});
+
+test("set_orchestration validates bounds and each call replaces the snapshot", () => {
+  const ticket = (id, state, extra = {}) => ({ id, state, ...extra });
+  const first = setOrchestration(undefined, { doing: " Running  2 ", tickets: [ticket("A-001", "running", { step: "execute", gates: 1 }), ticket("a-002", "committed", { commit: "A1B2C3D" })] }, "call-1");
+  assert.deepEqual(first, { doing: "Running 2", tickets: [{ id: "a-001", state: "running", step: "execute", gates: 1 }, { id: "a-002", state: "committed", commit: "a1b2c3d" }] });
+  const second = setOrchestration(first, { tickets: [ticket("a-003", "queued")] }, "call-2");
+  assert.deepEqual(second, { tickets: [{ id: "a-003", state: "queued" }] });
+  assert.equal(setOrchestration(second, { tickets: [] }, "call-3"), undefined);
+  const many = Array.from({ length: 25 }, (_, index) => ticket(`a-${String(index + 1).padStart(3, "0")}`, "queued"));
+  for (const [input, error] of [
+    [{ tickets: many }, /At most 24/],
+    [{ tickets: [ticket("nope", "queued")] }, /id like/],
+    [{ tickets: [ticket("a-001", "done")] }, /state must be/],
+    [{ tickets: [ticket("a-001", "running", { step: "build" })] }, /step must be/],
+    [{ tickets: [ticket("a-001", "parked", { note: "x".repeat(81) })] }, /note must be 1–80/],
+    [{ tickets: [ticket("a-001", "committed", { commit: "main" })] }, /short hash/],
+    [{ tickets: [ticket("a-001", "running", { gates: -1 })] }, /gates must be/],
+    [{ tickets: [ticket("a-001", "queued"), ticket("A-001", "queued")] }, /repeats/],
+  ]) assert.throws(() => setOrchestration(first, input, "bad"), error);
+  assert.equal(setOrchestration(undefined, { tickets: many.slice(0, 24) }, "max").tickets.length, 24);
+});
+
+test("an epic orchestration lens counts commits and windows 24 tickets to 12 open-first items", () => {
+  const states = ["committed", "committed", "running", "gated", "parked", ...Array(19).fill("queued")];
+  const tickets = states.map((state, index) => ({ id: `e-${String(index + 1).padStart(3, "0")}`, state, ...(state === "committed" ? { commit: "abc1234" } : {}),
+    ...(state === "running" ? { step: "execute" } : state === "gated" ? { step: "review" } : {}), ...(state === "parked" ? { note: "Which CDN?" } : {}) }));
+  const orchestration = setOrchestration(undefined, { doing: "Running 2 tickets", tickets }, "seed");
+  const entry = withWorkflowDefinition({ orchestration });
+  assert.equal(entry.activeStep, undefined);
+  assert.equal(entry.heldStep, undefined);
+  assert.deepEqual(entry.lens.progress, { completed: 2, total: 24, unit: "committed" });
+  assert.equal(entry.lens.summary, "2 running · 1 parked · 19 queued");
+  assert.equal(entry.lens.stages, undefined);
+  const list = entry.lens.list;
+  assert.equal(list.label, "TIX");
+  assert.equal(list.items.length, 12);
+  assert.deepEqual(list.items.slice(0, 3), [
+    { state: "active", text: "e-003  EX" }, { state: "active", text: "e-004  RV" }, { state: "attention", text: "e-005  parked" },
+  ]);
+  assert.deepEqual(list.items[3], { state: "pending", text: "e-006  queued" });
+  // The two commits are hidden behind the open and queued tickets and counted as earlier.
+  assert.equal(list.before, 2);
+  assert.equal(list.after, 10);
+  const small = withWorkflowDefinition({ orchestration: setOrchestration(undefined, { tickets: tickets.slice(0, 6), pr: "#12 draft" }, "seed") }).lens.list;
+  assert.deepEqual(small.items.map((item) => item.text), ["e-001  committed  abc1234", "e-002  committed  abc1234", "e-003  EX", "e-004  RV", "e-005  parked", "e-006  queued"]);
+  assert.equal(small.head, "PR #12 draft");
+  assert.deepEqual(parkedAttention(orchestration), { requestId: orchestration.tickets[4].requestId, kind: "blocked", text: "e-005 parked · Which CDN?" });
+});
+
+test("a single-ticket orchestration lens shows the runner's rail with explicit gates", () => {
+  const lens = (ticket) => withWorkflowDefinition({ orchestration: setOrchestration(undefined, { doing: "Waiting for review", tickets: [ticket] }, "seed") }).lens;
+  const running = lens({ id: "w-002", state: "running", step: "review", gates: 2 });
+  assert.deepEqual(running, {
+    doing: "Waiting for review",
+    stages: [{ label: "PL", state: "done" }, { label: "EX", state: "done" }, { label: "RV", state: "active" }, { label: "RF", state: "pending" }, { label: "CM", state: "pending" }],
+    summary: "2 gates ✓",
+  });
+  assert.equal(lens({ id: "w-002", state: "parked", step: "execute", gates: 1, note: "Which?" }).summary, "1 gate ✓ · parked");
+  assert.equal(lens({ id: "w-002", state: "running", step: "execute" }).summary, undefined);
+  assert.ok(lens({ id: "w-002", state: "committed", commit: "abc1234" }).stages.every((stage) => stage.state === "done"));
+});
+
+test("an active incomplete parent step keeps its own lens; a completed one yields to orchestration", () => {
+  const orchestration = setOrchestration(undefined, { doing: "Running", tickets: [{ id: "o-001", state: "running", step: "execute" }, { id: "o-002", state: "queued" }] }, "seed");
+  const planning = withWorkflowDefinition({ activeStep: "plan-md", activity: { id: "writing-plan", label: "Writing plan" }, orchestration });
+  assert.equal(planning.activeStep, "plan-md");
+  assert.equal(planning.lens.doing, "Writing plan");
+  const ready = withWorkflowDefinition(setWorkflowActivity({ ...startWorkflowStep({ orchestration }, "plan-md") }, "plan-ready"));
+  assert.equal(ready.activeStep, undefined);
+  assert.equal(ready.heldStep, "plan-md");
+  assert.equal(ready.lens.doing, "Running");
+  assert.deepEqual(ready.orchestration, orchestration);
+});
+
+test("a parked episode keeps its question when omitted and its request stays within the attention bound", () => {
+  const first = setOrchestration(undefined, { tickets: [{ id: "p-001", state: "parked", note: "Which CDN?" }] }, "a");
+  const again = setOrchestration(first, { tickets: [{ id: "p-001", state: "parked", step: "execute" }] }, "b");
+  assert.equal(again.tickets[0].note, "Which CDN?");
+  assert.deepEqual(parkedAttention(again), parkedAttention(first));
+  const resumed = setOrchestration(again, { tickets: [{ id: "p-001", state: "running" }] }, "c");
+  assert.equal(resumed.tickets[0].note, undefined);
+  assert.equal(parkedAttention(resumed), undefined);
+  const id = (n) => `${"a".repeat(76)}-${String(n).padStart(3, "0")}`;
+  const long = setOrchestration(undefined, { tickets: [1, 2].map((n) => ({ id: id(n), state: "parked", note: "n".repeat(80) })) }, "d");
+  const text = parkedAttention(long).text;
+  assert.equal([...text].length, 150);
+  assert.match(text, /^a{76}-001 parked · n+ \(\+1 more\)$/);
 });

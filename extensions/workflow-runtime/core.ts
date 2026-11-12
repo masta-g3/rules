@@ -4,7 +4,7 @@ export type WorkflowStepDefinition = {
 	label?: string;
 };
 
-import { normalizeText } from "./session-context.ts";
+import { MAX_ATTENTION, normalizeText, stableRequestId } from "./session-context.ts";
 
 export type WorkflowModeDisplay = {
 	id: string;
@@ -104,8 +104,28 @@ export type WorkflowLens = {
 	stages?: LensStage[];
 	progress?: { completed: number; total: number; unit?: string };
 	pass?: number;
+	summary?: string;
 	list?: { label: string; head?: string; items: Array<{ state: LensState; text: string }>; before: number; after: number };
 };
+
+// The orchestrator's run as it last published it with set_orchestration; each call replaces it.
+export const ORCHESTRATION_STATES = ["queued", "running", "gated", "parked", "committed"] as const;
+export const MAX_ORCHESTRATION_TICKETS = 24;
+export const MAX_ORCHESTRATION_NOTE = 80;
+export const MAX_ORCHESTRATION_GATES = 99;
+const MAX_ORCHESTRATION_TEXT = 120;
+const MAX_ORCHESTRATION_ID = 80;
+export type OrchestrationTicket = {
+	id: string;
+	state: (typeof ORCHESTRATION_STATES)[number];
+	step?: StepName;
+	note?: string;
+	commit?: string;
+	gates?: number;
+	// Stable for one parked episode, so a dismissed request cannot hide a later park.
+	requestId?: string;
+};
+export type WorkflowOrchestration = { doing?: string; tickets: OrchestrationTicket[]; pr?: string };
 
 const LENS_STAGES = 12;
 const LENS_ITEMS = 12;
@@ -217,6 +237,124 @@ function activityLens(state: WorkflowState, step: StepName): WorkflowLens | unde
 	};
 }
 
+const TICKET_ID = /^[a-z][a-z0-9-]*-\d{3}$/i;
+const SHORT_HASH = /^[0-9a-f]{7,12}$/i;
+
+function boundedField(value: unknown, max: number, name: string): string | undefined {
+	if (value === undefined) return undefined;
+	const text = normalizeText(value, max + 1);
+	if (!text || [...text].length > max) throw new Error(`${name} must be 1–${max} characters.`);
+	return text;
+}
+
+/** Validates one set_orchestration call; an empty ticket list clears the snapshot. */
+export function setOrchestration(
+	previous: WorkflowOrchestration | undefined,
+	input: { doing?: unknown; tickets: readonly Record<string, unknown>[]; pr?: unknown },
+	requestSeed: string,
+): WorkflowOrchestration | undefined {
+	if (!Array.isArray(input.tickets)) throw new Error("tickets must be a list.");
+	if (input.tickets.length > MAX_ORCHESTRATION_TICKETS) throw new Error(`At most ${MAX_ORCHESTRATION_TICKETS} tickets are accepted; got ${input.tickets.length}.`);
+	if (!input.tickets.length) return undefined;
+	const ids = new Set<string>();
+	const tickets = input.tickets.map((raw, index): OrchestrationTicket => {
+		const where = `Ticket ${index + 1}`;
+		if (typeof raw.id !== "string" || !TICKET_ID.test(raw.id.trim()) || raw.id.trim().length > MAX_ORCHESTRATION_ID) throw new Error(`${where} needs an id like engine-003, at most ${MAX_ORCHESTRATION_ID} characters.`);
+		const id = raw.id.trim().toLowerCase();
+		if (ids.has(id)) throw new Error(`${where} repeats ${id}.`);
+		ids.add(id);
+		if (!(ORCHESTRATION_STATES as readonly unknown[]).includes(raw.state)) throw new Error(`${where} state must be one of ${ORCHESTRATION_STATES.join(", ")}.`);
+		const state = raw.state as OrchestrationTicket["state"];
+		if (raw.step !== undefined && !WORKFLOW_DEFINITION.some((step) => step.id === raw.step)) throw new Error(`${where} step must be a workflow step id.`);
+		const given = boundedField(raw.note, MAX_ORCHESTRATION_NOTE, `${where} note`);
+		if (raw.commit !== undefined && (typeof raw.commit !== "string" || !SHORT_HASH.test(raw.commit))) throw new Error(`${where} commit must be a short hash.`);
+		if (raw.gates !== undefined && (!Number.isInteger(raw.gates) || (raw.gates as number) < 0 || (raw.gates as number) > MAX_ORCHESTRATION_GATES)) throw new Error(`${where} gates must be a whole number from 0 to ${MAX_ORCHESTRATION_GATES}.`);
+		const before = previous?.tickets.find((ticket) => ticket.id === id);
+		const stillParked = state === "parked" && before?.state === "parked";
+		const requestId = state !== "parked" ? undefined : stillParked && before.requestId ? before.requestId : stableRequestId(`${requestSeed}:${id}`);
+		// A parked episode keeps its question until the ticket leaves parked, even when a later call omits it.
+		const note = given ?? (stillParked ? before.note : undefined);
+		return {
+			id,
+			state,
+			...(raw.step !== undefined ? { step: raw.step as StepName } : {}),
+			...(note ? { note } : {}),
+			...(raw.commit !== undefined ? { commit: (raw.commit as string).toLowerCase() } : {}),
+			...(raw.gates !== undefined ? { gates: raw.gates as number } : {}),
+			...(requestId ? { requestId } : {}),
+		};
+	});
+	const doing = boundedField(input.doing, MAX_ORCHESTRATION_TEXT, "doing");
+	const pr = boundedField(input.pr, MAX_ORCHESTRATION_TEXT, "pr");
+	return { ...(doing ? { doing } : {}), tickets, ...(pr ? { pr } : {}) };
+}
+
+/** The first parked ticket with a note, as the orchestrator's blocked request. */
+export function parkedAttention(orchestration: WorkflowOrchestration | undefined): { requestId: string; kind: "blocked"; text: string } | undefined {
+	const parked = orchestration?.tickets.filter((ticket) => ticket.state === "parked" && ticket.note && ticket.requestId) ?? [];
+	const first = parked[0];
+	if (!first) return undefined;
+	const more = parked.length > 1 ? ` (+${parked.length - 1} more)` : "";
+	// Long ids and notes are cut so the request stays within the context's attention bound.
+	const text = normalizeText(`${first.id} parked · ${first.note}`, MAX_ATTENTION - [...more].length)!.trimEnd();
+	return { requestId: first.requestId!, kind: "blocked", text: `${text}${more}` };
+}
+
+const ORCHESTRATION_ITEM: Record<OrchestrationTicket["state"], LensState> = { committed: "done", running: "active", gated: "active", parked: "attention", queued: "pending" };
+const stepShort = (step: StepName | undefined) => WORKFLOW_DEFINITION.find((item) => item.id === step)?.short;
+
+function ticketItem(ticket: OrchestrationTicket): LensItem {
+	const short = stepShort(ticket.step);
+	const status = (ticket.state === "running" || ticket.state === "gated") && short ? short : ticket.state;
+	return { state: ORCHESTRATION_ITEM[ticket.state], text: [ticket.id, status, ticket.commit].filter(Boolean).join("  ") };
+}
+
+function epicLens(orchestration: WorkflowOrchestration): WorkflowLens {
+	const tickets = orchestration.tickets;
+	const count = (state: OrchestrationTicket["state"]) => tickets.filter((ticket) => ticket.state === state).length;
+	// A ticket waiting at a gate is still running for the epic's counts.
+	const counts = { running: count("running") + count("gated"), parked: count("parked"), queued: count("queued") };
+	const summary = Object.entries(counts).filter(([, value]) => value).map(([state, value]) => `${value} ${state}`).join(" · ");
+	// Open tickets fill the window first, then upcoming ones, then the latest commits; the list keeps call order.
+	const rank = (ticket: OrchestrationTicket) => ticket.state === "queued" ? 1 : ticket.state === "committed" ? 2 : 0;
+	const order = tickets.map((ticket, index) => ({ ticket, index })).sort((a, b) => rank(a.ticket) - rank(b.ticket) || (rank(a.ticket) === 2 ? b.index - a.index : a.index - b.index));
+	const shown = new Set(order.slice(0, LENS_ITEMS).map((item) => item.index));
+	const hidden = tickets.filter((_ticket, index) => !shown.has(index));
+	const before = hidden.filter((ticket) => ticket.state === "committed").length;
+	return {
+		...(orchestration.doing ? { doing: orchestration.doing } : {}),
+		progress: { completed: count("committed"), total: tickets.length, unit: "committed" },
+		...(summary ? { summary } : {}),
+		list: {
+			label: "TIX",
+			...(orchestration.pr ? { head: boundedText(`PR ${orchestration.pr}`) } : {}),
+			items: tickets.filter((_ticket, index) => shown.has(index)).map(ticketItem),
+			before,
+			after: hidden.length - before,
+		},
+	};
+}
+
+function ticketLens(orchestration: WorkflowOrchestration, ticket: OrchestrationTicket): WorkflowLens {
+	const active = ticket.state === "committed" ? WORKFLOW_DEFINITION.length : WORKFLOW_DEFINITION.findIndex((step) => step.id === ticket.step);
+	const summary = [
+		ticket.gates !== undefined ? `${plural(ticket.gates, "gate")} ✓` : "",
+		ticket.state === "parked" ? "parked" : "",
+	].filter(Boolean).join(" · ");
+	return {
+		...(orchestration.doing ? { doing: orchestration.doing } : {}),
+		stages: WORKFLOW_DEFINITION.map((step, index) => ({ label: step.short, state: active < 0 ? "pending" as const : stageState(index, active) })),
+		...(summary ? { summary } : {}),
+	};
+}
+
+/** The orchestration lens wins unless the parent's own step is active and not yet complete. */
+export function orchestrationLens(state: WorkflowState): WorkflowLens | undefined {
+	const orchestration = state.orchestration;
+	if (!orchestration || (state.activeStep && !state.currentStepComplete)) return undefined;
+	return orchestration.tickets.length === 1 ? ticketLens(orchestration, orchestration.tickets[0]!) : epicLens(orchestration);
+}
+
 export function workflowLens(state: WorkflowState): WorkflowLens | undefined {
 	if (!state.activeStep) return undefined;
 	// A completed Commit keeps its closeout, and a completed Review or Reflect its item list, as the card's final state.
@@ -237,6 +375,7 @@ export type WorkflowState = {
 	stepFacts?: WorkflowStepFacts;
 	stepItems?: WorkflowStepItem[];
 	currentStepComplete?: boolean;
+	orchestration?: WorkflowOrchestration;
 	source?: WorkflowSource;
 	updatedAt?: number;
 };
@@ -313,6 +452,8 @@ export function restoreReachedDone(state: WorkflowState): WorkflowState {
 
 export type WorkflowRuntimeEntryData = Omit<WorkflowState, "plan"> & {
 	plan?: Omit<WorkflowPlanDisplay, "current" | "criteria">;
+	// The parent's step while the orchestration lens is published without a rail position.
+	heldStep?: StepName;
 	steps: WorkflowStepDefinition[];
 	activeMode?: WorkflowModeDisplay;
 	lens?: WorkflowLens;
@@ -326,11 +467,14 @@ export function withWorkflowDefinition(state: WorkflowState): WorkflowRuntimeEnt
 	const activeMode = state.execution?.mode === "focus"
 		? { ...FOCUS_MODE_DISPLAY, detail: `turn ${state.execution.turnsCompleted}` }
 		: undefined;
-	const lens = workflowLens(state);
+	const orchestrated = orchestrationLens(state);
+	const lens = orchestrated ?? workflowLens(state);
 	// The task window and criteria count feed only the lens; the published plan keeps counts and phases.
 	const { current: _current, criteria: _criteria, ...plan } = state.plan ?? {};
+	// Hub shows an orchestration lens without a rail, so the parent's step moves out of activeStep.
+	const { activeStep, ...unpositioned } = state;
 	return {
-		...state,
+		...(orchestrated && activeStep ? { ...unpositioned, heldStep: activeStep } : state),
 		...(state.plan ? { plan: plan as Omit<WorkflowPlanDisplay, "current" | "criteria"> } : {}),
 		steps: WORKFLOW_DEFINITION.map((step) => ({ ...step })),
 		...(activeMode ? { activeMode } : {}),
@@ -461,6 +605,7 @@ export function transition(state: WorkflowState, event: RuntimeEvent): Transitio
 			state: {
 				...(event.scope === "execute" ? { activeStep: "execute" as const } : {}),
 				...(ticketId ? { ticketId } : {}),
+				...(state.orchestration ? { orchestration: state.orchestration } : {}),
 				execution: {
 					mode: "focus",
 					scope: event.scope,
