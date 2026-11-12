@@ -322,6 +322,66 @@ test("persisted runtime data includes the producer definition", () => {
   );
 });
 
+test("execute publishes a lens from the plan without the internal window", () => {
+  const { projection } = parseWorkflowPlan("### Phase 1: Build\n- [x] A\n- [x] B\n### Phase 2: Conversation transport\n- [x] C\n- [ ] D\n- [ ] E\n### Phase 3: Ship\n- [ ] F");
+  const entry = withWorkflowDefinition({ activeStep: "execute", ticketId: "x-001", plan: projection });
+  assert.deepEqual(entry.lens, {
+    doing: "D",
+    stages: [{ label: "1", state: "done" }, { label: "2", state: "active" }, { label: "3", state: "pending" }],
+    progress: { completed: 3, total: 6, unit: "tasks" },
+    list: {
+      label: "PLAN", head: "Conversation transport",
+      items: [{ state: "done", text: "C" }, { state: "active", text: "D" }, { state: "pending", text: "E" }],
+      before: 0, after: 0,
+    },
+  });
+  assert.equal("current" in entry.plan, false);
+  assert.deepEqual(entry.plan.tasks, { completed: 3, total: 6 });
+
+  const lines = (count, done) => Array.from({ length: count }, (_, index) => `- [${index < done ? "x" : " "}] Task ${index}`).join("\n");
+  const long = withWorkflowDefinition({ activeStep: "execute", plan: parseWorkflowPlan(`### Phase 1: Long\n${lines(20, 6)}`).projection }).lens.list;
+  assert.deepEqual([long.items.length, long.before, long.after, long.items[3]], [12, 3, 5, { state: "active", text: "Task 6" }]);
+
+  const many = Array.from({ length: 20 }, (_, index) => `### Phase ${index + 1}: P${index + 1}\n- [${index < 15 ? "x" : " "}] T${index}`).join("\n");
+  const stages = withWorkflowDefinition({ activeStep: "execute", plan: parseWorkflowPlan(many).projection }).lens.stages;
+  assert.equal(stages.length, 12);
+  assert.equal(stages.find((stage) => stage.state === "active").label, "16");
+
+  assert.equal(withWorkflowDefinition({ activeStep: "execute" }).lens, undefined);
+  assert.equal(withWorkflowDefinition({ plan: projection }).lens, undefined);
+});
+
+test("other steps publish a lens from activity stages and review passes", () => {
+  const stageLabels = Object.fromEntries(Object.entries(WORKFLOW_ACTIVITIES).map(([step, items]) => [step, items.map((item) => item.stage)]));
+  assert.deepEqual(stageLabels, {
+    "plan-md": ["inspect", "scope", "write", "critic", "critic", "ready"], execute: [],
+    review: ["review", "fix", "done"], reflect: ["review", "update", "done"], commit: ["archive", "commit"],
+  });
+  const planStages = (states) => ["inspect", "scope", "write", "critic", "ready"].map((label, index) => ({ label, state: states[index] }));
+  let plan = startWorkflowStep({}, "plan-md");
+  assert.deepEqual(withWorkflowDefinition(plan).lens, { doing: "Inspecting code", stages: planStages(["active", "pending", "pending", "pending", "pending"]) });
+  plan = setWorkflowActivity(plan, "writing-plan");
+  assert.deepEqual(withWorkflowDefinition(plan).lens.stages, planStages(["done", "done", "active", "pending", "pending"]));
+  for (const activity of ["reviewing-plan", "updating-plan"]) {
+    plan = setWorkflowActivity(plan, activity);
+    assert.deepEqual(withWorkflowDefinition(plan).lens.stages, planStages(["done", "done", "done", "active", "pending"]), activity);
+  }
+  assert.equal(withWorkflowDefinition(setWorkflowActivity(plan, "plan-ready")).lens, undefined);
+
+  let review = setWorkflowActivity(startWorkflowStep({}, "review"), "reviewing-implementation");
+  assert.equal(withWorkflowDefinition(review).lens.pass, undefined);
+  review = setWorkflowActivity(review, "reviewing-implementation");
+  review = setWorkflowActivity(review, "fixing-review-findings");
+  assert.deepEqual(withWorkflowDefinition(review).lens, {
+    doing: "Fixing findings",
+    stages: [{ label: "review", state: "done" }, { label: "fix", state: "active" }, { label: "done", state: "pending" }],
+    pass: 2,
+  });
+
+  assert.equal(withWorkflowDefinition({}).lens, undefined);
+  assert.equal(withWorkflowDefinition(completeWorkflow(startWorkflowStep({}, "commit"))).lens, undefined);
+});
+
 test("focus entries publish one producer-owned active mode display", () => {
   const focused = withWorkflowDefinition({
     ...activeState({ turnsCompleted: 4 }),

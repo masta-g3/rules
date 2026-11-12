@@ -91,7 +91,7 @@ const STOP_NOTICES: Record<Exclude<RuntimeEffect, { kind: "continue" }>["reason"
 type CustomEntry = {
 	type: string;
 	customType?: string;
-	data?: WorkflowState & { steps?: unknown; activeMode?: unknown };
+	data?: WorkflowState & { steps?: unknown; activeMode?: unknown; lens?: unknown };
 };
 
 type RestoredState = {
@@ -208,7 +208,8 @@ function findLatestState(entries: unknown[]): RestoredState {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i] as CustomEntry;
 		if (entry?.type === "custom" && entry.customType === ENTRY_TYPE && entry.data) {
-			const { steps, activeMode: _activeMode, ...state } = entry.data;
+			// Derived display fields are recomputed at publish, never restored.
+			const { steps, activeMode: _activeMode, lens: _lens, ...state } = entry.data;
 			return { state, steps };
 		}
 	}

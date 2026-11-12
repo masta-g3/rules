@@ -50,29 +50,95 @@ export type WorkflowPlanDisplay = {
 
 export const WORKFLOW_ACTIVITIES = {
 	"plan-md": [
-		{ id: "inspecting-code", label: "Inspecting code" },
-		{ id: "clarifying-requirements", label: "Clarifying scope" },
-		{ id: "writing-plan", label: "Writing plan" },
-		{ id: "reviewing-plan", label: "Reviewing plan", review: true },
-		{ id: "updating-plan", label: "Updating plan" },
-		{ id: "plan-ready", label: "Plan ready", terminal: true },
+		{ id: "inspecting-code", label: "Inspecting code", stage: "inspect" },
+		{ id: "clarifying-requirements", label: "Clarifying scope", stage: "scope" },
+		{ id: "writing-plan", label: "Writing plan", stage: "write" },
+		{ id: "reviewing-plan", label: "Reviewing plan", stage: "critic", review: true },
+		{ id: "updating-plan", label: "Updating plan", stage: "critic" },
+		{ id: "plan-ready", label: "Plan ready", stage: "ready", terminal: true },
 	],
 	execute: [],
 	review: [
-		{ id: "reviewing-implementation", label: "Reviewing changes", review: true },
-		{ id: "fixing-review-findings", label: "Fixing findings" },
-		{ id: "review-complete", label: "Review complete", terminal: true },
+		{ id: "reviewing-implementation", label: "Reviewing changes", stage: "review", review: true },
+		{ id: "fixing-review-findings", label: "Fixing findings", stage: "fix" },
+		{ id: "review-complete", label: "Review complete", stage: "done", terminal: true },
 	],
 	reflect: [
-		{ id: "reviewing-guidance", label: "Reviewing guidance", review: true },
-		{ id: "updating-guidance", label: "Updating guidance" },
-		{ id: "reflection-complete", label: "Reflection complete", terminal: true },
+		{ id: "reviewing-guidance", label: "Reviewing guidance", stage: "review", review: true },
+		{ id: "updating-guidance", label: "Updating guidance", stage: "update" },
+		{ id: "reflection-complete", label: "Reflection complete", stage: "done", terminal: true },
 	],
 	commit: [
-		{ id: "archiving-plan", label: "Archiving plan" },
-		{ id: "committing-changes", label: "Committing changes" },
+		{ id: "archiving-plan", label: "Archiving plan", stage: "archive" },
+		{ id: "committing-changes", label: "Committing changes", stage: "commit" },
 	],
 } as const;
+
+type ActivityDefinition = { id: string; label: string; stage: string; review?: boolean; terminal?: boolean };
+
+const activitiesOf = (step: StepName) => WORKFLOW_ACTIVITIES[step] as readonly ActivityDefinition[];
+
+export type LensState = "done" | "active" | "pending" | "attention" | "skipped";
+export type LensStage = { label: string; state: "done" | "active" | "pending" };
+export type WorkflowLens = {
+	doing?: string;
+	stages?: LensStage[];
+	progress?: { completed: number; total: number; unit?: string };
+	pass?: number;
+	list?: { label: string; head?: string; items: Array<{ state: LensState; text: string }>; before: number; after: number };
+};
+
+const LENS_STAGES = 12;
+
+const stageState = (index: number, active: number): LensStage["state"] => index < active ? "done" : index === active ? "active" : "pending";
+
+function executeLens(plan: WorkflowPlanDisplay): WorkflowLens {
+	const phases = plan.phases ?? [];
+	const active = plan.phase ? plan.phase.index - 1 : -1;
+	// Keep the current phase visible when a plan has more phases than the stage bound.
+	const start = Math.max(0, Math.min(active - 3, phases.length - LENS_STAGES));
+	const stages = phases.slice(start, start + LENS_STAGES).map((phase, offset) => {
+		const index = start + offset;
+		const state: LensStage["state"] = phase.completed === phase.total ? "done" : index === active ? "active" : "pending";
+		return { label: String(index + 1), state };
+	});
+	const window = plan.current;
+	const open = window?.tasks.findIndex((task) => !task.done) ?? -1;
+	return {
+		...(plan.nextStep ? { doing: plan.nextStep } : {}),
+		...(stages.length ? { stages } : {}),
+		progress: { ...plan.tasks, unit: "tasks" },
+		...(window?.tasks.length ? {
+			list: {
+				label: "PLAN",
+				...(plan.phase ? { head: plan.phase.title } : {}),
+				items: window.tasks.map((task, index) => ({ state: task.done ? "done" as const : index === open ? "active" as const : "pending" as const, text: task.text })),
+				before: window.before,
+				after: window.after,
+			},
+		} : {}),
+	};
+}
+
+function activityLens(state: WorkflowState, step: StepName): WorkflowLens | undefined {
+	if (!state.activity) return undefined;
+	const definitions = activitiesOf(step);
+	const stages = [...new Set(definitions.map((item) => item.stage))];
+	const current = definitions.find((item) => item.id === state.activity!.id)?.stage;
+	const active = current ? stages.indexOf(current) : -1;
+	const pass = Math.max(0, ...definitions.filter((item) => item.review).map((item) => state.activityPasses?.[item.id] ?? 0));
+	return {
+		doing: state.activity.label,
+		...(stages.length ? { stages: stages.map((label, index) => ({ label, state: stageState(index, active) })) } : {}),
+		...(pass > 1 ? { pass } : {}),
+	};
+}
+
+export function workflowLens(state: WorkflowState): WorkflowLens | undefined {
+	if (!state.activeStep || state.currentStepComplete) return undefined;
+	if (state.activeStep === "execute") return state.plan ? executeLens(state.plan) : undefined;
+	return activityLens(state, state.activeStep);
+}
 
 export type WorkflowState = {
 	activeStep?: StepName;
@@ -116,7 +182,7 @@ export function startWorkflowStep(state: WorkflowState, step: StepName, source?:
 
 export function setWorkflowActivity(state: WorkflowState, activityId: string): WorkflowState {
 	if (!state.activeStep) throw new Error("No active workflow step.");
-	const definition = (WORKFLOW_ACTIVITIES[state.activeStep] as readonly { id: string; label: string; review?: boolean; terminal?: boolean }[]).find((item) => item.id === activityId);
+	const definition = activitiesOf(state.activeStep).find((item) => item.id === activityId);
 	if (!definition) {
 		const owner = WORKFLOW_DEFINITION.find((step) => (WORKFLOW_ACTIVITIES[step.id] as readonly { id: string }[]).some((activity) => activity.id === activityId));
 		throw new Error(`Activity ${activityId} does not belong to ${state.activeStep}.${owner ? ` Call set_workflow_step with stepId "${owner.id}" first, only if the user authorized that step.` : ""}`);
@@ -139,9 +205,11 @@ export function restoreReachedDone(state: WorkflowState): WorkflowState {
 	return done && state.activityPasses?.[done.id] ? setWorkflowActivity(state, done.id) : state;
 }
 
-export type WorkflowRuntimeEntryData = WorkflowState & {
+export type WorkflowRuntimeEntryData = Omit<WorkflowState, "plan"> & {
+	plan?: Omit<WorkflowPlanDisplay, "current">;
 	steps: WorkflowStepDefinition[];
 	activeMode?: WorkflowModeDisplay;
+	lens?: WorkflowLens;
 };
 
 type RestoredWorkflowState = WorkflowState & {
@@ -152,10 +220,15 @@ export function withWorkflowDefinition(state: WorkflowState): WorkflowRuntimeEnt
 	const activeMode = state.execution?.mode === "focus"
 		? { ...FOCUS_MODE_DISPLAY, detail: `turn ${state.execution.turnsCompleted}` }
 		: undefined;
+	const lens = workflowLens(state);
+	// The task window feeds only the lens; the published plan keeps counts and phases.
+	const { current: _current, ...plan } = state.plan ?? {};
 	return {
 		...state,
+		...(state.plan ? { plan: plan as Omit<WorkflowPlanDisplay, "current"> } : {}),
 		steps: WORKFLOW_DEFINITION.map((step) => ({ ...step })),
 		...(activeMode ? { activeMode } : {}),
+		...(lens ? { lens } : {}),
 	};
 }
 
