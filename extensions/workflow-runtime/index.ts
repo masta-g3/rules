@@ -15,6 +15,9 @@ import {
 	recoverFocus,
 	setWorkflowActivity,
 	restoreReachedDone,
+	MAX_STEP_ITEM_TEXT,
+	MAX_STEP_ITEMS,
+	STEP_ITEM_STATES,
 	setWorkflowTicketState,
 	shouldNormalizeWorkflowDefinition,
 	startWorkflowStep,
@@ -893,9 +896,15 @@ export default function workflowRuntime(
 		name: "set_workflow_activity",
 		label: "Set Workflow Activity",
 		description: "Publish a fixed activity for the active workflow step.",
-		parameters: Type.Object({ activityId: StringEnum(ACTIVITY_IDS as [string, ...string[]]) }),
+		parameters: Type.Object({
+			activityId: StringEnum(ACTIVITY_IDS as [string, ...string[]]),
+			items: Type.Optional(Type.Array(Type.Object({
+				text: Type.String({ minLength: 1, maxLength: MAX_STEP_ITEM_TEXT, description: "Short title of one finding or candidate" }),
+				state: StringEnum(STEP_ITEM_STATES),
+			}), { maxItems: MAX_STEP_ITEMS, description: "Review findings or Reflect candidates with their state; replaces the step's list. Review and Reflect only." })),
+		}),
 		async execute(_id, params, _signal, _update, ctx) {
-			state = setState(pi, ctx, setWorkflowActivity(state, params.activityId));
+			state = setState(pi, ctx, setWorkflowActivity(state, params.activityId, params.items));
 			return { content: [{ type: "text", text: `Workflow activity: ${state.activity!.label}${state.activity!.pass ? ` (pass ${state.activity!.pass})` : ""}.` }], details: { activity: state.activity } };
 		},
 	});

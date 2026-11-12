@@ -446,6 +446,75 @@ test("commit lens lists closeout and commits, shows push once reached, and stays
   assert.deepEqual([list.head, list.items.length, list.before, list.after, list.items.at(-1).text], ["14 commits", 12, 3, 0, "r13 abc1234 S13"]);
 });
 
+test("review and reflect lenses list agent-reported items and keep the final list", () => {
+  const findings = [
+    { text: "Retry after unknown delivery showed twice", state: "done" },
+    { text: "Lost history cursor on empty session", state: "done" },
+    { text: "Parser stall on long backtick runs", state: "active" },
+    { text: "Failed read dropped loaded history", state: "open" },
+    { text: "Login in a link: deferred", state: "deferred" },
+  ];
+  let review = setWorkflowActivity(setWorkflowActivity(startWorkflowStep({ ticketId: "x-001" }, "review"), "reviewing-implementation"), "reviewing-implementation");
+  review = setWorkflowActivity(review, "fixing-review-findings", findings);
+  assert.deepEqual(withWorkflowDefinition(review).lens, {
+    doing: "Parser stall on long backtick runs",
+    stages: [{ label: "review", state: "done" }, { label: "fix", state: "active" }, { label: "done", state: "pending" }],
+    pass: 2,
+    list: { label: "FOUND", head: "2 fixed · 2 open · 1 deferred", items: [
+      { state: "done", text: "Retry after unknown delivery showed twice" }, { state: "done", text: "Lost history cursor on empty session" },
+      { state: "active", text: "Parser stall on long backtick runs" }, { state: "pending", text: "Failed read dropped loaded history" },
+      { state: "skipped", text: "Login in a link: deferred" },
+    ], before: 0, after: 0 },
+  });
+  // A call without items keeps the list; with no active item DOING is the activity label.
+  const settled = setWorkflowActivity(review, "fixing-review-findings", findings.map((item) => ({ ...item, state: item.state === "active" ? "done" : item.state })));
+  assert.equal(withWorkflowDefinition(settled).lens.doing, "Fixing findings");
+  assert.deepEqual(setWorkflowActivity(review, "reviewing-implementation").stepItems, review.stepItems);
+  // The completed step keeps its final list with every stage done under its terminal label, also after a reload.
+  const complete = setWorkflowActivity(settled, "review-complete");
+  const final = withWorkflowDefinition(complete);
+  assert.equal(withWorkflowDefinition(setWorkflowActivity(review, "review-complete")).lens.doing, "Review complete");
+  assert.deepEqual(final.lens, { doing: "Review complete", stages: ["review", "fix", "done"].map((label) => ({ label, state: "done" })), pass: 2, list: { ...withWorkflowDefinition(settled).lens.list, head: "3 fixed · 1 open · 1 deferred" } });
+  const { steps: _steps, lens: _lens, activeMode: _mode, ...reloaded } = JSON.parse(JSON.stringify(final));
+  assert.deepEqual(withWorkflowDefinition(reloaded).lens, final.lens);
+  // Without items a completed step still drops its lens.
+  assert.equal(withWorkflowDefinition(setWorkflowActivity(startWorkflowStep({}, "review"), "review-complete")).lens, undefined);
+  assert.equal(withWorkflowDefinition(setWorkflowActivity(startWorkflowStep({}, "plan-md"), "plan-ready")).lens, undefined);
+
+  let reflect = setWorkflowActivity(startWorkflowStep({}, "reflect"), "updating-guidance", [
+    { text: "STRUCTURE.md: transcript source", state: "done" },
+    { text: "STRUCTURE.md: Markdown safety rule", state: "active" },
+    { text: "New ticket: keyboard dock check", state: "attention" },
+    { text: "Retry wording: no change", state: "deferred" },
+  ]);
+  const cands = withWorkflowDefinition(reflect).lens;
+  assert.equal(cands.doing, "STRUCTURE.md: Markdown safety rule");
+  assert.deepEqual([cands.list.label, cands.list.head, cands.list.items.map((item) => item.state)], ["CANDS", "1 applied · 1 now · 1 needs you · 1 no action", ["done", "active", "attention", "skipped"]]);
+  reflect = setWorkflowActivity(reflect, "reflection-complete", [{ text: "STRUCTURE.md: transcript source", state: "done" }]);
+  assert.deepEqual(withWorkflowDefinition(reflect).lens.list.items, [{ state: "done", text: "STRUCTURE.md: transcript source" }]);
+  assert.equal(withWorkflowDefinition(reflect).lens.list.head, "1 applied");
+
+  // Items reset on step change, ticket switch and unlink.
+  assert.equal(startWorkflowStep(review, "review").stepItems, undefined);
+  assert.equal(startWorkflowStep(review, "reflect").stepItems, undefined);
+  assert.equal(setWorkflowTicketState(review, "y-001").stepItems, undefined);
+  assert.deepEqual(setWorkflowTicketState(review, "x-001").stepItems, review.stepItems);
+  assert.equal(unlinkWorkflowTicketState(review).stepItems, undefined);
+});
+
+test("activity items are bounded and accepted only in review and reflect", () => {
+  const item = { text: "A finding", state: "open" };
+  assert.throws(() => setWorkflowActivity(startWorkflowStep({}, "plan-md"), "writing-plan", [item]), /only accepted in review and reflect, not plan-md/);
+  assert.throws(() => setWorkflowActivity(startWorkflowStep({}, "commit"), "archiving-plan", []), /only accepted in review and reflect, not commit/);
+  const review = startWorkflowStep({}, "review");
+  assert.throws(() => setWorkflowActivity(review, "fixing-review-findings", Array(13).fill(item)), /At most 12/);
+  assert.throws(() => setWorkflowActivity(review, "fixing-review-findings", [{ text: " \n ", state: "open" }]), /item 1 needs non-empty text/);
+  assert.throws(() => setWorkflowActivity(review, "fixing-review-findings", [{ text: "x".repeat(121), state: "open" }]), /exceeds 120/);
+  assert.throws(() => setWorkflowActivity(review, "fixing-review-findings", [{ text: "x", state: "pending" }]), /state must be one of/);
+  assert.deepEqual(setWorkflowActivity(review, "fixing-review-findings", [{ text: " Two\nlines ", state: "open" }]).stepItems, [{ text: "Two lines", state: "open" }]);
+  assert.equal(setWorkflowActivity(review, "fixing-review-findings", Array(12).fill(item)).stepItems.length, 12);
+});
+
 test("focus entries publish one producer-owned active mode display", () => {
   const focused = withWorkflowDefinition({
     ...activeState({ turnsCompleted: 4 }),

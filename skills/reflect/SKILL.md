@@ -16,6 +16,7 @@ When the tools are available:
 - The initial activity is `reviewing-guidance`; do not duplicate that signal.
 - Call `set_workflow_activity` with `updating-guidance` before substantive edits, not minor fixes to typos, links, paths, or formatting.
 - Before a successful report, call `set_workflow_activity` with `reflection-complete`.
+- On `updating-guidance` and `reflection-complete`, pass `items`: one short title per reflection candidate (up to 12, each at most 120 characters) with `state` `done` (applied), `active` (being applied now), `open` (to apply), `attention` (needs the user, such as a proposed ticket), or `deferred` (no action). Each call replaces the list. Repeat `updating-guidance` with updated `items` only when a candidate changes state.
 
 ### Process
 

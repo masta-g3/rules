@@ -4,6 +4,8 @@ export type WorkflowStepDefinition = {
 	label?: string;
 };
 
+import { normalizeText } from "./session-context.ts";
+
 export type WorkflowModeDisplay = {
 	id: string;
 	short: string;
@@ -56,6 +58,13 @@ export type WorkflowStepFacts = {
 	closeout?: { archived?: true; ticketDone?: true };
 	pushed?: true;
 };
+
+// Agent-reported Review findings and Reflect candidates, kept for the current step run.
+export const STEP_ITEM_STATES = ["open", "active", "done", "deferred", "attention"] as const;
+export type WorkflowStepItem = { text: string; state: (typeof STEP_ITEM_STATES)[number] };
+export const MAX_STEP_ITEMS = 12;
+export const MAX_STEP_ITEM_TEXT = 120;
+const ITEM_STEPS = ["review", "reflect"] as const;
 
 export const WORKFLOW_ACTIVITIES = {
 	"plan-md": [
@@ -123,6 +132,27 @@ function planList(state: WorkflowState): LensList | undefined {
 	return { label: "PLAN", ...(head ? { head } : {}), items, before: 0, after: 0 };
 }
 
+const ITEM_LENS_STATE: Record<WorkflowStepItem["state"], LensState> = { open: "pending", active: "active", done: "done", deferred: "skipped", attention: "attention" };
+// Each head bucket counts the item states listed with it; Review counts an item that needs the user as open.
+const ITEM_HEADS: Record<(typeof ITEM_STEPS)[number], { label: string; buckets: Array<[string, WorkflowStepItem["state"][]]> }> = {
+	review: { label: "FOUND", buckets: [["fixed", ["done"]], ["open", ["open", "active", "attention"]], ["deferred", ["deferred"]]] },
+	reflect: { label: "CANDS", buckets: [["applied", ["done"]], ["now", ["open", "active"]], ["needs you", ["attention"]], ["no action", ["deferred"]]] },
+};
+
+function itemList(state: WorkflowState, step: (typeof ITEM_STEPS)[number]): LensList | undefined {
+	const items = state.stepItems;
+	if (!items?.length) return undefined;
+	const { label, buckets } = ITEM_HEADS[step];
+	const head = buckets
+		.map(([noun, states]) => [items.filter((item) => states.includes(item.state)).length, noun] as const)
+		.filter(([count]) => count)
+		.map(([count, noun]) => `${count} ${noun}`)
+		.join(" · ");
+	return { label, head, items: items.map((item) => ({ state: ITEM_LENS_STATE[item.state], text: item.text })), before: 0, after: 0 };
+}
+
+const isItemStep = (step: StepName | undefined): step is (typeof ITEM_STEPS)[number] => (ITEM_STEPS as readonly string[]).includes(step ?? "");
+
 function commitList(state: WorkflowState): LensList | undefined {
 	const facts = state.stepFacts;
 	const commits = facts?.commits ?? [];
@@ -175,10 +205,12 @@ function activityLens(state: WorkflowState, step: StepName): WorkflowLens | unde
 	const stages = [...new Set(definitions.map((item) => item.stage))].filter((stage) => stage !== "push" || state.stepFacts?.pushed);
 	const current = definitions.find((item) => item.id === state.activity!.id)?.stage;
 	const active = state.currentStepComplete ? stages.length : current ? stages.indexOf(current) : -1;
-	const list = step === "plan-md" ? planList(state) : step === "commit" ? commitList(state) : undefined;
+	const list = step === "plan-md" ? planList(state) : step === "commit" ? commitList(state) : isItemStep(step) ? itemList(state, step) : undefined;
 	const pass = Math.max(0, ...definitions.filter((item) => item.review).map((item) => state.activityPasses?.[item.id] ?? 0));
+	// A completed step names its terminal activity, such as "Review complete", above its final list.
+	const activeItem = state.currentStepComplete ? undefined : state.stepItems?.find((item) => item.state === "active");
 	return {
-		doing: state.activity.label,
+		doing: activeItem?.text ?? state.activity.label,
 		...(stages.length ? { stages: stages.map((label, index) => ({ label, state: stageState(index, active) })) } : {}),
 		...(pass > 1 ? { pass } : {}),
 		...(list ? { list } : {}),
@@ -187,8 +219,9 @@ function activityLens(state: WorkflowState, step: StepName): WorkflowLens | unde
 
 export function workflowLens(state: WorkflowState): WorkflowLens | undefined {
 	if (!state.activeStep) return undefined;
-	// A completed Commit keeps its closeout as the card's final state.
-	if (state.currentStepComplete && state.activeStep !== "commit") return undefined;
+	// A completed Commit keeps its closeout, and a completed Review or Reflect its item list, as the card's final state.
+	const keepsFinal = state.activeStep === "commit" || (isItemStep(state.activeStep) && state.stepItems?.length);
+	if (state.currentStepComplete && !keepsFinal) return undefined;
 	if (state.activeStep === "execute") return state.plan ? executeLens(state.plan) : undefined;
 	return activityLens(state, state.activeStep);
 }
@@ -202,13 +235,14 @@ export type WorkflowState = {
 	activityPasses?: Record<string, number>;
 	plan?: WorkflowPlanDisplay;
 	stepFacts?: WorkflowStepFacts;
+	stepItems?: WorkflowStepItem[];
 	currentStepComplete?: boolean;
 	source?: WorkflowSource;
 	updatedAt?: number;
 };
 
 export function setWorkflowTicketState(state: WorkflowState, ticketId: string | undefined, source?: WorkflowSource): WorkflowState {
-	const { plan: _plan, activity: _activity, activityPasses: _passes, stepFacts: _facts, currentStepComplete: _complete, worktreeRecord: _binding, ...withoutStepRun } = state;
+	const { plan: _plan, activity: _activity, activityPasses: _passes, stepFacts: _facts, stepItems: _items, currentStepComplete: _complete, worktreeRecord: _binding, ...withoutStepRun } = state;
 	return {
 		...(state.ticketId === ticketId ? state : withoutStepRun),
 		ticketId,
@@ -217,7 +251,7 @@ export function setWorkflowTicketState(state: WorkflowState, ticketId: string | 
 }
 
 export function unlinkWorkflowTicketState(state: WorkflowState, source?: WorkflowSource): WorkflowState {
-	const { ticketId: _ticketId, plan: _plan, execution: _execution, stepFacts: _facts, ...unlinked } = state;
+	const { ticketId: _ticketId, plan: _plan, execution: _execution, stepFacts: _facts, stepItems: _items, ...unlinked } = state;
 	return { ...unlinked, ...(source ? { source } : {}) };
 }
 
@@ -230,18 +264,33 @@ export function startWorkflowStep(state: WorkflowState, step: StepName, source?:
 		activity: first ? { id: first.id, label: first.label } : undefined,
 		activityPasses: {},
 		stepFacts: undefined,
+		stepItems: undefined,
 		currentStepComplete: undefined,
 		...(source ? { source } : {}),
 	};
 }
 
-export function setWorkflowActivity(state: WorkflowState, activityId: string): WorkflowState {
+function checkStepItems(step: StepName, items: readonly { text: unknown; state: unknown }[]): WorkflowStepItem[] {
+	if (!isItemStep(step)) throw new Error(`Activity items are only accepted in review and reflect, not ${step}.`);
+	if (items.length > MAX_STEP_ITEMS) throw new Error(`At most ${MAX_STEP_ITEMS} activity items are accepted; got ${items.length}.`);
+	return items.map((item, index) => {
+		const text = normalizeText(item.text, MAX_STEP_ITEM_TEXT + 1);
+		if (!text) throw new Error(`Activity item ${index + 1} needs non-empty text.`);
+		if ([...text].length > MAX_STEP_ITEM_TEXT) throw new Error(`Activity item ${index + 1} text exceeds ${MAX_STEP_ITEM_TEXT} characters.`);
+		if (!(STEP_ITEM_STATES as readonly unknown[]).includes(item.state)) throw new Error(`Activity item ${index + 1} state must be one of ${STEP_ITEM_STATES.join(", ")}.`);
+		return { text, state: item.state as WorkflowStepItem["state"] };
+	});
+}
+
+// Items replace the step's list; a call without items keeps the last list.
+export function setWorkflowActivity(state: WorkflowState, activityId: string, items?: readonly { text: unknown; state: unknown }[]): WorkflowState {
 	if (!state.activeStep) throw new Error("No active workflow step.");
 	const definition = activitiesOf(state.activeStep).find((item) => item.id === activityId);
 	if (!definition) {
 		const owner = WORKFLOW_DEFINITION.find((step) => (WORKFLOW_ACTIVITIES[step.id] as readonly { id: string }[]).some((activity) => activity.id === activityId));
 		throw new Error(`Activity ${activityId} does not belong to ${state.activeStep}.${owner ? ` Call set_workflow_step with stepId "${owner.id}" first, only if the user authorized that step.` : ""}`);
 	}
+	const stepItems = items ? checkStepItems(state.activeStep, items) : undefined;
 	const passes = { ...(state.activityPasses ?? {}) };
 	// Terminal publishes are counted too, so a ready hand-back can restore a done label this step run reached.
 	if (definition.review || definition.terminal) passes[activityId] = (passes[activityId] ?? 0) + 1;
@@ -249,6 +298,7 @@ export function setWorkflowActivity(state: WorkflowState, activityId: string): W
 	return {
 		...state,
 		...(activityId === "pushing-changes" ? { stepFacts: { ...state.stepFacts, pushed: true as const } } : {}),
+		...(stepItems ? { stepItems } : {}),
 		activityPasses: passes,
 		activity: { id: definition.id, label: definition.label, ...(pass && pass > 1 ? { pass } : {}) },
 		currentStepComplete: definition.terminal ? true : undefined,

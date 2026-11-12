@@ -499,6 +499,30 @@ test("workflow clear commands durably unlink the right projection and release na
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
+test("set_workflow_activity publishes review items as the lens list until unlink", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd);
+    const activity = runtime.tools.get("set_workflow_activity");
+    await runtime.emit("input", { source: "interactive", text: "/skill:review meta-001" });
+    await activity.execute("activity", { activityId: "fixing-review-findings", items: [{ text: "Stale cursor", state: "active" }, { text: "Dropped history", state: "open" }] }, undefined, undefined, runtime.ctx);
+    assert.deepEqual(runtime.latest("workflow-runtime").lens.list, {
+      label: "FOUND", head: "2 open", items: [{ state: "active", text: "Stale cursor" }, { state: "pending", text: "Dropped history" }], before: 0, after: 0,
+    });
+    assert.equal(runtime.latest("workflow-runtime").lens.doing, "Stale cursor");
+    await activity.execute("activity", { activityId: "review-complete", items: [{ text: "Stale cursor", state: "done" }, { text: "Dropped history", state: "deferred" }] }, undefined, undefined, runtime.ctx);
+    assert.equal(runtime.latest("workflow-runtime").lens.list.head, "1 fixed · 1 deferred");
+    const resumed = harness(cwd, runtime.branch, runtime.name);
+    await resumed.emit("session_start", { reason: "resume" });
+    assert.deepEqual(resumed.latest("workflow-runtime").stepItems, [{ text: "Stale cursor", state: "done" }, { text: "Dropped history", state: "deferred" }]);
+    await resumed.commands.get("wf-ticket").handler("clear", resumed.ctx);
+    assert.equal(resumed.latest("workflow-runtime").stepItems, undefined);
+    assert.equal(resumed.latest("workflow-runtime").lens, undefined);
+    await resumed.emit("input", { source: "interactive", text: "/skill:plan-md meta-001" });
+    await assert.rejects(resumed.tools.get("set_workflow_activity").execute("activity", { activityId: "writing-plan", items: [{ text: "x", state: "open" }] }, undefined, undefined, resumed.ctx), /review and reflect/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
 test("unlink invalidates stale naming, handoffs, and deferred workflow input", async () => {
   const cwd = await project();
   const delayed = delayedModel();
