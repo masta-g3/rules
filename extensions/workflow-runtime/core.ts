@@ -467,12 +467,12 @@ type RestoredWorkflowState = WorkflowState & {
 	steps?: unknown;
 };
 
-export function withWorkflowDefinition(state: WorkflowState): WorkflowRuntimeEntryData {
+export function withWorkflowDefinition(state: WorkflowState, openLens?: WorkflowLens): WorkflowRuntimeEntryData {
 	const activeMode = state.execution?.mode === "focus"
 		? { ...FOCUS_MODE_DISPLAY, detail: `turn ${state.execution.turnsCompleted}` }
 		: undefined;
 	const orchestrated = orchestrationLens(state);
-	const lens = orchestrated ?? workflowLens(state);
+	const lens = orchestrated ?? workflowLens(state) ?? (!state.activeStep ? openLens : undefined);
 	// The task window and criteria count feed only the lens; the published plan keeps counts and phases.
 	const { current: _current, criteria: _criteria, ...plan } = state.plan ?? {};
 	// Hub shows an orchestration lens without a rail, so the parent's step moves out of activeStep.
