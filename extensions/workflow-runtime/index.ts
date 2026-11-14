@@ -446,7 +446,7 @@ export default function workflowRuntime(
 	let lastPublishedWorkflow = "";
 	const openSession = () => !process.env.PI_TMUX_SUBAGENTS_JOB_ID && !state.activeStep && !orchestrationLens(state);
 	const publishWorkflow = (nextState = state, force = false) => {
-		const snapshot = withWorkflowDefinition(nextState, process.env.PI_TMUX_SUBAGENTS_JOB_ID ? undefined : openTrack.lens());
+		const snapshot = withWorkflowDefinition(nextState, nextState.activeStep === "execute" || !process.env.PI_TMUX_SUBAGENTS_JOB_ID ? openTrack.lens() : undefined);
 		const comparable = JSON.stringify({ ...snapshot, updatedAt: 0 });
 		if (!force && (!lastPublishedWorkflow && !snapshot.lens || comparable === lastPublishedWorkflow)) return;
 		lastPublishedWorkflow = comparable;
@@ -476,6 +476,7 @@ export default function workflowRuntime(
 		if (nextState.activeStep !== state.activeStep || nextState.ticketId !== state.ticketId || (state.stepFacts && !nextState.stepFacts)) {
 			factsRun += 1;
 			pendingCommitCalls.clear();
+			openTrack.reset();
 		}
 		const updated = { ...nextState, updatedAt: Date.now() };
 		publishWorkflow(updated, true);
@@ -1281,7 +1282,7 @@ export default function workflowRuntime(
 	};
 
 	pi.on("tool_execution_start", async (event, ctx) => {
-		if (openSession()) {
+		if (openSession() || state.activeStep === "execute") {
 			openTrack.start(event.toolCallId, event.toolName, event.args);
 			publishWorkflow();
 		}
@@ -1326,9 +1327,12 @@ export default function workflowRuntime(
 	});
 
 	pi.on("tool_execution_end", async (event, ctx) => {
-		if (openSession()) {
-			openTrack.finish(event.toolCallId);
-			publishWorkflow();
+		if (openSession() || state.activeStep === "execute") {
+			const stage = openTrack.finish(event.toolCallId);
+			if (stage && state.activeStep === "execute") {
+				const activity = stage === "verify" ? { id: "verify", label: "Verifying" } : { id: "implement", label: "Implementing" };
+				state = setState(pi, ctx, { ...state, activity });
+			} else publishWorkflow();
 		}
 		if (event.toolName === "ask_user_question") {
 			const requestId = stableRequestId(event.toolCallId);
@@ -1362,7 +1366,7 @@ export default function workflowRuntime(
 
 	pi.on("agent_end", async (event, ctx) => {
 		openTrack.endTurn();
-		if (openSession()) publishWorkflow();
+		if (openSession() || state.activeStep === "execute") publishWorkflow();
 		const requestGeneration = generation;
 		const stopReason = finalAssistantStopReason(event.messages);
 		await refreshPlan(ctx);
@@ -1497,6 +1501,8 @@ export default function workflowRuntime(
 			if (ticketId) await selectTicket(ctx, ticketId, false, currentAttention);
 			else if (currentAttention) publishContext(currentAttention);
 		}
+		// A saved Execute lens may describe a tool that cannot survive this process boundary.
+		if (!startsEmpty && state.activeStep === "execute") publishWorkflow();
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {

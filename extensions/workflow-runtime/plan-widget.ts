@@ -30,5 +30,5 @@ export class PlanWidget implements Component {
 
 export function applyPlanWidget(ctx: ExtensionContext, plan?: PlanProjection): void {
 	if (!ctx.hasUI) return;
-	ctx.ui.setWidget(PLAN_WIDGET_KEY, plan ? (_tui, theme) => new PlanWidget(theme, plan) : undefined, { placement: "aboveEditor" });
+	ctx.ui.setWidget(PLAN_WIDGET_KEY, plan?.tasks.total ? (_tui, theme) => new PlanWidget(theme, plan) : undefined, { placement: "aboveEditor" });
 }

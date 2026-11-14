@@ -61,7 +61,7 @@ test("late first and changed goals keep the producing turn and newer observation
 test("open lens reuses runtime entry and yields to step and orchestration lenses", () => {
   const lens = { stages: [{ label: "explore", state: "active" }] };
   assert.deepEqual(withWorkflowDefinition({}, lens).lens, lens);
-  assert.equal(withWorkflowDefinition({ activeStep: "execute" }, lens).lens, undefined);
+  assert.equal(withWorkflowDefinition({ activeStep: "execute" }, lens).lens.stages[0].label, "implement");
   const orchestrated = withWorkflowDefinition({ orchestration: { doing: "Coordinating", tickets: [{ id: "x-001", state: "queued" }] } }, lens);
   assert.equal(orchestrated.lens.doing, "Coordinating");
 });
