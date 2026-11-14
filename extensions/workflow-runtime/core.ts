@@ -117,6 +117,8 @@ const MAX_ORCHESTRATION_TEXT = 120;
 const MAX_ORCHESTRATION_ID = 80;
 export type OrchestrationTicket = {
 	id: string;
+	// From the project backlog when the tool runs; the orchestrator never sends it.
+	title?: string;
 	state: (typeof ORCHESTRATION_STATES)[number];
 	step?: StepName;
 	note?: string;
@@ -306,7 +308,9 @@ const stepShort = (step: StepName | undefined) => WORKFLOW_DEFINITION.find((item
 function ticketItem(ticket: OrchestrationTicket): LensItem {
 	const short = stepShort(ticket.step);
 	const status = (ticket.state === "running" || ticket.state === "gated") && short ? short : ticket.state;
-	return { state: ORCHESTRATION_ITEM[ticket.state], text: [ticket.id, status, ticket.commit].filter(Boolean).join("  ") };
+	const tail = [status, ticket.commit].filter(Boolean).join("  ");
+	// Hub folds repeated spaces, so a dot keeps the title apart from the step or state after it.
+	return { state: ORCHESTRATION_ITEM[ticket.state], text: boundedText(ticket.title ? `${ticket.id}  ${ticket.title} · ${tail}` : `${ticket.id}  ${tail}`) };
 }
 
 function epicLens(orchestration: WorkflowOrchestration): WorkflowLens {

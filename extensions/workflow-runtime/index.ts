@@ -1099,7 +1099,13 @@ export default function workflowRuntime(
 		}),
 		async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 			const before = parkedAttention(state.orchestration);
-			const orchestration = setOrchestration(state.orchestration, params, toolCallId);
+			const validated = setOrchestration(state.orchestration, params, toolCallId);
+			// Each ticket line names its title from the backlog the orchestrator plans from.
+			const root = effectiveProjectCwd(ctx.cwd);
+			const orchestration = validated && { ...validated, tickets: await Promise.all(validated.tickets.map(async (ticket) => {
+				const title = (await readTicketContext(root, ticket.id))?.title;
+				return title ? { ...ticket, title } : ticket;
+			})) };
 			const { orchestration: _previous, ...rest } = state;
 			state = setState(pi, ctx, orchestration ? { ...rest, orchestration } : rest);
 			// A newer question or handoff keeps priority; the parked request returns once it clears.

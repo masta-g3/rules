@@ -2195,6 +2195,10 @@ test("set_orchestration publishes a lens-only entry once the parent's step compl
     await reloaded.tools.get("set_workflow_activity").execute("a", { activityId: "plan-ready" }, undefined, undefined, reloaded.ctx);
     assert.equal(reloaded.latest("workflow-runtime").lens.list.label, "TIX");
 
+    // Ticket lines name each ticket's title from the backlog; an unknown ticket keeps its id alone.
+    assert.deepEqual(reloaded.latest("workflow-runtime").lens.list.items.map((item) => item.text), ["meta-001  Metadata redesign · EX", "other-001  Other ticket · queued"]);
+    await reloaded.tools.get("set_orchestration").execute("o1b", { tickets: [{ id: "meta-001", state: "running", step: "review" }, { id: "gone-001", state: "queued" }] }, undefined, undefined, reloaded.ctx);
+    assert.deepEqual(reloaded.latest("workflow-runtime").lens.list.items.map((item) => item.text), ["meta-001  Metadata redesign · RV", "gone-001  queued"]);
     await reloaded.tools.get("set_orchestration").execute("o2", { tickets: [] }, undefined, undefined, reloaded.ctx);
     assert.equal(reloaded.latest("workflow-runtime").orchestration, undefined);
     assert.equal(reloaded.latest("workflow-runtime").activeStep, "plan-md");
