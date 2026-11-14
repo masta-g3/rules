@@ -118,6 +118,8 @@ Shared backlog operations live in `skills/_lib/features_yaml.py` and are invoked
 
 ## CLI Tools
 
+[Card signal study](tools/card-signal/README.md) replays Pi session-card signals and measures progress cadence.
+
 ### pv - Portfolio & Feature Viewer
 
 Terminal TUI for visualizing and editing `agent-work/features.yaml` across projects. `pv`/`fv` are human tools; agents and scripts should use `skills/_lib/features_yaml.sh` for deterministic JSON/id output.
