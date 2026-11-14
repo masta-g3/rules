@@ -86,11 +86,12 @@ export class OpenSessionTrack {
 		const stage = classifyTool(tool, args);
 		this.calls.set(id, stage ? { stage, doing: toolDoing(tool, args, stage) } : {});
 	}
-	finish(id: string): void {
+	finish(id: string): Stage | undefined {
 		// Pi's completion event has no arguments. Capture classification at start, apply it only at end.
 		const call = this.calls.get(id);
 		this.calls.delete(id);
 		if (call?.stage) this.observations.set(call.stage, { turn: this.turn, sequence: ++this.sequence });
+		return call?.stage;
 	}
 	goal(goal: string | undefined, turn: number): void {
 		if (!goal) return;

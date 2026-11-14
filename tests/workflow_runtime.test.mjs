@@ -37,7 +37,7 @@ import {
   recentTranscript,
   sanitizeSessionName,
 } from "../extensions/workflow-runtime/session-context.ts";
-import { parseWorkflowPlan } from "../extensions/workflow-runtime/workflow-plan.ts";
+import { parseWorkflowPlan, readWorkflowPlan } from "../extensions/workflow-runtime/workflow-plan.ts";
 import { closeoutKinds, runsGitCommit } from "../extensions/workflow-runtime/commit-facts.ts";
 
 const expectedWorkflowDefinition = [
@@ -321,6 +321,7 @@ test("persisted runtime data includes the producer definition", () => {
       source: "input",
       updatedAt: 1784772000000,
       steps: expectedWorkflowDefinition,
+      lens: { doing: "Implementing", stages: [{ label: "implement", state: "active" }, { label: "verify", state: "pending" }, { label: "done", state: "pending" }] },
     },
   );
 });
@@ -330,10 +331,11 @@ test("execute publishes a lens from the plan without the internal window", () =>
   const entry = withWorkflowDefinition({ activeStep: "execute", ticketId: "x-001", plan: projection });
   assert.deepEqual(entry.lens, {
     doing: "D",
-    stages: [{ label: "1", state: "done" }, { label: "2", state: "active" }, { label: "3", state: "pending" }],
+    stages: [{ label: "implement", state: "active" }, { label: "verify", state: "pending" }, { label: "done", state: "pending" }],
+    summary: "phase 2/3 · Conversation transport",
     progress: { completed: 3, total: 6, unit: "tasks" },
     list: {
-      label: "PLAN", head: "Conversation transport",
+      label: "PLAN", head: "3 done · 3 open",
       items: [{ state: "done", text: "C" }, { state: "active", text: "D" }, { state: "pending", text: "E" }],
       before: 0, after: 0,
     },
@@ -347,11 +349,60 @@ test("execute publishes a lens from the plan without the internal window", () =>
 
   const many = Array.from({ length: 20 }, (_, index) => `### Phase ${index + 1}: P${index + 1}\n- [${index < 15 ? "x" : " "}] T${index}`).join("\n");
   const stages = withWorkflowDefinition({ activeStep: "execute", plan: parseWorkflowPlan(many).projection }).lens.stages;
-  assert.equal(stages.length, 12);
-  assert.equal(stages.find((stage) => stage.state === "active").label, "16");
-
-  assert.equal(withWorkflowDefinition({ activeStep: "execute" }).lens, undefined);
+  assert.equal(stages.length, 3);
+  assert.equal(stages.find((stage) => stage.state === "active").label, "implement");
+  assert.equal(withWorkflowDefinition({ activeStep: "execute", plan: parseWorkflowPlan(many).projection }).lens.summary, "phase 16/20 · P16");
+  assert.equal(withWorkflowDefinition({ activeStep: "execute" }).lens.doing, "Implementing");
+  assert.equal(withWorkflowDefinition({ activeStep: "execute" }).lens.progress, undefined);
   assert.equal(withWorkflowDefinition({ plan: projection }).lens, undefined);
+});
+
+test("execute separates observed action from checklist position and uses named terminal stages", () => {
+  const plan = parseWorkflowPlan("## Phase 1: Build\n- [ ] Write contract").projection;
+  const state = { activeStep: "execute", activity: { id: "verify", label: "Verifying" }, plan };
+  const observed = { doing: "Checking npm test" };
+  const live = withWorkflowDefinition(state, observed).lens;
+  assert.equal(live.doing, "Checking npm test");
+  assert.equal(live.list.items[0].text, "Write contract");
+  assert.deepEqual(live.stages.map(s => [s.label, s.state]), [["implement", "done"], ["verify", "active"], ["done", "pending"]]);
+  assert.equal(withWorkflowDefinition(state).lens.doing, "Write contract");
+  const done = withWorkflowDefinition({ ...state, plan: parseWorkflowPlan("## Phase 1: Build\n- [x] Write contract").projection }).lens;
+  assert.equal(done.doing, "Implementation complete");
+  assert.deepEqual(done.stages.map(s => s.state), ["done", "done", "done"]);
+  assert.equal(done.list.head, "1 done · 0 open");
+  assert.equal(withWorkflowDefinition({ ...state, currentStepComplete: true }, observed).lens, undefined);
+});
+
+test("plan progress exists without checkboxes and meters count checked criteria only", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "plan-parity-"));
+  try {
+    await writeFile(join(cwd, "plan.md"), "# Plan\nScope only.");
+    const read = await readWorkflowPlan(cwd, "plan.md");
+    assert.equal(read.found, true);
+    assert.equal(read.plan, undefined);
+    const noCriteria = withWorkflowDefinition({ ...startWorkflowStep({}, "plan-md"), plan: read.projection }).lens;
+    assert.equal(noCriteria.progress, undefined);
+    assert.deepEqual(noCriteria.list.items, [{ state: "done", text: "plan written" }]);
+    const projection = parseWorkflowPlan("## Acceptance Criteria\n- [x] First\n- [ ] Second").projection;
+    const state = { ...startWorkflowStep({}, "plan-md"), plan: projection };
+    assert.deepEqual(withWorkflowDefinition(state).lens.progress, { completed: 1, total: 2, unit: "criteria" });
+    assert.deepEqual(withWorkflowDefinition(state).lens.list.items, [{ state: "done", text: "plan written" }, { state: "pending", text: "criteria 1/2" }]);
+    assert.equal(withWorkflowDefinition(setWorkflowActivity(state, "reviewing-plan")).lens.doing, "critic pass 1");
+    const checked = withWorkflowDefinition({ ...state, plan: parseWorkflowPlan("## Acceptance Criteria\n- [x] First\n- [x] Second").projection }).lens;
+    assert.deepEqual(checked.progress, { completed: 2, total: 2, unit: "criteria" });
+    assert.deepEqual(checked.list.items.at(-1), { state: "done", text: "criteria 2/2" });
+    const published = withWorkflowDefinition(state).plan;
+    assert.equal("written" in published, false);
+    assert.equal("criteria" in published, false);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("settlement meters do not invent a denominator for missing or empty items", () => {
+  for (const step of ["review", "reflect", "commit"]) {
+    const state = startWorkflowStep({}, step);
+    assert.equal(withWorkflowDefinition(state).lens.progress, undefined);
+    assert.equal(withWorkflowDefinition({ ...state, stepItems: [] }).lens.progress, undefined);
+  }
 });
 
 test("other steps publish a lens from activity stages and review passes", () => {
@@ -389,7 +440,7 @@ test("other steps publish a lens from activity stages and review passes", () => 
 
 test("parseWorkflowPlan counts acceptance criteria under their heading only", () => {
   const text = "## Phase 1: Build\n- [ ] A\n## Acceptance Criteria\n- [ ] One\n- [x] Two\n### Notes\n- [ ] Three\n## Risks\n- [ ] Not a criterion\n```\n- [ ] fenced\n```";
-  assert.equal(parseWorkflowPlan(text).projection.criteria, 3);
+  assert.deepEqual(parseWorkflowPlan(text).projection.criteria, { checked: 1, total: 3 });
   assert.equal(parseWorkflowPlan("## Phase 1: Build\n- [ ] A").projection.criteria, undefined);
   // The criteria count feeds the lens only.
   assert.equal("criteria" in withWorkflowDefinition({ activeStep: "plan-md", plan: parseWorkflowPlan(text).projection }).plan, false);
@@ -400,14 +451,14 @@ test("plan-md lens lists plan facts, answered and waiting questions, and the cri
   assert.equal(withWorkflowDefinition(plan).lens.list, undefined);
   plan = { ...setWorkflowActivity(plan, "clarifying-requirements"), stepFacts: { questions: { answered: 4, waiting: { count: 1, text: "Keep the button?", requestId: "r" } } } };
   assert.deepEqual(withWorkflowDefinition(plan).lens.list, {
-    label: "PLAN", items: [{ state: "done", text: "4 answered" }, { state: "attention", text: "1 waiting: Keep the button?" }], before: 0, after: 0,
+    label: "PLAN", head: "4 answered · 1 waiting", items: [{ state: "done", text: "4 answered" }, { state: "attention", text: "1 waiting: Keep the button?" }], before: 0, after: 0,
   });
   const phases = "## Phase 1: A\n- [ ] a\n- [ ] b\n## Phase 2: B\n- [ ] c\n## Acceptance Criteria\n- [ ] x\n- [ ] y";
   plan = { ...plan, plan: parseWorkflowPlan(phases).projection, stepFacts: { questions: { answered: 4 } } };
   assert.deepEqual(withWorkflowDefinition(plan).lens.list, {
-    label: "PLAN", head: "2 phases · 3 tasks · 2 criteria", items: [{ state: "done", text: "4 answered" }], before: 0, after: 0,
+    label: "PLAN", head: "2 phases · 3 tasks · 2 criteria", items: [{ state: "done", text: "plan written" }, { state: "pending", text: "criteria 0/2" }, { state: "done", text: "4 answered" }], before: 0, after: 0,
   });
-  assert.deepEqual(withWorkflowDefinition({ ...plan, stepFacts: undefined }).lens.list.items, [{ state: "pending", text: "critic pass 1" }]);
+  assert.deepEqual(withWorkflowDefinition({ ...plan, stepFacts: undefined }).lens.list.items, [{ state: "done", text: "plan written" }, { state: "pending", text: "criteria 0/2" }]);
   plan = setWorkflowActivity(plan, "reviewing-plan");
   assert.deepEqual(withWorkflowDefinition(plan).lens.list.items.at(-1), { state: "active", text: "critic pass 1" });
   plan = setWorkflowActivity(setWorkflowActivity(plan, "reviewing-plan"), "updating-plan");
@@ -462,6 +513,7 @@ test("review and reflect lenses list agent-reported items and keep the final lis
     doing: "Parser stall on long backtick runs",
     stages: [{ label: "review", state: "done" }, { label: "fix", state: "active" }, { label: "done", state: "pending" }],
     pass: 2,
+    progress: { completed: 3, total: 5, unit: "settled" },
     list: { label: "FOUND", head: "2 fixed · 2 open · 1 deferred", items: [
       { state: "done", text: "Retry after unknown delivery showed twice" }, { state: "done", text: "Lost history cursor on empty session" },
       { state: "active", text: "Parser stall on long backtick runs" }, { state: "pending", text: "Failed read dropped loaded history" },
@@ -476,7 +528,7 @@ test("review and reflect lenses list agent-reported items and keep the final lis
   const complete = setWorkflowActivity(settled, "review-complete");
   const final = withWorkflowDefinition(complete);
   assert.equal(withWorkflowDefinition(setWorkflowActivity(review, "review-complete")).lens.doing, "Review complete");
-  assert.deepEqual(final.lens, { doing: "Review complete", stages: ["review", "fix", "done"].map((label) => ({ label, state: "done" })), pass: 2, list: { ...withWorkflowDefinition(settled).lens.list, head: "3 fixed · 1 open · 1 deferred" } });
+  assert.deepEqual(final.lens, { doing: "Review complete", stages: ["review", "fix", "done"].map((label) => ({ label, state: "done" })), pass: 2, progress: { completed: 4, total: 5, unit: "settled" }, list: { ...withWorkflowDefinition(settled).lens.list, head: "3 fixed · 1 open · 1 deferred" } });
   const { steps: _steps, lens: _lens, activeMode: _mode, ...reloaded } = JSON.parse(JSON.stringify(final));
   assert.deepEqual(withWorkflowDefinition(reloaded).lens, final.lens);
   // Without items a completed step still drops its lens.
@@ -491,6 +543,7 @@ test("review and reflect lenses list agent-reported items and keep the final lis
   ]);
   const cands = withWorkflowDefinition(reflect).lens;
   assert.equal(cands.doing, "STRUCTURE.md: Markdown safety rule");
+  assert.deepEqual(cands.progress, { completed: 2, total: 4, unit: "settled" });
   assert.deepEqual([cands.list.label, cands.list.head, cands.list.items.map((item) => item.state)], ["CANDS", "1 applied · 1 now · 1 needs you · 1 no action", ["done", "active", "attention", "skipped"]]);
   reflect = setWorkflowActivity(reflect, "reflection-complete", [{ text: "STRUCTURE.md: transcript source", state: "done" }]);
   assert.deepEqual(withWorkflowDefinition(reflect).lens.list.items, [{ state: "done", text: "STRUCTURE.md: transcript source" }]);
