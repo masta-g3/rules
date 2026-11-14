@@ -13,6 +13,7 @@ export const MAX_REQUEST_ID = 64;
 export const MAX_RECOMMENDATION = 150;
 export const MAX_ARTIFACT = 1_024;
 export const MAX_PROGRESS = 120;
+export const MAX_GOAL = 80;
 const MAX_PROJECT_CWD = 4_096;
 
 export function effectiveProjectCwd(cwd: string, primaryCwd = process.env.PI_AGENT_HUB_PRIMARY_CWD): string {
@@ -28,7 +29,7 @@ export type SessionAttention = {
 	recommendation?: string;
 	artifact?: string;
 };
-export type ProgressNote = { done?: string; next?: string; updatedAt: number };
+export type ProgressNote = { goal?: string; done?: string; next?: string; updatedAt: number };
 export type TicketContext = { id: string; title?: string; subtitle?: string; description?: string; planFile?: string };
 export type PiAgentHubContextV1 = {
 	version: 1;
@@ -49,7 +50,12 @@ Return only the name.
 Do not include a ticket ID, label, quote, or punctuation.`;
 
 export const PROGRESS_PROMPT = `Summarize an agent's progress from the ticket, if any, and the recent conversation.
-Return only a JSON object: {"done":"…","next":"…"}.
+Return only a JSON object: {"goal":"…","done":"…","next":"…"}.
+goal: a short action-and-object task title, at most 80 characters. Name only the topic, not the instructions for this turn.
+For "Debug the failing addition test. Do not fix it yet", goal is "Debug addition", never "Debug addition without fixing it".
+Exclude permissions, restrictions, output format, procedure and completion status from goal.
+If Previous goal is nonempty, copy it exactly unless the user explicitly changes the topic. A fix, more tests or changed permission within the same task keeps the same goal.
+On an explicit topic switch, write a title for the new topic, e.g. "Explain blue sky".
 done: what the agent has concretely achieved so far in this task.
 next: what the agent will do or is waiting for next.
 Each value is one plain sentence of at most 120 characters, stating present or past facts.
@@ -185,13 +191,14 @@ export async function readTicketContext(cwd: string, ticketId: string): Promise<
 	};
 }
 
-function progressFields(value: Record<string, unknown>): { done?: string; next?: string } | undefined {
+function progressFields(value: Record<string, unknown>): Omit<ProgressNote, "updatedAt"> | undefined {
+	const goal = normalizeText(value.goal, MAX_GOAL);
 	const done = normalizeText(value.done, MAX_PROGRESS);
 	const next = normalizeText(value.next, MAX_PROGRESS);
-	return done || next ? { ...(done ? { done } : {}), ...(next ? { next } : {}) } : undefined;
+	return goal || done || next ? { ...(goal ? { goal } : {}), ...(done ? { done } : {}), ...(next ? { next } : {}) } : undefined;
 }
 
-export function parseProgressNote(raw: string): { done?: string; next?: string } | undefined {
+export function parseProgressNote(raw: string): Omit<ProgressNote, "updatedAt"> | undefined {
 	const text = raw.replace(/```(?:json)?/giu, "");
 	const start = text.indexOf("{");
 	const end = text.lastIndexOf("}");

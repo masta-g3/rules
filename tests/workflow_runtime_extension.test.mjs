@@ -149,6 +149,120 @@ async function withForkCompactAttempt(attemptId, run) {
   }
 }
 
+test("open sessions publish live doing, finished stages, stable goal input and topic reseeding", async () => {
+  const model = delayedModel();
+  const runtime = harness("/tmp", [], "Debug limits", model.call);
+  await runtime.emit("session_start", { reason: "new" });
+  const call = async (id, toolName, args) => {
+    await runtime.emit("tool_execution_start", { toolCallId: id, toolName, args });
+    assert.ok(runtime.latest("workflow-runtime").lens.doing);
+    await runtime.emit("tool_execution_end", { toolCallId: id, toolName });
+    assert.equal(runtime.latest("workflow-runtime").lens.doing, undefined);
+  };
+  await runtime.emit("before_agent_start", { systemPrompt: "" });
+  await call("r", "read", { path: "limits.ts" });
+  runtime.branch.push({ type: "message", message: { role: "user", content: "Debug limits" } });
+  await runtime.emit("agent_end", { messages: [] });
+  model.calls[0].resolve('{"goal":"Debug limits","done":"Read limits"}');
+  await settle();
+  assert.equal(runtime.latest("pi-agent-hub-context").progress.goal, "Debug limits");
+  assert.deepEqual(runtime.latest("workflow-runtime").lens.stages.map(s => s.state), ["active", "pending", "pending"]);
+  await runtime.emit("before_agent_start", { systemPrompt: "" });
+  await call("w", "edit", { path: "limits.ts" });
+  await runtime.emit("agent_end", { messages: [] });
+  assert.match(model.calls[1].input, /Previous goal: "Debug limits"/);
+  model.calls[1].resolve('{"goal":"Debug limits","done":"Fixed limits"}');
+  await settle();
+  assert.deepEqual(runtime.latest("workflow-runtime").lens.stages.map(s => s.state), ["done", "active", "pending"]);
+  await runtime.emit("before_agent_start", { systemPrompt: "" });
+  await call("v", "bash", { command: "npm test" });
+  await runtime.emit("agent_end", { messages: [] });
+  model.calls[2].resolve('{"goal":"Explain testing","done":"Checked tests"}');
+  await settle();
+  assert.deepEqual(runtime.latest("workflow-runtime").lens.stages.map(s => s.state), ["pending", "pending", "active"]);
+  const count = runtime.operations.filter(op => op.customType === "workflow-runtime").length;
+  await runtime.emit("tool_execution_end", { toolCallId: "v2", toolName: "bash", args: { command: "npm test" } });
+  assert.equal(runtime.operations.filter(op => op.customType === "workflow-runtime").length, count);
+  await runtime.tools.get("set_workflow_step").execute("step", { stepId: "execute" }, undefined, undefined, runtime.ctx);
+  await runtime.emit("tool_execution_end", { toolCallId: "r2", toolName: "read", args: {} });
+  assert.equal(runtime.latest("workflow-runtime").lens, undefined);
+  await runtime.commands.get("wf-clear").handler("", runtime.ctx);
+  assert.equal(runtime.latest("workflow-runtime").lens, undefined);
+});
+
+test("an active workflow step replaces open signals and suppresses later classified calls", async () => {
+  for (const stepId of ["plan-md", "execute", "review", "reflect", "commit"]) {
+    const runtime = harness("/tmp", [], "Debugging");
+    await runtime.emit("tool_execution_start", { toolCallId: "read", toolName: "read", args: { path: "sum.js" } });
+    await runtime.emit("tool_execution_end", { toolCallId: "read", toolName: "read" });
+    assert.equal(runtime.latest("workflow-runtime").lens.stages[0].label, "explore");
+    await runtime.tools.get("set_workflow_step").execute("step", { stepId }, undefined, undefined, runtime.ctx);
+    for (const event of ["tool_execution_start", "tool_execution_end"]) {
+      await runtime.emit(event, { toolCallId: "edit", toolName: "edit", ...(event.endsWith("start") ? { args: { path: "sum.js" } } : {}) });
+      const snapshot = runtime.latest("workflow-runtime");
+      assert.equal(snapshot.activeStep, stepId);
+      assert.ok(!snapshot.lens?.stages?.some(stage => stage.label === "explore"));
+      assert.notEqual(snapshot.lens?.doing, "Editing sum.js");
+    }
+  }
+});
+
+test("an aborted open turn cannot retain DOING or advance an unfinished stage", async () => {
+  const runtime = harness("/tmp", [], "Debugging");
+  await runtime.emit("tool_execution_start", { toolCallId: "read", toolName: "read", args: { path: "sum.js" } });
+  assert.equal(runtime.latest("workflow-runtime").lens.doing, "Reading sum.js");
+  await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "aborted" }] });
+  assert.equal(runtime.latest("workflow-runtime").lens, undefined);
+});
+
+test("open stage history survives resume without restoring an old live tool", async () => {
+  const initial = harness("/tmp", [], "Debugging");
+  await initial.emit("session_start", { reason: "new" });
+  await initial.emit("tool_execution_start", { toolCallId: "read", toolName: "read", args: { path: "sum.js" } });
+  await initial.emit("tool_execution_end", { toolCallId: "read", toolName: "read" });
+  await initial.emit("tool_execution_start", { toolCallId: "test", toolName: "bash", args: { command: "node --test" } });
+  await initial.emit("tool_execution_end", { toolCallId: "test", toolName: "bash" });
+  await initial.emit("tool_execution_start", { toolCallId: "edit", toolName: "edit", args: { path: "sum.js" } });
+  const resumed = harness("/tmp", initial.branch, "Debugging");
+  await resumed.emit("session_start", { reason: "startup" });
+  assert.equal(resumed.latest("workflow-runtime").lens.doing, undefined);
+  assert.deepEqual(resumed.latest("workflow-runtime").lens.stages.map(s => s.state), ["done", "pending", "active"]);
+  await resumed.emit("tool_execution_start", { toolCallId: "edit2", toolName: "edit", args: { path: "sum.js" } });
+  await resumed.emit("tool_execution_end", { toolCallId: "edit2", toolName: "edit" });
+  assert.deepEqual(resumed.latest("workflow-runtime").lens.stages.map(s => s.state), ["done", "active", "done"]);
+  await resumed.tools.get("set_workflow_step").execute("step", { stepId: "execute" }, undefined, undefined, resumed.ctx);
+  await resumed.commands.get("wf-clear").handler("", resumed.ctx);
+  await resumed.emit("tool_execution_end", { toolCallId: "edit", toolName: "edit" });
+  assert.equal(resumed.latest("workflow-runtime").lens, undefined);
+});
+
+test("orchestration and subagents do not publish the open session lens", async () => {
+  const runtime = harness("/tmp", [], "Orchestrating");
+  await runtime.emit("tool_execution_start", { toolCallId: "prior", toolName: "read", args: { path: "parent.js" } });
+  await runtime.emit("tool_execution_end", { toolCallId: "prior", toolName: "read" });
+  await runtime.tools.get("set_orchestration").execute("o", { doing: "Coordinating", tickets: [{ id: "test-001", state: "queued" }] }, undefined, undefined, runtime.ctx);
+  await runtime.emit("tool_execution_start", { toolCallId: "r", toolName: "read", args: { path: "sum.js" } });
+  await runtime.emit("tool_execution_end", { toolCallId: "r", toolName: "read" });
+  assert.equal(runtime.latest("workflow-runtime").lens.doing, "Coordinating");
+  assert.ok(!runtime.latest("workflow-runtime").lens.stages?.some(stage => stage.label === "explore"));
+  const previous = process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+  process.env.PI_TMUX_SUBAGENTS_JOB_ID = "test-child";
+  try {
+    const child = harness("/tmp", [], "Child");
+    await child.emit("tool_execution_start", { toolCallId: "r", toolName: "read", args: {} });
+    await child.emit("tool_execution_end", { toolCallId: "r", toolName: "read", args: {} });
+    assert.equal(child.latest("workflow-runtime"), undefined);
+    const inherited = harness("/tmp", [{ type: "custom", customType: "workflow-runtime", data: {
+      lens: { doing: "Reading parent.js", stages: [{ label: "explore", state: "active" }, { label: "change", state: "pending" }, { label: "verify", state: "pending" }] },
+    } }], "Child");
+    await inherited.emit("session_start", { reason: "startup" });
+    assert.equal(inherited.latest("workflow-runtime").lens, undefined);
+  } finally {
+    if (previous === undefined) delete process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+    else process.env.PI_TMUX_SUBAGENTS_JOB_ID = previous;
+  }
+});
+
 test("compact-fork startup clears inherited producer state before its exact receipt", async () => {
   const cwd = await project();
   const attemptId = "4ebbf00d-35f9-49a2-b513-a79b3432e402";
@@ -1911,7 +2025,7 @@ test("finished turns publish a progress note that survives later publishes and r
     await runtime.emit("agent_end", end);
     assert.equal(delayed.calls.length, 1);
     assert.match(delayed.calls[0].prompt, /"done"/);
-    assert.match(delayed.calls[0].input, /^Ticket: meta-001[\s\S]*Assistant: Added the contract type\.$/);
+    assert.match(delayed.calls[0].input, /Previous goal: ""[\s\S]*Ticket: meta-001[\s\S]*Assistant: Added the contract type\.$/);
     delayed.calls[0].resolve('```json\n{"done":"Added the contract type.","next":"Write the tests."}\n```');
     await settle();
     const progress = runtime.latest("pi-agent-hub-context").progress;
