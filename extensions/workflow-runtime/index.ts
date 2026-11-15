@@ -142,6 +142,11 @@ function syncFocusPulse(active: boolean): void {
 	}, FOCUS_PULSE_MS);
 }
 
+function withoutNext<T extends { next?: string }>(note: T): Omit<T, "next"> {
+	const { next: _next, ...rest } = note;
+	return rest;
+}
+
 function isStepName(value: string): value is StepName {
 	return WORKFLOW.some((step) => step.id === value);
 }
@@ -741,7 +746,9 @@ export default function workflowRuntime(
 		try {
 			const note = await callMetadata(ctx, "progress note", PROGRESS_PROMPT, input, 128, parseProgressNote);
 			if (!note || requestGeneration !== generation) return;
-			currentProgress = { ...note, updatedAt: Date.now() };
+			// A note that lands after the next turn started cannot say what that turn does next.
+			const fresh = noteTurn === openTrack.turn ? note : withoutNext(note);
+			currentProgress = fresh.goal || fresh.done || fresh.next ? { ...fresh, updatedAt: Date.now() } : undefined;
 			openTrack.goal(note.goal, noteTurn);
 			progressTicketId = ticketId;
 			publishContext(currentAttention);
@@ -1385,7 +1392,10 @@ export default function workflowRuntime(
 		openTrack.beginTurn();
 		// Ordinary attention ends with the turn; a parked ticket's request stays until the ticket leaves parked.
 		const parked = parkedAttention(state.orchestration);
-		if (currentAttention !== parked && JSON.stringify(currentAttention) !== JSON.stringify(parked)) { currentAttention = parked; publishContext(currentAttention); }
+		// NEXT predicts this turn from the last one; once the turn starts it is stale. DONE and GOAL stay true.
+		if (currentProgress?.next) currentProgress = withoutNext(currentProgress);
+		if (currentAttention !== parked && JSON.stringify(currentAttention) !== JSON.stringify(parked)) currentAttention = parked;
+		publishContext(currentAttention);
 		if (state.execution) {
 			const recovery = recoverFocus(recoveryPending, { type: "before-agent-start" });
 			recoveryPending = recovery.pending;

@@ -2132,6 +2132,46 @@ test("finished turns publish a progress note that survives later publishes and r
   }
 });
 
+test("a new turn drops the previous turn's NEXT and keeps DONE and GOAL", async () => {
+  const cwd = await project();
+  const previousJob = process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+  delete process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+  try {
+    const delayed = delayedModel();
+    const runtime = harness(cwd, [], undefined, delayed.call);
+    runtime.branch.push(
+      { type: "message", message: { role: "user", content: "Fix the sum" } },
+      { type: "message", message: { role: "assistant", content: "Should I add negative tests?" } },
+    );
+    const end = { messages: [{ role: "assistant", stopReason: "stop" }] };
+    await runtime.emit("agent_end", end);
+    delayed.calls[0].resolve('{"goal":"Fix sum","done":"Found the subtraction bug.","next":"Await your choice about negative tests."}');
+    await settle();
+    assert.equal(runtime.latest("pi-agent-hub-context").progress.next, "Await your choice about negative tests.");
+
+    await runtime.emit("before_agent_start", { systemPrompt: "" });
+    const started = runtime.latest("pi-agent-hub-context").progress;
+    assert.deepEqual({ ...started, updatedAt: 0 }, { goal: "Fix sum", done: "Found the subtraction bug.", updatedAt: 0 });
+
+    // A note still pending when the next turn starts predicts the turn that already began.
+    await runtime.emit("agent_end", end);
+    await runtime.emit("before_agent_start", { systemPrompt: "" });
+    delayed.calls[1].resolve('{"goal":"Fix sum","done":"Fixed the sum.","next":"Run the tests."}');
+    await settle();
+    const late = runtime.latest("pi-agent-hub-context").progress;
+    assert.deepEqual({ ...late, updatedAt: 0 }, { goal: "Fix sum", done: "Fixed the sum.", updatedAt: 0 });
+
+    await runtime.emit("agent_end", end);
+    delayed.calls[2].resolve('{"goal":"Fix sum","done":"Fixed the sum.","next":"Run the tests."}');
+    await settle();
+    assert.equal(runtime.latest("pi-agent-hub-context").progress.next, "Run the tests.");
+  } finally {
+    if (previousJob === undefined) delete process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+    else process.env.PI_TMUX_SUBAGENTS_JOB_ID = previousJob;
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test("switching tickets drops the previous ticket's progress note", async () => {
   const cwd = await project();
   const previousJob = process.env.PI_TMUX_SUBAGENTS_JOB_ID;
