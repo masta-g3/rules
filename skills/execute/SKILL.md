@@ -25,7 +25,7 @@ Check the relevant baseline once before starting. Report existing failures; stop
 
 ### Begin Implementation
 
-Iterate through each phase: implement, verify existing features still work, confirm tests pass, then move on. Mark completed steps with `[x]` as you go.
+Iterate through each phase: implement, verify existing features still work, confirm tests pass, then move on. After verifying a task, mark it `[x]` before starting the next distinct task. You may mark tasks verified together in one edit; do not wait until an unrelated phase ends.
 
 Execute the approved plan autonomously end-to-end unless the plan says otherwise. Resolve routine implementation issues within the approved scope. If a fix would change agreed behavior, acceptance criteria, architecture, dependencies, or data safety, stop and ask the user before proceeding. Record approved changes in the plan before continuing.
 
