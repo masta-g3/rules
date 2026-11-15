@@ -17,7 +17,7 @@ PI_PACKAGE = GLOBAL_NODE_MODULES / "@earendil-works" / "pi-coding-agent"
 class WorkflowRuntimeTest(unittest.TestCase):
     def test_runtime_behavior(self) -> None:
         result = subprocess.run(
-            ["node", "--experimental-strip-types", "--test", str(NODE_TEST)],
+            ["node", "--experimental-strip-types", "--test", str(NODE_TEST), str(REPO_ROOT / "tests" / "workflow_runtime_open_session.test.mjs")],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,

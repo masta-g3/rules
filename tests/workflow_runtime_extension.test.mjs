@@ -6,7 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import workflowRuntime from "../extensions/workflow-runtime/index.ts";
-import { PlanWidget } from "../extensions/workflow-runtime/plan-widget.ts";
+import { applyPlanWidget, PlanWidget } from "../extensions/workflow-runtime/plan-widget.ts";
 import { createSessionModelCall, resolveSessionModels } from "../extensions/workflow-runtime/session-model.ts";
 import { TodoPanel } from "../extensions/workflow-runtime/todo-panel.ts";
 import { parseWorkflowPlan } from "../extensions/workflow-runtime/workflow-plan.ts";
@@ -148,6 +148,179 @@ async function withForkCompactAttempt(attemptId, run) {
     delete globalThis[RESET_CAPABILITY];
   }
 }
+
+test("execute derives live action and verify stages from tool events without checking tasks", async () => {
+  const cwd = await project();
+  try {
+    const runtime = harness(cwd, [], "Parity");
+    await runtime.emit("session_start", { reason: "new" });
+    await runtime.commands.get("wf-ticket").handler("meta-001", runtime.ctx);
+    await runtime.tools.get("set_workflow_step").execute("step", { stepId: "execute" }, undefined, undefined, runtime.ctx);
+    const lens = () => runtime.latest("workflow-runtime").lens;
+    await runtime.emit("tool_execution_start", { toolName: "bash", toolCallId: "test", args: { command: "npm test" } });
+    assert.equal(lens().doing, "Checking npm test");
+    assert.equal(lens().list.items[0].text, "Add contract");
+    await runtime.emit("tool_execution_end", { toolName: "bash", toolCallId: "test", isError: true });
+    assert.equal(lens().doing, "Add contract");
+    assert.deepEqual(lens().stages.map(s => [s.label, s.state]), [["implement", "done"], ["verify", "active"], ["done", "pending"]]);
+    assert.deepEqual(lens().progress, { completed: 0, total: 1, unit: "tasks" });
+    const restored = harness(cwd, runtime.branch, "Parity");
+    await restored.emit("session_start", { reason: "resume" });
+    assert.equal(restored.latest("workflow-runtime").lens.stages[1].state, "active");
+    assert.equal(restored.latest("workflow-runtime").lens.doing, "Add contract");
+    await runtime.emit("tool_execution_start", { toolName: "read", toolCallId: "read", args: { path: "sum.js" } });
+    await runtime.emit("tool_execution_end", { toolName: "read", toolCallId: "read" });
+    assert.equal(lens().stages[0].state, "active");
+    await runtime.emit("tool_execution_start", { toolName: "edit", toolCallId: "edit", args: { path: "sum.js" } });
+    assert.equal(lens().doing, "Editing sum.js");
+    await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "aborted" }] });
+    assert.equal(lens().doing, "Add contract");
+    await writeFile(join(cwd, "agent-work/plans/meta-001.md"), "### Phase 1: Foundation\n- [x] Add contract\n");
+    await runtime.emit("tool_execution_end", { toolName: "edit", toolCallId: "edit" });
+    assert.equal(lens().doing, "Implementation complete");
+    assert.deepEqual(lens().stages.map(s => s.state), ["done", "done", "done"]);
+    await runtime.emit("tool_execution_start", { toolName: "bash", toolCallId: "late", args: { command: "npm test" } });
+    await runtime.tools.get("set_workflow_step").execute("review", { stepId: "review" }, undefined, undefined, runtime.ctx);
+    await runtime.tools.get("set_workflow_step").execute("again", { stepId: "execute" }, undefined, undefined, runtime.ctx);
+    await runtime.emit("tool_execution_end", { toolName: "bash", toolCallId: "late" });
+    assert.equal(runtime.latest("workflow-runtime").activity, undefined, "a late completion cannot update a new step run");
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test("Execute resume clears persisted live DOING even without a linked plan", async () => {
+  const initial = harness("/tmp", [], "Execute");
+  await initial.tools.get("set_workflow_step").execute("step", { stepId: "execute" }, undefined, undefined, initial.ctx);
+  await initial.emit("tool_execution_start", { toolCallId: "read", toolName: "read", args: { path: "stale.ts" } });
+  assert.equal(initial.latest("workflow-runtime").lens.doing, "Reading stale.ts");
+  for (const reason of ["resume", "reload", "startup"]) {
+    const resumed = harness("/tmp", initial.branch, "Execute");
+    await resumed.emit("session_start", { reason });
+    assert.equal(resumed.latest("workflow-runtime").lens.doing, "Implementing", reason);
+    assert.equal(resumed.latest("workflow-runtime").lens.progress, undefined);
+    assert.deepEqual(resumed.latest("workflow-runtime").lens.stages.map(stage => stage.label), ["implement", "verify", "done"]);
+  }
+});
+
+test("open sessions publish live doing, finished stages, stable goal input and topic reseeding", async () => {
+  const model = delayedModel();
+  const runtime = harness("/tmp", [], "Debug limits", model.call);
+  await runtime.emit("session_start", { reason: "new" });
+  const call = async (id, toolName, args) => {
+    await runtime.emit("tool_execution_start", { toolCallId: id, toolName, args });
+    assert.ok(runtime.latest("workflow-runtime").lens.doing);
+    await runtime.emit("tool_execution_end", { toolCallId: id, toolName });
+    assert.equal(runtime.latest("workflow-runtime").lens.doing, undefined);
+  };
+  await runtime.emit("before_agent_start", { systemPrompt: "" });
+  await call("r", "read", { path: "limits.ts" });
+  runtime.branch.push({ type: "message", message: { role: "user", content: "Debug limits" } });
+  await runtime.emit("agent_end", { messages: [] });
+  model.calls[0].resolve('{"goal":"Debug limits","done":"Read limits"}');
+  await settle();
+  assert.equal(runtime.latest("pi-agent-hub-context").progress.goal, "Debug limits");
+  assert.deepEqual(runtime.latest("workflow-runtime").lens.stages.map(s => s.state), ["active", "pending", "pending"]);
+  await runtime.emit("before_agent_start", { systemPrompt: "" });
+  await call("w", "edit", { path: "limits.ts" });
+  await runtime.emit("agent_end", { messages: [] });
+  assert.match(model.calls[1].input, /Previous goal: "Debug limits"/);
+  model.calls[1].resolve('{"goal":"Debug limits","done":"Fixed limits"}');
+  await settle();
+  assert.deepEqual(runtime.latest("workflow-runtime").lens.stages.map(s => s.state), ["done", "active", "pending"]);
+  await runtime.emit("before_agent_start", { systemPrompt: "" });
+  await call("v", "bash", { command: "npm test" });
+  await runtime.emit("agent_end", { messages: [] });
+  model.calls[2].resolve('{"goal":"Explain testing","done":"Checked tests"}');
+  await settle();
+  assert.deepEqual(runtime.latest("workflow-runtime").lens.stages.map(s => s.state), ["pending", "pending", "active"]);
+  const count = runtime.operations.filter(op => op.customType === "workflow-runtime").length;
+  await runtime.emit("tool_execution_end", { toolCallId: "v2", toolName: "bash", args: { command: "npm test" } });
+  assert.equal(runtime.operations.filter(op => op.customType === "workflow-runtime").length, count);
+  await runtime.tools.get("set_workflow_step").execute("step", { stepId: "execute" }, undefined, undefined, runtime.ctx);
+  await runtime.emit("tool_execution_end", { toolCallId: "r2", toolName: "read", args: {} });
+  assert.equal(runtime.latest("workflow-runtime").lens.doing, "Implementing");
+  await runtime.commands.get("wf-clear").handler("", runtime.ctx);
+  assert.equal(runtime.latest("workflow-runtime").lens, undefined);
+});
+
+test("workflow steps replace open stages; only Execute keeps live classified calls", async () => {
+  for (const stepId of ["plan-md", "execute", "review", "reflect", "commit"]) {
+    const runtime = harness("/tmp", [], "Debugging");
+    await runtime.emit("tool_execution_start", { toolCallId: "read", toolName: "read", args: { path: "sum.js" } });
+    await runtime.emit("tool_execution_end", { toolCallId: "read", toolName: "read" });
+    assert.equal(runtime.latest("workflow-runtime").lens.stages[0].label, "explore");
+    await runtime.tools.get("set_workflow_step").execute("step", { stepId }, undefined, undefined, runtime.ctx);
+    for (const event of ["tool_execution_start", "tool_execution_end"]) {
+      await runtime.emit(event, { toolCallId: "edit", toolName: "edit", ...(event.endsWith("start") ? { args: { path: "sum.js" } } : {}) });
+      const snapshot = runtime.latest("workflow-runtime");
+      assert.equal(snapshot.activeStep, stepId);
+      assert.ok(!snapshot.lens?.stages?.some(stage => stage.label === "explore"));
+      if (stepId === "execute" && event.endsWith("start")) assert.equal(snapshot.lens.doing, "Editing sum.js");
+      else assert.notEqual(snapshot.lens?.doing, "Editing sum.js");
+    }
+  }
+});
+
+test("an aborted open turn cannot retain DOING or advance an unfinished stage", async () => {
+  const runtime = harness("/tmp", [], "Debugging");
+  await runtime.emit("tool_execution_start", { toolCallId: "read", toolName: "read", args: { path: "sum.js" } });
+  assert.equal(runtime.latest("workflow-runtime").lens.doing, "Reading sum.js");
+  await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "aborted" }] });
+  assert.equal(runtime.latest("workflow-runtime").lens, undefined);
+});
+
+test("open stage history survives resume without restoring an old live tool", async () => {
+  const initial = harness("/tmp", [], "Debugging");
+  await initial.emit("session_start", { reason: "new" });
+  await initial.emit("tool_execution_start", { toolCallId: "read", toolName: "read", args: { path: "sum.js" } });
+  await initial.emit("tool_execution_end", { toolCallId: "read", toolName: "read" });
+  await initial.emit("tool_execution_start", { toolCallId: "test", toolName: "bash", args: { command: "node --test" } });
+  await initial.emit("tool_execution_end", { toolCallId: "test", toolName: "bash" });
+  await initial.emit("tool_execution_start", { toolCallId: "edit", toolName: "edit", args: { path: "sum.js" } });
+  const resumed = harness("/tmp", initial.branch, "Debugging");
+  await resumed.emit("session_start", { reason: "startup" });
+  assert.equal(resumed.latest("workflow-runtime").lens.doing, undefined);
+  assert.deepEqual(resumed.latest("workflow-runtime").lens.stages.map(s => s.state), ["done", "pending", "active"]);
+  await resumed.emit("tool_execution_start", { toolCallId: "edit2", toolName: "edit", args: { path: "sum.js" } });
+  await resumed.emit("tool_execution_end", { toolCallId: "edit2", toolName: "edit" });
+  assert.deepEqual(resumed.latest("workflow-runtime").lens.stages.map(s => s.state), ["done", "active", "done"]);
+  await resumed.tools.get("set_workflow_step").execute("step", { stepId: "execute" }, undefined, undefined, resumed.ctx);
+  await resumed.commands.get("wf-clear").handler("", resumed.ctx);
+  await resumed.emit("tool_execution_end", { toolCallId: "edit", toolName: "edit" });
+  assert.equal(resumed.latest("workflow-runtime").lens, undefined);
+});
+
+test("orchestration and subagents do not publish the open session lens", async () => {
+  const runtime = harness("/tmp", [], "Orchestrating");
+  await runtime.emit("tool_execution_start", { toolCallId: "prior", toolName: "read", args: { path: "parent.js" } });
+  await runtime.emit("tool_execution_end", { toolCallId: "prior", toolName: "read" });
+  await runtime.tools.get("set_orchestration").execute("o", { doing: "Coordinating", tickets: [{ id: "test-001", state: "queued" }] }, undefined, undefined, runtime.ctx);
+  await runtime.emit("tool_execution_start", { toolCallId: "r", toolName: "read", args: { path: "sum.js" } });
+  await runtime.emit("tool_execution_end", { toolCallId: "r", toolName: "read" });
+  assert.equal(runtime.latest("workflow-runtime").lens.doing, "Coordinating");
+  assert.ok(!runtime.latest("workflow-runtime").lens.stages?.some(stage => stage.label === "explore"));
+  const previous = process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+  process.env.PI_TMUX_SUBAGENTS_JOB_ID = "test-child";
+  try {
+    const child = harness("/tmp", [], "Child");
+    await child.emit("tool_execution_start", { toolCallId: "r", toolName: "read", args: {} });
+    await child.emit("tool_execution_end", { toolCallId: "r", toolName: "read", args: {} });
+    assert.equal(child.latest("workflow-runtime"), undefined);
+    const inherited = harness("/tmp", [{ type: "custom", customType: "workflow-runtime", data: {
+      lens: { doing: "Reading parent.js", stages: [{ label: "explore", state: "active" }, { label: "change", state: "pending" }, { label: "verify", state: "pending" }] },
+    } }], "Child");
+    await inherited.emit("session_start", { reason: "startup" });
+    assert.equal(inherited.latest("workflow-runtime").lens, undefined);
+    await child.tools.get("set_workflow_step").execute("execute", { stepId: "execute" }, undefined, undefined, child.ctx);
+    await child.emit("tool_execution_start", { toolCallId: "v", toolName: "bash", args: { command: "npm test" } });
+    assert.equal(child.latest("workflow-runtime").lens.doing, "Checking npm test");
+    await child.emit("tool_execution_end", { toolCallId: "v", toolName: "bash" });
+    assert.equal(child.latest("workflow-runtime").lens.stages[1].state, "active");
+    assert.equal(child.latest("workflow-runtime").lens.progress, undefined);
+  } finally {
+    if (previous === undefined) delete process.env.PI_TMUX_SUBAGENTS_JOB_ID;
+    else process.env.PI_TMUX_SUBAGENTS_JOB_ID = previous;
+  }
+});
 
 test("compact-fork startup clears inherited producer state before its exact receipt", async () => {
   const cwd = await project();
@@ -337,6 +510,19 @@ test("capability cleanup respects a later producer registration", async () => {
     delete globalThis[RESET_CAPABILITY];
     await rm(cwd, { recursive: true, force: true });
   }
+});
+
+test("a checkbox-free plan supplies lens facts without creating a zero-denominator task widget", () => {
+  let factory;
+  const ctx = { hasUI: true, ui: { setWidget(_id, value) { factory = value; } } };
+  const { projection } = parseWorkflowPlan("# Plan\nScope is written; no checklist yet.");
+  assert.equal(projection.written, true);
+  applyPlanWidget(ctx, projection);
+  assert.equal(factory, undefined);
+  applyPlanWidget(ctx, parseWorkflowPlan("# Plan\n- [ ] Inspect source").projection);
+  assert.equal(typeof factory, "function");
+  applyPlanWidget(ctx, projection);
+  assert.equal(factory, undefined, "a rewritten checklist-free plan clears the old task widget");
 });
 
 test("plan widget and todo drawer remain bounded and read only", () => {
@@ -735,9 +921,10 @@ test("ticket context precedes native name, ordinary turns stay stable, and plan 
     assert.equal(runtime.latest("workflow-runtime").plan.current, undefined);
     assert.deepEqual(runtime.latest("workflow-runtime").lens, {
       doing: "Add tests",
-      stages: [{ label: "1", state: "active" }],
+      stages: [{ label: "implement", state: "active" }, { label: "verify", state: "pending" }, { label: "done", state: "pending" }],
+      summary: "phase 1/1 · Foundation",
       progress: { completed: 1, total: 2, unit: "tasks" },
-      list: { label: "PLAN", head: "Foundation", items: [{ state: "done", text: "Add contract" }, { state: "active", text: "Add tests" }], before: 0, after: 0 },
+      list: { label: "PLAN", head: "1 done · 1 open", items: [{ state: "done", text: "Add contract" }, { state: "active", text: "Add tests" }], before: 0, after: 0 },
     });
     assert.ok(runtime.ctx.ui && runtime.renderWorkflow(80));
     await runtime.commands.get("wf-todos").handler("", runtime.ctx);
@@ -764,7 +951,7 @@ test("a reload never republishes a stored lens after completion or unlinking", a
       await reloaded.emit("session_start", { reason: "reload" });
       assert.equal(reloaded.branch.filter((entry) => entry.customType === "workflow-runtime").length, 2);
       // A completed Commit recomputes its closeout lens from state; the stored lens never returns.
-      assert.equal(reloaded.latest("workflow-runtime").lens?.doing, data.activeStep === "commit" ? "Commit complete" : undefined);
+      assert.equal(reloaded.latest("workflow-runtime").lens?.doing, data.activeStep === "commit" ? "Commit complete" : "Implementing");
     }
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
@@ -1911,7 +2098,7 @@ test("finished turns publish a progress note that survives later publishes and r
     await runtime.emit("agent_end", end);
     assert.equal(delayed.calls.length, 1);
     assert.match(delayed.calls[0].prompt, /"done"/);
-    assert.match(delayed.calls[0].input, /^Ticket: meta-001[\s\S]*Assistant: Added the contract type\.$/);
+    assert.match(delayed.calls[0].input, /Previous goal: ""[\s\S]*Ticket: meta-001[\s\S]*Assistant: Added the contract type\.$/);
     delayed.calls[0].resolve('```json\n{"done":"Added the contract type.","next":"Write the tests."}\n```');
     await settle();
     const progress = runtime.latest("pi-agent-hub-context").progress;
@@ -1975,12 +2162,12 @@ test("Plan lens counts answered and waiting questions per step run", async () =>
     const list = () => runtime.latest("workflow-runtime").lens.list;
     await runtime.emit("input", { source: "interactive", text: "/skill:plan-md meta-001" });
     await ask("q1", ["Scope?", "Timing?"]);
-    assert.deepEqual(list().items[0], { state: "attention", text: "2 waiting: Scope?" });
+    assert.deepEqual(list().items.at(-1), { state: "attention", text: "2 waiting: Scope?" });
     await answer("q1");
     await ask("q2", ["Keep the reply button?"]);
-    assert.deepEqual(list().items.slice(0, 2), [{ state: "done", text: "2 answered" }, { state: "attention", text: "1 waiting: Keep the reply button?" }]);
+    assert.deepEqual(list().items.slice(1, 3), [{ state: "done", text: "2 answered" }, { state: "attention", text: "1 waiting: Keep the reply button?" }]);
     await answer("q2", true);
-    assert.deepEqual(list().items[0], { state: "done", text: "2 answered" });
+    assert.deepEqual(list().items.at(-1), { state: "done", text: "2 answered" });
     assert.equal(list().head, "1 phase · 1 task");
     assert.equal(runtime.latest("workflow-runtime").stepFacts.questions.waiting, undefined);
 
@@ -2007,7 +2194,7 @@ test("Plan lens counts answered and waiting questions per step run", async () =>
     await runtime.tools.get("set_workflow_activity").execute("a", { activityId: "reviewing-plan" }, undefined, undefined, runtime.ctx);
     await ask("q6", ["Keep it?"]);
     assert.equal(runtime.latest("workflow-runtime").activity.id, "reviewing-plan");
-    assert.deepEqual(list().items, [{ state: "done", text: "1 answered" }, { state: "attention", text: "1 waiting: Keep it?" }, { state: "active", text: "critic pass 1" }]);
+    assert.deepEqual(list().items, [{ state: "done", text: "plan written" }, { state: "done", text: "1 answered" }, { state: "attention", text: "1 waiting: Keep it?" }, { state: "active", text: "critic pass 1" }]);
     await answer("q6");
     await runtime.commands.get("wf-ticket").handler("clear", runtime.ctx);
     assert.equal(runtime.latest("workflow-runtime").stepFacts, undefined);

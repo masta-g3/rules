@@ -10,7 +10,8 @@ export type PlanProjection = {
 	phases?: Array<{ completed: number; total: number; title?: string }>;
 	nextStep?: string;
 	current?: { tasks: PlanTask[]; before: number; after: number };
-	criteria?: number;
+	written?: true;
+	criteria?: { checked: number; total: number };
 };
 
 const CURRENT_TASKS = 12;
@@ -38,7 +39,7 @@ export function parseWorkflowPlan(text: string): { plan?: WorkflowPlan; projecti
 	let active: (typeof sections)[number] | undefined;
 	// Acceptance criteria are the checkboxes under an "Acceptance Criteria" heading, up to the next same-level heading.
 	let criteriaLevel: number | undefined;
-	let criteria = 0;
+	const criteria = { checked: 0, total: 0 };
 	let fence: { marker: string; length: number } | undefined;
 	for (const line of text.split(/\r?\n/)) {
 		const delimiter = /^\s*(`{3,}|~{3,})(.*)$/.exec(line);
@@ -65,24 +66,25 @@ export function parseWorkflowPlan(text: string): { plan?: WorkflowPlan; projecti
 		const checkbox = /^\s*-\s+\[([ xX])]\s+(.+?)\s*$/.exec(line);
 		if (!checkbox) continue;
 		const task = { done: checkbox[1]!.toLowerCase() === "x", text: clean(checkbox[2] ?? "") };
-		if (criteriaLevel !== undefined) criteria += 1;
+		if (criteriaLevel !== undefined) { criteria.total += 1; if (task.done) criteria.checked += 1; }
 		all.push(task); active?.tasks.push(task);
 	}
 	const populated = sections.filter((section) => section.tasks.length);
 	const tasks = populated.length ? populated.flatMap((section) => section.tasks) : all;
-	if (!tasks.length) return {};
+	if (!tasks.length) return { projection: { written: true, tasks: { completed: 0, total: 0 } } };
 	const current = populated.findIndex((section) => section.tasks.some((task) => !task.done));
 	const selected = populated.length ? (current >= 0 ? current : populated.length - 1) : 0;
 	const planSections: PlanSection[] = populated.length ? populated.map(({ heading, tasks }) => ({ heading, tasks })) : [{ tasks: all }];
 	const plan: WorkflowPlan = { sections: planSections, completed: tasks.filter((task) => task.done).length, total: tasks.length, currentSectionIndex: selected };
 	const section = populated[selected];
 	const projection: PlanProjection = {
+		written: true,
 		...(section ? { phase: { index: selected + 1, count: populated.length, title: bounded(section.title!, 80) } } : {}),
 		tasks: { completed: plan.completed, total: plan.total },
 		...(populated.length ? { phases: populated.slice(0, 100).map((item) => ({ completed: item.tasks.filter((task) => task.done).length, total: item.tasks.length, title: bounded(item.title!, 80) })) } : {}),
 		...(tasks.find((task) => !task.done) ? { nextStep: bounded(tasks.find((task) => !task.done)!.text, 120) } : {}),
 		current: currentWindow(planSections[selected]!.tasks),
-		...(criteria ? { criteria } : {}),
+		...(criteria.total ? { criteria } : {}),
 	};
 	return { plan, projection };
 }

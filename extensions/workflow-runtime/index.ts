@@ -70,6 +70,7 @@ import { baselines, closeoutKinds, mergeCommits, newCommits, runsGitCommit, work
 import { readWorkflowPlan } from "./workflow-plan.ts";
 import { brokenWorktreeSnapshot, clearedWorktreeSnapshot, projectWorktreeSnapshot, readWorktreeBinding, type WorktreeLifecycleSnapshot } from "./worktree-context.ts";
 import { TodoPanel, TODO_PANEL_OVERLAY_OPTIONS, TODO_PANEL_SHORTCUT } from "./todo-panel.ts";
+import { OpenSessionTrack } from "./open-session.ts";
 
 const ENTRY_TYPE = "workflow-runtime";
 const EVENT_TYPE = "workflow-runtime-event";
@@ -109,6 +110,7 @@ type CustomEntry = {
 type RestoredState = {
 	state: WorkflowState;
 	steps?: unknown;
+	openLens?: unknown;
 };
 
 type RuntimeEventDetails = {
@@ -220,16 +222,13 @@ function findLatestState(entries: unknown[]): RestoredState {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i] as CustomEntry;
 		if (entry?.type === "custom" && entry.customType === ENTRY_TYPE && entry.data) {
-			// Derived display fields are recomputed at publish, never restored.
+			// Workflow display fields are recomputed; open stages alone retain observed history.
 			const { steps, activeMode: _activeMode, lens: _lens, heldStep, ...state } = entry.data;
-			return { state: heldStep ? { ...state, activeStep: heldStep } : state, steps };
+			return { state: heldStep ? { ...state, activeStep: heldStep } : state, steps,
+				...(!state.activeStep && !heldStep && !state.orchestration && _lens ? { openLens: _lens } : {}) };
 		}
 	}
 	return { state: {} };
-}
-
-function persistState(pi: ExtensionAPI, state: WorkflowState): void {
-	pi.appendEntry(ENTRY_TYPE, withWorkflowDefinition(state));
 }
 
 function renderTicket(theme: ExtensionContext["ui"]["theme"], ticketId?: string): string {
@@ -382,7 +381,7 @@ function rejectedMetadataText(raw: string | undefined): string {
 
 function metadataParseContract(operation?: MetadataOperation): string {
 	return operation === "progress note"
-		? "a JSON object with a non-empty done or next sentence"
+		? "a JSON object with a non-empty goal, done or next sentence"
 		: "1–3 words, at most 32 characters, using letters and numbers only";
 }
 
@@ -443,6 +442,16 @@ export default function workflowRuntime(
 	let currentProgress: ProgressNote | undefined;
 	let progressTicketId: string | undefined;
 	let progressPending = false;
+	const openTrack = new OpenSessionTrack();
+	let lastPublishedWorkflow = "";
+	const openSession = () => !process.env.PI_TMUX_SUBAGENTS_JOB_ID && !state.activeStep && !orchestrationLens(state);
+	const publishWorkflow = (nextState = state, force = false) => {
+		const snapshot = withWorkflowDefinition(nextState, nextState.activeStep === "execute" || !process.env.PI_TMUX_SUBAGENTS_JOB_ID ? openTrack.lens() : undefined);
+		const comparable = JSON.stringify({ ...snapshot, updatedAt: 0 });
+		if (!force && (!lastPublishedWorkflow && !snapshot.lens || comparable === lastPublishedWorkflow)) return;
+		lastPublishedWorkflow = comparable;
+		pi.appendEntry(ENTRY_TYPE, { ...snapshot, updatedAt: Date.now() });
+	};
 	let deferredWorkflowInputs: Array<{ name: string; ticketId?: string; text: string }> = [];
 	// Commit-step bash calls in flight: their step run, closeout kinds and each workspace repo's HEAD reflog length at start.
 	const pendingCommitCalls = new Map<string, { run: number; closeout: Array<"archived" | "ticketDone">; repos?: RepoBaseline[] }>();
@@ -467,9 +476,10 @@ export default function workflowRuntime(
 		if (nextState.activeStep !== state.activeStep || nextState.ticketId !== state.ticketId || (state.stepFacts && !nextState.stepFacts)) {
 			factsRun += 1;
 			pendingCommitCalls.clear();
+			openTrack.reset();
 		}
 		const updated = { ...nextState, updatedAt: Date.now() };
-		persistState(pi, updated);
+		publishWorkflow(updated, true);
 		applyWidget(ctx, updated, metadataStatus);
 		applyPlanWidget(ctx, updated.plan);
 		return updated;
@@ -482,6 +492,7 @@ export default function workflowRuntime(
 	const startStep = (base: WorkflowState, step: StepName, source: Parameters<typeof startWorkflowStep>[2]): WorkflowState => {
 		factsRun += 1;
 		pendingCommitCalls.clear();
+		openTrack.reset();
 		return startWorkflowStep(base, step, source);
 	};
 
@@ -500,6 +511,7 @@ export default function workflowRuntime(
 		recoveryPending = false;
 		deferredWorkflowInputs = [];
 		currentProgress = undefined;
+		openTrack.reset();
 		automaticNamingStarted = false;
 		lastAdvanceShortcutAt = 0;
 		ticketContext = undefined;
@@ -719,8 +731,10 @@ export default function workflowRuntime(
 	const noteProgress = async (ctx: ExtensionContext) => {
 		if (!metadataEnabled || progressPending || process.env.PI_TMUX_SUBAGENTS_JOB_ID) return;
 		const transcript = recentTranscript(ctx.sessionManager.getBranch() as TranscriptEntry[]);
-		const input = ticketContext ? ticketNamingInput(ticketContext, transcript) : transcript;
-		if (!input) return;
+		const source = ticketContext ? ticketNamingInput(ticketContext, transcript) : transcript;
+		if (!source) return;
+		const input = `Previous goal: ${JSON.stringify(currentProgress?.goal ?? "")}\n\n${source}`;
+		const noteTurn = openTrack.turn;
 		const requestGeneration = generation;
 		const ticketId = ticketContext?.id;
 		progressPending = true;
@@ -728,8 +742,10 @@ export default function workflowRuntime(
 			const note = await callMetadata(ctx, "progress note", PROGRESS_PROMPT, input, 128, parseProgressNote);
 			if (!note || requestGeneration !== generation) return;
 			currentProgress = { ...note, updatedAt: Date.now() };
+			openTrack.goal(note.goal, noteTurn);
 			progressTicketId = ticketId;
 			publishContext(currentAttention);
+			if (openSession()) publishWorkflow();
 		} finally {
 			progressPending = false;
 		}
@@ -1266,6 +1282,10 @@ export default function workflowRuntime(
 	};
 
 	pi.on("tool_execution_start", async (event, ctx) => {
+		if (openSession() || state.activeStep === "execute") {
+			openTrack.start(event.toolCallId, event.toolName, event.args);
+			publishWorkflow();
+		}
 		if (event.toolName === "ask_user_question") {
 			const attention = questionAttention(event.toolCallId, event.args);
 			if (attention) {
@@ -1307,6 +1327,13 @@ export default function workflowRuntime(
 	});
 
 	pi.on("tool_execution_end", async (event, ctx) => {
+		if (openSession() || state.activeStep === "execute") {
+			const stage = openTrack.finish(event.toolCallId);
+			if (stage && state.activeStep === "execute") {
+				const activity = stage === "verify" ? { id: "verify", label: "Verifying" } : { id: "implement", label: "Implementing" };
+				state = setState(pi, ctx, { ...state, activity });
+			} else publishWorkflow();
+		}
 		if (event.toolName === "ask_user_question") {
 			const requestId = stableRequestId(event.toolCallId);
 			if (requestId && currentAttention?.kind === "question" && currentAttention.requestId === requestId) {
@@ -1338,6 +1365,8 @@ export default function workflowRuntime(
 	});
 
 	pi.on("agent_end", async (event, ctx) => {
+		openTrack.endTurn();
+		if (openSession() || state.activeStep === "execute") publishWorkflow();
 		const requestGeneration = generation;
 		const stopReason = finalAssistantStopReason(event.messages);
 		await refreshPlan(ctx);
@@ -1353,6 +1382,7 @@ export default function workflowRuntime(
 	});
 
 	pi.on("before_agent_start", async (event) => {
+		openTrack.beginTurn();
 		// Ordinary attention ends with the turn; a parked ticket's request stays until the ticket leaves parked.
 		const parked = parkedAttention(state.orchestration);
 		if (currentAttention !== parked && JSON.stringify(currentAttention) !== JSON.stringify(parked)) { currentAttention = parked; publishContext(currentAttention); }
@@ -1416,6 +1446,9 @@ export default function workflowRuntime(
 		const restoredContext = startsEmpty ? undefined : branchContext;
 		worktreeLifecycle = compactForkStartup || event.reason === "fork" ? branchContext?.worktree : restoredContext?.worktree;
 		currentProgress = restoredContext?.progress;
+		openTrack.reset();
+		openTrack.goal(currentProgress?.goal, openTrack.turn);
+		lastPublishedWorkflow = "";
 		progressTicketId = restoredContext?.ticket?.id;
 		lastPublishedContext = branchContext ? JSON.stringify({ ...branchContext, updatedAt: 0 }) : "";
 		const restoredRequestQuestion = restoredContext?.attention?.kind === "question" && restoredContext.attention.requestId !== undefined;
@@ -1424,12 +1457,13 @@ export default function workflowRuntime(
 			ticketContext = restoredContext?.ticket;
 			publishContext();
 		}
-		const latest = event.reason === "new" ? { state: {} as WorkflowState } : findLatestState(branch);
+		const latest: RestoredState = event.reason === "new" ? { state: {} } : findLatestState(branch);
 		// Like request-backed question attention, an open question cannot survive the process boundary.
 		const staleWaiting = latest.state.stepFacts?.questions?.waiting !== undefined;
 		const restored = staleWaiting
 			? { ...latest, state: { ...latest.state, stepFacts: { ...latest.state.stepFacts, questions: { answered: latest.state.stepFacts!.questions!.answered } } } }
 			: latest;
+		if (!startsEmpty) openTrack.restore((restored.openLens as { stages?: unknown } | undefined)?.stages);
 		const boundaryReason = compactForkStartup ? "fork" : event.reason;
 		const result = transition(restored.state, { type: "session-boundary", reason: boundaryReason });
 		const normalizeDefinition = shouldNormalizeWorkflowDefinition(
@@ -1457,12 +1491,18 @@ export default function workflowRuntime(
 			applyWidget(ctx, state, metadataStatus);
 			applyPlanWidget(ctx, state.plan);
 		}
+		if (!startsEmpty && restored.openLens) {
+			lastPublishedWorkflow = JSON.stringify({ ...withWorkflowDefinition(state), lens: restored.openLens, updatedAt: 0 });
+			publishWorkflow();
+		}
 		if (event.reason !== "new" && event.reason !== "fork") {
 			currentAttention ??= parkedAttention(state.orchestration);
 			const ticketId = state.ticketId ?? restoredContext?.ticket?.id;
 			if (ticketId) await selectTicket(ctx, ticketId, false, currentAttention);
 			else if (currentAttention) publishContext(currentAttention);
 		}
+		// A saved Execute lens may describe a tool that cannot survive this process boundary.
+		if (!startsEmpty && state.activeStep === "execute") publishWorkflow();
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
