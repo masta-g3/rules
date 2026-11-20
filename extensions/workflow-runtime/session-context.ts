@@ -44,7 +44,8 @@ type MessageContent = string | Array<{ type?: string; text?: string }>;
 export type TranscriptEntry = { type?: string; message?: { role?: string; content?: MessageContent } };
 
 export const NAMING_PROMPT = `Create a plain Pi session name.
-Use 1–3 concrete words in Title Case.
+Use 1–3 concrete words in Title Case. Never use 4 or more words.
+Drop filler words: for "Enhance game asset quality", return "Game Asset Quality".
 Maximum 32 characters.
 Return only the name.
 Do not include a ticket ID, label, quote, or punctuation.`;
@@ -300,6 +301,10 @@ export function ticketNamingInput(ticket: TicketContext, transcript: string): st
 export function sanitizeSessionName(raw: string): string | undefined {
 	let name = raw.split(/\r?\n/).find((line) => line.trim())?.trim() ?? "";
 	name = name.replace(/^```(?:text)?\s*/i, "").replace(/^(?:title|name):\s*/i, "").replace(/^['"`]+|['"`]+$/g, "").trim();
-	if (!name || [...name].length > MAX_TITLE || !/^[\p{L}\p{N}]+(?: [\p{L}\p{N}]+){0,2}$/u.test(name)) return undefined;
+	name = name.replace(/[.!]+$/u, "").trim();
+	// Models often return one or two words too many; keep the first three, but reject prose.
+	if (!/^[\p{L}\p{N}]+(?: [\p{L}\p{N}]+){0,4}$/u.test(name)) return undefined;
+	name = name.split(" ").slice(0, 3).join(" ");
+	if ([...name].length > MAX_TITLE) return undefined;
 	return name.split(/\s+/).map((word) => word ? word[0]!.toLocaleUpperCase() + word.slice(1).toLocaleLowerCase() : word).join(" ");
 }

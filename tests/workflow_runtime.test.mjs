@@ -155,7 +155,8 @@ test("session context bounds transcript, names, and attention", () => {
   assert.ok(recentTranscript(entries).length <= 3000);
   assert.equal(recentTranscript(entries).split("\n\n").length, 4);
   assert.equal(sanitizeSessionName('"metadata redesign"'), "Metadata Redesign");
-  assert.equal(sanitizeSessionName("four word session name"), undefined);
+  assert.equal(sanitizeSessionName("Enhance Game Asset Quality."), "Enhance Game Asset");
+  assert.equal(sanitizeSessionName("here is a good session name"), undefined);
   for (const length of [97, 150]) {
     const attention = { kind: "ready", text: "x".repeat(length) };
     assert.deepEqual(parseContextSnapshot({ version: 1, updatedAt: 1, attention })?.attention, attention);
