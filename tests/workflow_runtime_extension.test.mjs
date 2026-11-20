@@ -735,7 +735,7 @@ test("unlink invalidates stale naming, handoffs, and deferred workflow input", a
 
     const linked = harness(cwd, [], "Existing");
     await linked.commands.get("wf-ticket").handler("meta-001", linked.ctx);
-    await linked.tools.get("hand_off").execute("old-handoff", { kind: "ready", text: "Old work" }, undefined, undefined, linked.ctx);
+    await linked.tools.get("hand_off").execute("old-handoff", { kind: "ready", title: "Short title", text: "Old work" }, undefined, undefined, linked.ctx);
     assert.equal(linked.latest("pi-agent-hub-context").attention.text, "Old work");
     await linked.commands.get("wf-ticket").handler("clear", linked.ctx);
     assert.equal(linked.latest("pi-agent-hub-context").ticket, undefined);
@@ -1955,6 +1955,7 @@ test("hand_off publishes explicit handoffs with recommendation and evidence", as
     const handOff = runtime.tools.get("hand_off");
     const result = await handOff.execute("call-ready", {
       kind: "ready",
+      title: "  Send form\n steers ",
       text: "  Send form   supports Steer ",
       recommendation: "Commit,\n then reload",
       artifact: "agent-work/tickets/meta  001/validation.md",
@@ -1964,13 +1965,14 @@ test("hand_off publishes explicit handoffs with recommendation and evidence", as
       requestId: ready.requestId,
       kind: "ready",
       text: "Send form supports Steer",
+      title: "Send form steers",
       recommendation: "Commit, then reload",
       artifact: join(cwd, "agent-work/tickets/meta  001/validation.md"),
     });
     assert.match(ready.requestId, /^[0-9a-f]{64}$/);
     assert.match(result.content[0].text, /final response/i);
 
-    await handOff.execute("call-blocked", { kind: "blocked", text: "Needs a token", artifact: "https://github.com/o/r/pull/1" }, undefined, undefined, runtime.ctx);
+    await handOff.execute("call-blocked", { kind: "blocked", title: "Short title", text: "Needs a token", artifact: "https://github.com/o/r/pull/1" }, undefined, undefined, runtime.ctx);
     const blocked = runtime.latest("pi-agent-hub-context").attention;
     assert.equal(blocked.kind, "blocked");
     assert.equal(blocked.artifact, "https://github.com/o/r/pull/1");
@@ -1980,7 +1982,7 @@ test("hand_off publishes explicit handoffs with recommendation and evidence", as
     const resumed = harness(cwd, runtime.branch, "Existing");
     await resumed.emit("session_start", { reason: "resume" });
     assert.deepEqual(resumed.latest("pi-agent-hub-context").attention, blocked);
-    await handOff.execute("call-spaces", { kind: "ready", text: "Done", artifact: "agent-work/tickets/meta  001/validation.md" }, undefined, undefined, runtime.ctx);
+    await handOff.execute("call-spaces", { kind: "ready", title: "Short title", text: "Done", artifact: "agent-work/tickets/meta  001/validation.md" }, undefined, undefined, runtime.ctx);
     const reloaded = harness(cwd, runtime.branch, "Existing");
     await reloaded.emit("session_start", { reason: "reload" });
     assert.equal(reloaded.latest("pi-agent-hub-context").attention.artifact, join(cwd, "agent-work/tickets/meta  001/validation.md"));
@@ -1995,7 +1997,7 @@ test("ready hand_off restores a done label the step already reached", async () =
   try {
     const runtime = harness(cwd, [], "Metadata redesign");
     const activity = (id) => runtime.tools.get("set_workflow_activity").execute(id, { activityId: id }, undefined, undefined, runtime.ctx);
-    const handOff = (kind) => runtime.tools.get("hand_off").execute(`call-${kind}`, { kind, text: "Handed back" }, undefined, undefined, runtime.ctx);
+    const handOff = (kind) => runtime.tools.get("hand_off").execute(`call-${kind}`, { kind, title: "Handed back", text: "Handed back" }, undefined, undefined, runtime.ctx);
     const question = () => runtime.emit("tool_execution_start", { toolCallId: "q", toolName: "ask_user_question", args: { questions: [{ question: "Ticket?" }] } });
     const current = () => runtime.latest("workflow-runtime");
 
@@ -2032,13 +2034,16 @@ test("hand_off rejects invalid input without publishing", async () => {
     const runtime = harness(cwd, [], "Existing");
     const handOff = runtime.tools.get("hand_off");
     const cases = [
-      [{ kind: "ready", text: "   " }, /text/i],
-      [{ kind: "ready", text: "x".repeat(151) }, /text/i],
-      [{ kind: "ready", text: "Done", recommendation: "x".repeat(151) }, /recommendation/i],
-      [{ kind: "ready", text: "Done", artifact: "missing/file.md" }, /artifact.*not found|does not exist/i],
-      [{ kind: "ready", text: "Done", artifact: "agent-work/\u001b[31mplans" }, /artifact/i],
-      [{ kind: "ready", text: "Done", artifact: `/${"x".repeat(1_024)}` }, /artifact/i],
-      [{ kind: "question", text: "Done" }, /kind/i],
+      [{ kind: "ready", text: "Done" }, /title/i],
+      [{ kind: "ready", title: "   ", text: "Done" }, /title/i],
+      [{ kind: "ready", title: "x".repeat(61), text: "Done" }, /title/i],
+      [{ kind: "ready", title: "Done", text: "   " }, /text/i],
+      [{ kind: "ready", title: "Done", text: "x".repeat(151) }, /text/i],
+      [{ kind: "ready", title: "Done", text: "Done", recommendation: "x".repeat(151) }, /recommendation/i],
+      [{ kind: "ready", title: "Done", text: "Done", artifact: "missing/file.md" }, /artifact.*not found|does not exist/i],
+      [{ kind: "ready", title: "Done", text: "Done", artifact: "agent-work/\u001b[31mplans" }, /artifact/i],
+      [{ kind: "ready", title: "Done", text: "Done", artifact: `/${"x".repeat(1_024)}` }, /artifact/i],
+      [{ kind: "question", title: "Done", text: "Done" }, /kind/i],
     ];
     for (const [params, message] of cases) {
       await assert.rejects(handOff.execute("bad", params, undefined, undefined, runtime.ctx), message);
@@ -2055,7 +2060,7 @@ test("hand_off ends focus so the handoff survives the turn", async () => {
     await runtime.tools.get("start_focus").execute("focus", {}, undefined, undefined, runtime.ctx);
     assert.ok(runtime.latest("workflow-runtime").execution);
     const before = runtime.operations.length;
-    await runtime.tools.get("hand_off").execute("call", { kind: "blocked", text: "Needs credentials" }, undefined, undefined, runtime.ctx);
+    await runtime.tools.get("hand_off").execute("call", { kind: "blocked", title: "Short title", text: "Needs credentials" }, undefined, undefined, runtime.ctx);
     assert.equal(runtime.latest("workflow-runtime").execution, undefined);
     assert.ok(runtime.operations.slice(before).some((item) => item.kind === "notify" && /Focus mode ended: blocked/.test(item.message)));
     await runtime.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop", content: "Blocked." }] });
@@ -2105,7 +2110,7 @@ test("finished turns publish a progress note that survives later publishes and r
     assert.deepEqual({ ...progress, updatedAt: 0 }, { done: "Added the contract type.", next: "Write the tests.", updatedAt: 0 });
     assert.equal(typeof progress.updatedAt, "number");
 
-    await runtime.tools.get("hand_off").execute("call", { kind: "ready", text: "Contract ready" }, undefined, undefined, runtime.ctx);
+    await runtime.tools.get("hand_off").execute("call", { kind: "ready", title: "Short title", text: "Contract ready" }, undefined, undefined, runtime.ctx);
     assert.deepEqual(runtime.latest("pi-agent-hub-context").progress, progress);
 
     await runtime.emit("agent_end", end);
@@ -2116,7 +2121,7 @@ test("finished turns publish a progress note that survives later publishes and r
 
     const resumed = harness(cwd, runtime.branch, "Metadata redesign", delayed.call);
     await resumed.emit("session_start", { reason: "resume" });
-    await resumed.tools.get("hand_off").execute("next", { kind: "blocked", text: "Needs review" }, undefined, undefined, resumed.ctx);
+    await resumed.tools.get("hand_off").execute("next", { kind: "blocked", title: "Short title", text: "Needs review" }, undefined, undefined, resumed.ctx);
     assert.deepEqual(resumed.latest("pi-agent-hub-context").progress, progress);
     await resumed.commands.get("wf-ticket").handler("clear", resumed.ctx);
     assert.equal(resumed.latest("pi-agent-hub-context").progress, undefined);
@@ -2479,7 +2484,7 @@ test("a parked ticket raises one blocked request that persists until it leaves p
     assert.equal(attention().kind, "question");
     await runtime.emit("tool_execution_end", { toolName: "ask_user_question", toolCallId: "q1" });
     assert.deepEqual(attention(), first);
-    await runtime.tools.get("hand_off").execute("h1", { kind: "ready", text: "Done" }, undefined, undefined, runtime.ctx);
+    await runtime.tools.get("hand_off").execute("h1", { kind: "ready", title: "Short title", text: "Done" }, undefined, undefined, runtime.ctx);
     assert.equal(attention().kind, "ready");
     await runtime.emit("before_agent_start", { systemPrompt: "base" });
     assert.deepEqual(attention(), first);

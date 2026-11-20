@@ -187,7 +187,18 @@ test("question attention has bounded deterministic request identity and summary"
     requestId: stableRequestId("call_123"),
     kind: "question",
     text: "Choose the rollout? (+2 more)",
+    title: "Choose the rollout? (+2 more)",
   });
+
+  // The title is the question's label and its asking sentence; the text keeps the opening context.
+  const long = questionAttention("call_long", { questions: [{ header: "Sample result", question: `The accuracy sample is finished: 146 businesses were checked for 8.72 USD. ${"More context. ".repeat(20)}How should its results be treated?` }, { question: "Second" }] });
+  assert.equal(long.title, "Sample result · How should its results be treated? (+1 more)");
+  assert.match(long.text, /^The accuracy sample is finished/);
+  assert.equal([...long.text].length, 150);
+  // A question with no question mark, or one long sentence, is cut to the title bound.
+  const flat = questionAttention("call_flat", { questions: [{ header: "Scope", question: "y".repeat(200) }] });
+  assert.equal([...flat.title].length, 80);
+  assert.ok(flat.title.startsWith("Scope · yyy"));
 
   const bounded = questionAttention("long-call", {
     questions: [{ question: "x".repeat(200) }, { question: "another" }],

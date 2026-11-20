@@ -39,6 +39,7 @@ import {
 } from "./core.ts";
 import {
 	CONTEXT_ENTRY_TYPE,
+	MAX_HAND_OFF_TITLE,
 	NAMING_PROMPT,
 	PROGRESS_PROMPT,
 	contextSnapshot,
@@ -1070,10 +1071,12 @@ export default function workflowRuntime(
 		promptGuidelines: [
 			"Call hand_off as the final action of a turn that hands work back: kind ready when a requested outcome is ready for review, kind blocked when you cannot continue without the user or an external dependency.",
 			"Do not call hand_off for progress updates or ordinary answers. Use ask_user_question for questions.",
+			"Set title to the outcome or blocker in at most 60 characters, such as 'PR #6 ready: 5 of 7 merged'. The user reads it in a one-line list row, so it must make sense alone; text gives the detail.",
 			"Set recommendation to the next action you advise. Set artifact to an existing file or URL that holds the evidence, such as a plan, validation notes, or a pull request.",
 		],
 		parameters: Type.Object({
 			kind: StringEnum(["ready", "blocked"] as const),
+			title: Type.String({ minLength: 1, maxLength: MAX_HAND_OFF_TITLE, description: "The outcome or blocker in one short line" }),
 			text: Type.String({ minLength: 1, description: "What is ready or what blocks progress" }),
 			recommendation: Type.Optional(Type.String({ minLength: 1, description: "The next action you advise" })),
 			artifact: Type.Optional(Type.String({ minLength: 1, description: "Existing file path or URL holding the evidence" })),

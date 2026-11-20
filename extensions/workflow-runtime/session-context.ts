@@ -9,6 +9,9 @@ export const MAX_TITLE = 32;
 export const MAX_SUBTITLE = 64;
 export const MAX_DESCRIPTION = 240;
 export const MAX_ATTENTION = 150;
+/** A request's one-line name for list rows. Agents write hand-off titles within the shorter bound. */
+export const MAX_ATTENTION_TITLE = 80;
+export const MAX_HAND_OFF_TITLE = 60;
 export const MAX_REQUEST_ID = 64;
 export const MAX_RECOMMENDATION = 150;
 export const MAX_ARTIFACT = 1_024;
@@ -26,6 +29,7 @@ export type SessionAttention = {
 	requestId?: string;
 	kind: "ready" | "question" | "blocked";
 	text: string;
+	title?: string;
 	recommendation?: string;
 	artifact?: string;
 };
@@ -57,9 +61,9 @@ For "Debug the failing addition test. Do not fix it yet", goal is "Debug additio
 Exclude permissions, restrictions, output format, procedure and completion status from goal.
 If Previous goal is nonempty, copy it exactly unless the user explicitly changes the topic. A fix, more tests or changed permission within the same task keeps the same goal.
 On an explicit topic switch, write a title for the new topic, e.g. "Explain blue sky".
-done: what the agent has concretely achieved so far in this task.
-next: what the agent will do or is waiting for next.
-Each value is one plain sentence of at most 120 characters, stating present or past facts.
+done: what the agent has concretely achieved so far in this task, in at most 60 characters. It is read in a one-line list row: name the result, not the steps.
+next: what the agent will do or is waiting for next, in at most 120 characters.
+Each value is one plain sentence stating present or past facts.
 Start with the verb and name no subject: "Fixed the login redirect.", not "The assistant fixed…".
 Name the concrete thing changed, found, or awaited, so the sentence is useful on its own.
 Do not include ticket IDs, markdown, or speculation.
@@ -85,10 +89,12 @@ export function rawArtifact(value: unknown): string | undefined {
 
 export async function handOffAttention(
 	toolCallId: string,
-	params: { kind: unknown; text: unknown; recommendation?: unknown; artifact?: unknown },
+	params: { kind: unknown; title: unknown; text: unknown; recommendation?: unknown; artifact?: unknown },
 	cwd: string,
 ): Promise<SessionAttention> {
 	if (params.kind !== "ready" && params.kind !== "blocked") throw new Error("hand_off kind must be ready or blocked.");
+	const title = normalizeText(params.title, MAX_HAND_OFF_TITLE + 1);
+	if (!title || [...title].length > MAX_HAND_OFF_TITLE) throw new Error(`hand_off title must be 1–${MAX_HAND_OFF_TITLE} characters.`);
 	const text = normalizeText(params.text, MAX_ATTENTION + 1);
 	if (!text || [...text].length > MAX_ATTENTION) throw new Error(`hand_off text must be 1–${MAX_ATTENTION} characters.`);
 	let recommendation: string | undefined;
@@ -109,7 +115,15 @@ export async function handOffAttention(
 		}
 	}
 	const requestId = stableRequestId(toolCallId);
-	return { ...(requestId ? { requestId } : {}), kind: params.kind, text, ...(recommendation ? { recommendation } : {}), ...(artifact ? { artifact } : {}) };
+	return { ...(requestId ? { requestId } : {}), kind: params.kind, text, title, ...(recommendation ? { recommendation } : {}), ...(artifact ? { artifact } : {}) };
+}
+
+/** The sentence that asks: the last one ending in a question mark, without the context around it. */
+function askingSentence(question: string): string {
+	const end = question.lastIndexOf("?");
+	if (end < 0) return question;
+	const before = [...question.slice(0, end).matchAll(/[.!?]\s/gu)].at(-1);
+	return question.slice(before ? before.index + 1 : 0, end + 1).trim();
 }
 
 export function questionAttention(toolCallId: unknown, args: unknown): SessionAttention | undefined {
@@ -121,9 +135,13 @@ export function questionAttention(toolCallId: unknown, args: unknown): SessionAt
 	if (!first || typeof first !== "object" || Array.isArray(first)) return undefined;
 	const more = questions.length - 1;
 	const suffix = more > 0 ? ` (+${more} more)` : "";
-	const question = normalizeText((first as Record<string, unknown>).question, MAX_ATTENTION - [...suffix].length);
-	if (!question) return undefined;
-	return { requestId, kind: "question", text: `${question}${suffix}` };
+	const whole = normalizeText((first as Record<string, unknown>).question, Number.MAX_SAFE_INTEGER);
+	const question = normalizeText(whole, MAX_ATTENTION - [...suffix].length);
+	if (!whole || !question) return undefined;
+	// List rows name the question by its label and asking sentence; the text keeps its opening context.
+	const header = normalizeText((first as Record<string, unknown>).header, MAX_ATTENTION_TITLE);
+	const title = normalizeText(`${header ? `${header} · ` : ""}${askingSentence(whole)}`, MAX_ATTENTION_TITLE - [...suffix].length)!.trimEnd();
+	return { requestId, kind: "question", text: `${question}${suffix}`, title: `${title}${suffix}` };
 }
 
 function unquote(value: string): string {
@@ -241,6 +259,8 @@ export function parseContextSnapshot(value: unknown): PiAgentHubContextV1 | unde
 		if (raw.requestId !== undefined && (!requestId || requestId !== raw.requestId)) return undefined;
 		const text = normalizeText(raw.text, MAX_ATTENTION);
 		if (!text || text !== raw.text) return undefined;
+		const title = raw.title === undefined ? undefined : normalizeText(raw.title, MAX_ATTENTION_TITLE);
+		if (raw.title !== undefined && (!title || title !== raw.title)) return undefined;
 		const recommendation = raw.recommendation === undefined ? undefined : normalizeText(raw.recommendation, MAX_RECOMMENDATION);
 		if (raw.recommendation !== undefined && (!recommendation || recommendation !== raw.recommendation)) return undefined;
 		const artifact = raw.artifact === undefined ? undefined : rawArtifact(raw.artifact);
@@ -249,6 +269,7 @@ export function parseContextSnapshot(value: unknown): PiAgentHubContextV1 | unde
 			...(requestId ? { requestId } : {}),
 			kind: raw.kind as SessionAttention["kind"],
 			text,
+			...(title ? { title } : {}),
 			...(recommendation ? { recommendation } : {}),
 			...(artifact ? { artifact } : {}),
 		};
