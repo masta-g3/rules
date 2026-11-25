@@ -388,7 +388,7 @@ function rejectedMetadataText(raw: string | undefined): string {
 function metadataParseContract(operation?: MetadataOperation): string {
 	return operation === "progress note"
 		? "a JSON object with a non-empty goal, done or next sentence"
-		: "1–3 words, at most 32 characters, using letters and numbers only";
+		: "1–3 words, at most 32 characters, using letters, numbers and inner hyphens only";
 }
 
 function metadataFailureNotice(kind: MetadataFailureKind | "parse"): string {

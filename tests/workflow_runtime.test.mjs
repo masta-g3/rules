@@ -157,6 +157,8 @@ test("session context bounds transcript, names, and attention", () => {
   assert.equal(sanitizeSessionName('"metadata redesign"'), "Metadata Redesign");
   assert.equal(sanitizeSessionName("Enhance Game Asset Quality."), "Enhance Game Asset");
   assert.equal(sanitizeSessionName("here is a good session name"), undefined);
+  assert.equal(sanitizeSessionName("Queue Sub-Agent Messages"), "Queue Sub-Agent Messages");
+  assert.equal(sanitizeSessionName("Queue - Messages"), undefined);
   for (const length of [97, 150]) {
     const attention = { kind: "ready", text: "x".repeat(length) };
     assert.deepEqual(parseContextSnapshot({ version: 1, updatedAt: 1, attention })?.attention, attention);

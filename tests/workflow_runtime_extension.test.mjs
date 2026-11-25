@@ -1626,7 +1626,7 @@ test("metadata status records parse failures separately from model failures", as
     const report = runtime.operations.at(-1).message;
     assert.match(report, /parse/i);
     assert.match(report, /Operation: session name/);
-    assert.match(report, /Expected: 1–3 words, at most 32 characters, using letters and numbers only/);
+    assert.match(report, /Expected: 1–3 words, at most 32 characters, using letters, numbers and inner hyphens only/);
     assert.match(report, /Received: This response has too many title words/);
     assert.match(report, /No user action is required/);
   } finally { await rm(cwd, { recursive: true, force: true }); }

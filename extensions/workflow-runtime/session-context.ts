@@ -324,8 +324,9 @@ export function sanitizeSessionName(raw: string): string | undefined {
 	name = name.replace(/^```(?:text)?\s*/i, "").replace(/^(?:title|name):\s*/i, "").replace(/^['"`]+|['"`]+$/g, "").trim();
 	name = name.replace(/[.!]+$/u, "").trim();
 	// Models often return one or two words too many; keep the first three, but reject prose.
-	if (!/^[\p{L}\p{N}]+(?: [\p{L}\p{N}]+){0,4}$/u.test(name)) return undefined;
+	// Hyphenated compounds such as "Sub-Agent" count as one word.
+	if (!/^[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*(?: [\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*){0,4}$/u.test(name)) return undefined;
 	name = name.split(" ").slice(0, 3).join(" ");
 	if ([...name].length > MAX_TITLE) return undefined;
-	return name.split(/\s+/).map((word) => word ? word[0]!.toLocaleUpperCase() + word.slice(1).toLocaleLowerCase() : word).join(" ");
+	return name.replace(/[\p{L}\p{N}]+/gu, (part) => part[0]!.toLocaleUpperCase() + part.slice(1).toLocaleLowerCase());
 }
