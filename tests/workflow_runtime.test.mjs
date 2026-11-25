@@ -950,6 +950,11 @@ test("an active incomplete parent step keeps its own lens; a completed one yield
   assert.equal(ready.heldStep, "plan-md");
   assert.equal(ready.lens.doing, "Running");
   assert.deepEqual(ready.orchestration, orchestration);
+  // A parent step after planning never holds the card: children own execute onward.
+  const executing = withWorkflowDefinition({ activeStep: "execute", activity: { id: "implement", label: "Implementing" }, orchestration });
+  assert.equal(executing.activeStep, undefined);
+  assert.equal(executing.heldStep, "execute");
+  assert.equal(executing.lens.doing, "Running");
 });
 
 test("a parked episode keeps its question when omitted and its request stays within the attention bound", () => {

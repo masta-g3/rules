@@ -354,10 +354,10 @@ function ticketLens(orchestration: WorkflowOrchestration, ticket: OrchestrationT
 	};
 }
 
-/** The orchestration lens wins unless the parent's own step is active and not yet complete. */
+/** The orchestration lens wins unless the parent is still planning; during a run the parent owns only plan-md. */
 export function orchestrationLens(state: WorkflowState): WorkflowLens | undefined {
 	const orchestration = state.orchestration;
-	if (!orchestration || (state.activeStep && !state.currentStepComplete)) return undefined;
+	if (!orchestration || (state.activeStep === "plan-md" && !state.currentStepComplete)) return undefined;
 	return orchestration.tickets.length === 1 ? ticketLens(orchestration, orchestration.tickets[0]!) : epicLens(orchestration);
 }
 
