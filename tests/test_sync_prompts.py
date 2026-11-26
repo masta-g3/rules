@@ -67,7 +67,7 @@ class SyncPromptsTest(unittest.TestCase):
             self.assertIn(f"tools: read, grep, find, ls, bash, edit, write, {workflow_tools}",
                           (root / ".pi/agent/agents/ticket-runner.md").read_text())
             claude = (root / ".claude/agents/ticket-runner.md").read_text()
-            self.assertIn("tools: Read, Grep, Glob, LS, Bash, Edit, Write\n", claude)
+            self.assertIn("tools: Read, Grep, Glob, Bash, Edit, Write\n", claude)
             self.assertNotIn("set_workflow", claude)
             self.assertNotIn("readonly", (root / ".cursor/agents/ticket-runner.md").read_text())
 
@@ -93,7 +93,7 @@ class SyncPromptsTest(unittest.TestCase):
                         for field in ("model:", "thinking:", "systemPromptMode:", "inheritProjectContext:", "inheritSkills:"):
                             self.assertNotIn(field, text)
                         if name == "frontend-designer":
-                            expected = "tools: Read, Grep, Glob, LS" if harness == ".claude" else "readonly: true"
+                            expected = "tools: Read, Grep, Glob\n" if harness == ".claude" else "readonly: true"
                             self.assertIn(expected, text)
 
     def test_manifest_prunes_stale_repo_skills_but_keeps_user_skills(self) -> None:

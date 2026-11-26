@@ -106,7 +106,8 @@ def main():
         write(skill / "agents/openai.yaml", "policy:\n  allow_implicit_invocation: false\n")
         (stage / "cursor_links" / prompt.stem).symlink_to(codex / "skills" / prompt.stem)
 
-    tool_names = {"read": "Read", "grep": "Grep", "find": "Glob", "ls": "LS", "bash": "Bash", "edit": "Edit", "write": "Write"}
+    # Claude Code has no LS tool; Glob covers directory listing.
+    tool_names = {"read": "Read", "grep": "Grep", "find": "Glob", "ls": "Glob", "bash": "Bash", "edit": "Edit", "write": "Write"}
     # Pi workflow-runtime tools have no Claude or Cursor equivalent; only the Pi copy keeps them.
     pi_only_tools = {"set_workflow_step", "set_workflow_ticket", "set_workflow_activity", "complete_workflow"}
     for agent in sorted((repo / "agents").glob("*.md")):
@@ -116,7 +117,7 @@ def main():
         read_only = bool(tools) and not any(tool in tools for tool in ("edit", "write"))
         claude = dict(identity)
         if tools:
-            claude["tools"] = ", ".join(tool_names[tool] for tool in tools)
+            claude["tools"] = ", ".join(dict.fromkeys(tool_names[tool] for tool in tools))
         cursor = dict(identity)
         if read_only:
             cursor["readonly"] = True
