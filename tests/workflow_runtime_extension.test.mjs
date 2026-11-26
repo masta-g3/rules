@@ -939,7 +939,7 @@ test("a reload never republishes a stored lens after completion or unlinking", a
     await runtime.emit("input", { source: "interactive", text: "/skill:commit meta-001" });
     assert.equal(runtime.latest("workflow-runtime").lens.doing, "Archiving plan");
     await runtime.tools.get("complete_workflow").execute("done", {}, undefined, undefined, runtime.ctx);
-    assert.equal(runtime.latest("workflow-runtime").lens.doing, "Commit complete");
+    assert.equal(runtime.latest("workflow-runtime").lens.doing, undefined);
 
     const stale = { doing: "Stale work", progress: { completed: 1, total: 2 } };
     for (const data of [
@@ -951,7 +951,8 @@ test("a reload never republishes a stored lens after completion or unlinking", a
       await reloaded.emit("session_start", { reason: "reload" });
       assert.equal(reloaded.branch.filter((entry) => entry.customType === "workflow-runtime").length, 2);
       // A completed Commit recomputes its closeout lens from state; the stored lens never returns.
-      assert.equal(reloaded.latest("workflow-runtime").lens?.doing, data.activeStep === "commit" ? "Commit complete" : "Implementing");
+      assert.equal(reloaded.latest("workflow-runtime").lens?.doing, data.activeStep === "commit" ? undefined : "Implementing");
+      assert.equal(reloaded.latest("workflow-runtime").lens?.progress, undefined);
     }
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });

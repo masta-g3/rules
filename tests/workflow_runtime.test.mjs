@@ -447,8 +447,9 @@ test("other steps publish a lens from activity stages and review passes", () => 
   });
 
   assert.equal(withWorkflowDefinition({}).lens, undefined);
+  // A finished step leaves DOING empty, so the card shows the agent's own DONE note.
   assert.deepEqual(withWorkflowDefinition(completeWorkflow(startWorkflowStep({}, "commit"))).lens, {
-    doing: "Commit complete", stages: [{ label: "archive", state: "done" }, { label: "commit", state: "done" }],
+    stages: [{ label: "archive", state: "done" }, { label: "commit", state: "done" }],
   });
 });
 
@@ -538,11 +539,11 @@ test("review and reflect lenses list agent-reported items and keep the final lis
   const settled = setWorkflowActivity(review, "fixing-review-findings", findings.map((item) => ({ ...item, state: item.state === "active" ? "done" : item.state })));
   assert.equal(withWorkflowDefinition(settled).lens.doing, "Fixing findings");
   assert.deepEqual(setWorkflowActivity(review, "reviewing-implementation").stepItems, review.stepItems);
-  // The completed step keeps its final list with every stage done under its terminal label, also after a reload.
+  // The completed step keeps its final list with every stage done, also after a reload.
   const complete = setWorkflowActivity(settled, "review-complete");
   const final = withWorkflowDefinition(complete);
-  assert.equal(withWorkflowDefinition(setWorkflowActivity(review, "review-complete")).lens.doing, "Review complete");
-  assert.deepEqual(final.lens, { doing: "Review complete", stages: ["review", "fix", "done"].map((label) => ({ label, state: "done" })), pass: 2, progress: { completed: 4, total: 5, unit: "settled" }, list: { ...withWorkflowDefinition(settled).lens.list, head: "3 fixed · 1 open · 1 deferred" } });
+  assert.equal(withWorkflowDefinition(setWorkflowActivity(review, "review-complete")).lens.doing, undefined);
+  assert.deepEqual(final.lens, { stages: ["review", "fix", "done"].map((label) => ({ label, state: "done" })), pass: 2, progress: { completed: 4, total: 5, unit: "settled" }, list: { ...withWorkflowDefinition(settled).lens.list, head: "3 fixed · 1 open · 1 deferred" } });
   const { steps: _steps, lens: _lens, activeMode: _mode, ...reloaded } = JSON.parse(JSON.stringify(final));
   assert.deepEqual(withWorkflowDefinition(reloaded).lens, final.lens);
   // Without items a completed step still drops its lens.
@@ -924,6 +925,9 @@ test("an epic orchestration lens counts commits and windows 24 tickets to 12 ope
   const small = withWorkflowDefinition({ orchestration: setOrchestration(undefined, { tickets: tickets.slice(0, 6), pr: "#12 draft" }, "seed") }).lens.list;
   assert.deepEqual(small.items.map((item) => item.text), ["e-001  committed  abc1234", "e-002  committed  abc1234", "e-003  EX", "e-004  RV", "e-005  parked", "e-006  queued"]);
   assert.equal(small.head, "PR #12 draft");
+  const linked = (pr) => withWorkflowDefinition({ orchestration: setOrchestration(undefined, { tickets: tickets.slice(0, 2), pr }, "seed") }).lens.list.head;
+  assert.equal(linked("https://github.com/masta-g3/homepage/pull/23 (draft)"), "PR #23 (draft)");
+  assert.equal(linked("https://example.com/pull/7"), "PR https://example.com/pull/7");
   assert.deepEqual(parkedAttention(orchestration), { requestId: orchestration.tickets[4].requestId, kind: "blocked", text: "e-005 parked · Which CDN?" });
 });
 

@@ -225,15 +225,15 @@ function activityLens(state: WorkflowState, step: StepName): WorkflowLens | unde
 	const active = state.currentStepComplete ? stages.length : current ? stages.indexOf(current) : -1;
 	const list = step === "plan-md" ? planList(state) : step === "commit" ? commitList(state) : isItemStep(step) ? itemList(state, step) : undefined;
 	const pass = Math.max(0, ...definitions.filter((item) => item.review).map((item) => state.activityPasses?.[item.id] ?? 0));
-	// A completed step names its terminal activity, such as "Review complete", above its final list.
-	const activeItem = state.currentStepComplete ? undefined : list?.items.find((item) => item.state === "active");
+	// A completed step publishes no DOING, so the card shows the agent's own DONE note above the final list.
+	const activeItem = list?.items.find((item) => item.state === "active");
 	const progress = step === "plan-md" && state.plan?.criteria
 		? { completed: state.plan.criteria.checked, total: state.plan.criteria.total, unit: "criteria" }
 		: isItemStep(step) && state.stepItems?.length
 			? { completed: state.stepItems.filter((item) => item.state === "done" || item.state === "deferred").length, total: state.stepItems.length, unit: "settled" }
 			: undefined;
 	return {
-		doing: activeItem?.text ?? state.activity.label,
+		...(state.currentStepComplete ? {} : { doing: activeItem?.text ?? state.activity.label }),
 		...(stages.length ? { stages: stages.map((label, index) => ({ label, state: stageState(index, active) })) } : {}),
 		...(pass > 1 ? { pass } : {}),
 		...(progress ? { progress } : {}),
@@ -333,7 +333,8 @@ function epicLens(orchestration: WorkflowOrchestration): WorkflowLens {
 		...(summary ? { summary } : {}),
 		list: {
 			label: "TIX",
-			...(orchestration.pr ? { head: boundedText(`PR ${orchestration.pr}`) } : {}),
+			// A GitHub pull URL reads as its number; the repository already shows on the card.
+			...(orchestration.pr ? { head: boundedText(`PR ${orchestration.pr.replace(/https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/(\d+)\S*/g, "#$1")}`) } : {}),
 			items: tickets.filter((_ticket, index) => shown.has(index)).map(ticketItem),
 			before,
 			after: hidden.length - before,
