@@ -59,10 +59,6 @@ Generated prompt skills remain under `~/.codex/skills/`, which Codex 0.155.1 sti
 
 Add standalone command prompts as direct `prompts/*.md` files with YAML frontmatter containing `description` and `disable-model-invocation: true`. The filename supplies the command name; omit `name` in the source. Do not reuse a shared skill name. `AGENTS.md` is reserved for the global template and excluded from command discovery. Keep procedures and automatically discovered guidance in `skills/`.
 
-## Experimental
-
-`experimental/autopilot/` — Claude Code-only autopilot flow. Not part of the main workflow or `prompts/AGENTS.md`. See that directory for details.
-
 ## Pi Runtime Assets
 
 Project-local Pi extensions live in `extensions/` and sync into `~/.pi/agent/extensions/` via `./sync-prompts.sh`. Pi auto-loads synced extensions on startup; use `/reload` in an existing Pi session after syncing.
@@ -118,8 +114,6 @@ Shared backlog operations live in `skills/_lib/features_yaml.py` and are invoked
 - Retry behavior: repeated no-op `update` returns `changed:false` and does not rewrite the file
 
 ## CLI Tools
-
-[Card signal study](tools/card-signal/README.md) replays Pi session-card signals and measures progress cadence.
 
 ### pv - Portfolio & Feature Viewer
 
