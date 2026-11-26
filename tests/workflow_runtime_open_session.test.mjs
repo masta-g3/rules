@@ -9,9 +9,11 @@ test("open session classifies observed tools and shell commands, not quoted test
   for (const name of ["edit", "write"]) assert.equal(classifyTool(name, {}), "change");
   for (const command of ["rg test src", "git -C repo diff", "cat test.js", "sed -n '1,20p' file", "ls && git status"]) assert.equal(classifyTool("bash", { command }), "explore", command);
   for (const command of ["mv a b", "cp a b", "rm a", "git -C repo add a", "git commit -m test", "printf x > a", "echo x >>a"]) assert.equal(classifyTool("bash", { command }), "change", command);
-  for (const command of ["uv run pytest -q", "npm test", "npm run typecheck", "npm run package:check", "node --test sum.test.js", "npx tsc --noEmit", "eslint src", "test -f file"]) assert.equal(classifyTool("bash", { command }), "verify", command);
+  for (const command of ["uv run pytest -q 2>&1 | tail -8", "uv sync 2>&1 | tail -2; uv run pytest -q 2>&1 | tail -8", "npm test >/dev/null 2>&1", "uv run pytest -q", "npm test", "npm run typecheck", "npm run package:check", "node --test sum.test.js", "npx tsc --noEmit", "eslint src", "test -f file"]) assert.equal(classifyTool("bash", { command }), "verify", command);
   for (const command of ["echo 'npm test'", "sleep 8", "sed 's/a/b/' file"]) assert.equal(classifyTool("bash", { command }), undefined, command);
   assert.equal(classifyTool("bash", { command: "node --test; edit-other-file" }), "verify");
+  assert.equal(classifyTool("bash", { command: "npm test 2> err.log" }), "change");
+  assert.equal(classifyTool("bash", { command: "git add a && git status" }), "change");
   assert.equal(classifyTool("bash", { command: "node --test && git add file" }), "change");
   assert.equal(classifyTool("ask_user_question", {}), undefined);
 });

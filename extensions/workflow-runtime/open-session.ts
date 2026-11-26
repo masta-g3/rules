@@ -8,7 +8,9 @@ const STAGES: Stage[] = ["explore", "change", "verify"];
 const READ_TOOLS = new Set(["read", "grep", "find", "ls", "web_search", "fetch_content"]);
 const GIT_VALUE_OPTIONS = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace"]);
 
-function shellStage(command: string): Stage | undefined {
+function shellStage(input: string): Stage | undefined {
+	// Redirections to a descriptor or /dev/null write no file; dropping them also keeps `2>&1` from splitting a command.
+	const command = input.replace(/\d*>>?\s*(?:&\d+|\/dev\/null\b)/g, "");
 	// Quoted > characters are arguments, not shell redirections.
 	if (/(?:^|[^<])>>?/.test(command.replace(/'[^']*'|"(?:\\.|[^"\\])*"/g, ""))) return "change";
 	let stage: Stage | undefined;
@@ -43,7 +45,8 @@ function shellStage(command: string): Stage | undefined {
 			if (["log", "show", "diff", "status"].includes(subcommand ?? "")) next = "explore";
 			if (["add", "commit", "apply"].includes(subcommand ?? "")) next = "change";
 		}
-		if (next) stage = next;
+		// A later read, such as `| tail`, does not hide an earlier change or check.
+		if (next && !(next === "explore" && stage)) stage = next;
 	}
 	return stage;
 }
